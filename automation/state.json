@@ -2,7 +2,35 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M6",
-  "active_run": null,
+  "active_run": {
+    "stage": "M6",
+    "base_commit": "4ef81468af18ddb90d7c9f64a0264088c43ee2d2",
+    "requirements": [
+      "PRD-002",
+      "PRD-004",
+      "PRD-005",
+      "PRD-006",
+      "PRD-015",
+      "PRD-016",
+      "PRD-019"
+    ],
+    "allowed_paths": [
+      "packaging/native/",
+      "scripts/native/",
+      "tests/e2e/",
+      ".github/workflows/",
+      "README.md",
+      "automation/workflow.json",
+      "automation/state.json",
+      "docs/planning/M6-implementation.md",
+      "docs/verification/evidence/M6.md"
+    ],
+    "checks": [],
+    "failures": [],
+    "decision": "M6 只组装 Windows 11 x64 自包含 ZIP 和发布运维/验收路径；复用同一 JAR、算法、Flyway、样例及浏览器测试，不修改业务实现，不建设安装器、Windows 服务或第二套运行逻辑。",
+    "next_action": "固定运行时输入并实现发布脚本、包内 PowerShell 运维入口和双新目录 G6 验收。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -71,13 +99,13 @@
       "note": "报告、统一业务审计、人工分类修订、项目备份和演示复位已通过作者检查、第四候选独立审查及 dev 远端回归。"
     },
     "M6": {
-      "status": "ready",
+      "status": "in_progress",
       "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "从远端核验的 M5 检查点建立 feat/m6-windows-native 并冻结原生运行时、PowerShell 运维和双目录验收契约。",
-      "note": "M5 已通过；M6 范围由 PRD-002/004/005/006/015/018 和 G6 固定。"
+      "next_action": "实现并验证自包含 Windows ZIP、五个 PowerShell 运维入口和双新目录彩排。",
+      "note": "M6 已从远端核验的 M5 状态检查点启动，业务功能保持冻结。"
     },
     "M7": {
       "status": "blocked",
