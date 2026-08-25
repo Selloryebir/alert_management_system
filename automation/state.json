@@ -16,7 +16,10 @@
       "src/algorithm/",
       "src/backend/",
       "samples/expected/",
+      "samples/generate_samples.py",
+      "samples/smoke/",
       "tests/contract/",
+      "tests/data/",
       "scripts/dev/",
       ".github/workflows/",
       "README.md",
@@ -25,25 +28,27 @@
       "docs/verification/evidence/M3.md"
     ],
     "checks": [
-      "scripts/dev/test.sh：后端 27、算法 27、合成数据 5、跨组件契约 4、前端 5 项通过",
+      "scripts/dev/test.sh：后端 29、算法 28、合成数据 5、跨组件契约 4、前端 5 项通过",
       "scripts/dev/m3-analysis-smoke.sh：实际 Java、Python、PostgreSQL 17.6 两次逐行结果及 12 条关联链与独立黄金预期一致",
       "算法服务中断时任务为 FAILED 且结果零写入；恢复后同批次 attempt=2 成功",
-      "固定种子 20,000 行在实际组件闭环中 4,796 ms 完成分析",
-      "嵌入式 PostgreSQL 集成测试覆盖超时、503、非法契约、强制完成失败回滚和 HTTP 边界"
+      "固定种子 20,000 行在实际组件闭环中 4,547 ms 完成分析",
+      "嵌入式 PostgreSQL 集成测试覆盖超时、503、非法契约、超窗/跨关系链、强制完成失败回滚和 HTTP 边界"
     ],
     "failures": [
       "初版 Java 参数提议与已冻结黄金规则冲突；已删除兼容分支并统一为 rules-v1.0.0",
       "首次冒烟因空 failure 字段被 JSON 省略而失败；断言按契约允许缺省空值后通过",
-      "首次跨批次比较受时区文本、随机记录 UUID 和链排序影响；改为瞬时时间、源行证据和稳定排序后通过"
+      "首次跨批次比较受时区文本、随机记录 UUID 和链排序影响；改为瞬时时间、源行证据和稳定排序后通过",
+      "首次固定候选独立审查为 FAIL：算法会把不同 site/area/unit 的步骤误连，且 Java 会接受超时间窗的非法链；已按关系键分组并在 Java 端校验关系键和时间窗",
+      "首次修复候选的允许路径漏列 automation/workflow.json；已补齐白名单并由审查者核验"
     ],
-    "decision": "实现已满足 G3 作者门槛；固定候选后只允许独立审查发现项，不扩展 M4 功能。",
-    "next_action": "提交固定候选并推送，等待远端 CI 与独立审查；两者通过后非快进合入 dev。",
+    "decision": "独立审查阻断已用最小改动修复并完成作者回归；第二次固定候选后不扩展 M4 功能。",
+    "next_action": "提交第二次固定候选并推送，等待远端 CI 与独立复核；两者通过后非快进合入 dev。",
     "resume_status": null
   },
   "stages": {
     "M0": {
       "status": "passed",
-      "attempt": 1,
+      "attempt": 2,
       "evidence_files": [
         "docs/verification/evidence/M0.md"
       ],
@@ -81,7 +86,7 @@
       "checkpoint_commit": null,
       "remote_verified": false,
       "next_action": "对固定候选执行独立审查和远端 CI，确认 G3 后合入 dev。",
-      "note": "规则、事件链、Java 编排、原子保存、黄金契约和真实组件冒烟均已完成作者检查。"
+      "note": "首次独立审查发现跨关系误连和 Java 未拒绝超窗链；修复后规则、Java 契约、黄金样例和真实组件冒烟均已通过作者检查。"
     },
     "M4": {
       "status": "blocked",
