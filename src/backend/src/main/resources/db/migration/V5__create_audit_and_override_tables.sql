@@ -4,7 +4,7 @@ CREATE TABLE analysis_result_override (
     noise_type VARCHAR(20) NOT NULL CHECK (
         noise_type IN ('NORMAL', 'DUPLICATE', 'CHATTER', 'SHORT_LIVED', 'PERSISTENT')
     ),
-    alarm_class VARCHAR(100) NOT NULL CHECK (alarm_class IN ('STANDARD', 'NUISANCE')),
+    alarm_class VARCHAR(100) NOT NULL CHECK (alarm_class IN ('STANDARD', 'NUISANCE', 'ACTIONABLE')),
     cause_category VARCHAR(30) NOT NULL CHECK (
         cause_category IN ('PROCESS_DISTURBANCE', 'EQUIPMENT_FAULT', 'INSTRUMENT_ISSUE', 'MAINTENANCE_TEST', 'UNKNOWN')
     ),

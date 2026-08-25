@@ -24,7 +24,7 @@ class AnalysisWorkflowService {
     private static final Set<String> PRIORITIES = Set.of("P1", "P2", "P3", "P4");
     private static final Set<String> NOISE_TYPES = Set.of(
             "NORMAL", "DUPLICATE", "CHATTER", "SHORT_LIVED", "PERSISTENT");
-    private static final Set<String> ALARM_CLASSES = Set.of("STANDARD", "NUISANCE");
+    private static final Set<String> ALARM_CLASSES = Set.of("STANDARD", "NUISANCE", "ACTIONABLE");
     private static final Set<String> CAUSE_CATEGORIES = Set.of(
             "PROCESS_DISTURBANCE", "EQUIPMENT_FAULT", "INSTRUMENT_ISSUE", "MAINTENANCE_TEST", "UNKNOWN");
     private static final Set<String> DISPOSITION_STATUSES = Set.of("OPEN", "IN_PROGRESS", "CLOSED");

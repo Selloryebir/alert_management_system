@@ -96,14 +96,14 @@ class ReportAuditResetIntegrationTest {
                 "SELECT COUNT(*) FROM audit_event", Integer.class)).isZero();
 
         String override = """
-                {"noise_type":"CHATTER","alarm_class":"NUISANCE",
+                {"noise_type":"CHATTER","alarm_class":"ACTIONABLE",
                  "cause_category":"INSTRUMENT_ISSUE","operator":"审核员A","reason":"根据事件序列复核"}
                 """;
         mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/classification",
                         seed.runId(), recordId).contentType(MediaType.APPLICATION_JSON).content(override))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.noise_type").value("CHATTER"))
-                .andExpect(jsonPath("$.alarm_class").value("NUISANCE"))
+                .andExpect(jsonPath("$.alarm_class").value("ACTIONABLE"))
                 .andExpect(jsonPath("$.algorithm_classification.noise_type").value("NORMAL"))
                 .andExpect(jsonPath("$.classification_override.operator").value("审核员A"))
                 .andExpect(jsonPath("$.classification_override.reason").value("根据事件序列复核"));
