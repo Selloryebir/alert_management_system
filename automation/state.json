@@ -20,6 +20,7 @@
       "scripts/dev/",
       ".github/workflows/",
       "README.md",
+      "automation/workflow.json",
       "automation/state.json",
       "docs/verification/evidence/M3.md"
     ],
