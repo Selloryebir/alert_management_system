@@ -10,6 +10,7 @@
 4. [系统架构基线](architecture/README.md)与[决策记录](decisions/README.md)：确认组件职责和禁止的架构漂移。
 5. [阶段开发计划](planning/README.md)：按 M0–M7 门槛实施和提交。
 6. [测试与验收策略](verification/README.md)：以当前提交上的可复现证据判断完成状态。
+7. [自动化开发蓝图](automation/README.md)：仅在需要自动持续开发时，按状态机和提示链推进当前阶段。
 
 ## 责任分层
 
@@ -22,5 +23,6 @@
 | [`decisions/`](decisions/) | 已接受的重要产品/架构决策 | 是 |
 | [`planning/`](planning/) | 阶段、步骤、智能体分工和验收门槛 | 是 |
 | [`verification/`](verification/) | 测试策略、缺陷等级和审计证据要求 | 是 |
+| [`automation/`](automation/) | 自动化状态机、Git 生命周期和开发审计引导 | 是 |
 
 原始或提取材料中的“已完成”“已通过”“达到指标”等均是历史陈述。当前重建项目只有在对应代码、测试和验收证据绑定同一 Git 提交后，才能声明完成。

@@ -27,8 +27,13 @@ REQUIRED_PATHS = (
     "docs/decisions",
     "docs/planning",
     "docs/verification",
+    "docs/automation",
+    "automation/README.md",
+    "automation/workflow.json",
+    "automation/state.json",
     "src/README.md",
     "scripts/validate_repository.py",
+    "scripts/validate_automation.py",
 )
 GENERATED_PARTS = {
     ".gradle",

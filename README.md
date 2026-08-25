@@ -12,6 +12,7 @@
 - [`docs/product/`](docs/product/)：经筛选的产品事实、范围和数据契约。
 - [`docs/architecture/`](docs/architecture/)：系统边界与已接受的技术决策。
 - [`docs/planning/`](docs/planning/)：阶段规划、范围和验收入口。
+- [`automation/`](automation/)：可恢复的阶段状态、机器可读工作流和 Codex 提示链。
 - [`src/`](src/)：产品代码的职责边界说明；业务代码尚未初始化。
 - [`tools/document-extraction/`](tools/document-extraction/)：可重复的历史材料提取工具。
 - [`scripts/validate_repository.py`](scripts/validate_repository.py)：无第三方依赖的仓库结构与文档链接检查。
@@ -23,19 +24,21 @@
 
 ## 本地验证
 
-Windows 11 x64（首要环境）：
+Windows 11 x64 的当前 WSL2 开发环境（在仓库根目录的 PowerShell 中）：
 
 ```powershell
-py -3 scripts/validate_repository.py
+wsl.exe python3 scripts/validate_repository.py
+wsl.exe python3 scripts/validate_automation.py
 ```
 
 Linux、WSL 或 macOS：
 
 ```bash
 python3 scripts/validate_repository.py
+python3 scripts/validate_automation.py
 ```
 
-该命令只验证仓库基础结构、Markdown 相对链接和已跟踪文件中是否混入生成目录；它不代表业务功能已经实现或通过验收。
+这些命令只验证仓库基础结构、文档链接和自动化状态定义；它们不代表业务功能已经实现或通过验收。
 
 ## 交付约束
 
@@ -46,4 +49,4 @@ python3 scripts/validate_repository.py
 
 ## 当前状态
 
-M0 的材料提取、信息隔离、产品事实、架构和验收基线已经建立；业务代码尚未初始化。下一步按 [`M1 可运行工程骨架`](docs/planning/#m1可运行工程骨架) 开始实现。
+M0 的材料提取、信息隔离、产品事实、架构和验收基线已经建立；业务代码尚未初始化。下一步由[自动化开发入口](automation/)从 `M1` 开始，并以 [`M1 可运行工程骨架`](docs/planning/#m1可运行工程骨架)为验收依据。
