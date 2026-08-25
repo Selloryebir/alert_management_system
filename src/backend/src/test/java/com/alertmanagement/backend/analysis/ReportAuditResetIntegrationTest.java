@@ -135,7 +135,7 @@ class ReportAuditResetIntegrationTest {
                 .andReturn().getResponse().getContentAsByteArray();
         try (PDDocument document = Loader.loadPDF(pdf)) {
             String text = new PDFTextStripper().getText(document);
-            assertThat(text).contains("2026 年灾后重建 Demo", "仅使用合成数据", "报警总数：5", "CHATTER=1",
+            assertThat(text).contains("报警管理系统", "仅使用合成数据", "报警总数：5", "CHATTER=1",
                     "北区 二线?=1");
             assertThat(text).doesNotContain("北区\n二线");
         }
@@ -149,7 +149,7 @@ class ReportAuditResetIntegrationTest {
         try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(xlsx))) {
             assertThat(workbook.getNumberOfSheets()).isEqualTo(4);
             assertThat(workbook.getSheet("概要").getRow(0).getCell(1).getStringCellValue())
-                    .isEqualTo("2026 年灾后重建 Demo");
+                    .isEqualTo("报警管理系统");
             assertThat(workbook.getSheet("报警明细").getLastRowNum()).isEqualTo(5);
             assertThat(workbook.getSheet("报警明细").getRow(1).getCell(10).getStringCellValue())
                     .isEqualTo("NORMAL");
@@ -284,7 +284,7 @@ class ReportAuditResetIntegrationTest {
         assertThat(count("analysis_run")).isZero();
         assertThat(count("audit_event")).isZero();
         assertThat(count("app_metadata")).isZero();
-        assertThat(count("flyway_schema_history")).isEqualTo(5);
+        assertThat(count("flyway_schema_history")).isEqualTo(6);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT value FROM external_sentinel WHERE id = 1", String.class)).isEqualTo("keep");
 

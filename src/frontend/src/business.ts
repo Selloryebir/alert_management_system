@@ -25,6 +25,23 @@ export interface AnalysisRun {
   completed_at?: string;
 }
 
+export interface AnalysisParameters {
+  duplicate_window_seconds: number;
+  chatter_window_seconds: number;
+  chatter_min_count: number;
+  chatter_min_transition_ratio: number;
+  short_lived_seconds: number;
+  persistent_requires_ack: boolean;
+  episode_gap_seconds: number;
+  chain_window_seconds: number;
+  chain_min_steps: number;
+  min_episode_support: number;
+  min_transition_probability: number;
+  min_lift: number;
+  expert_min_score: number;
+  expert_min_margin: number;
+}
+
 export interface CountPoint {
   bucket: string;
   count: number;
@@ -158,9 +175,26 @@ async function apiResponse<T>(response: Response): Promise<T> {
   throw new Error(message);
 }
 
-export async function startAnalysis(batchId: string): Promise<AnalysisRun> {
+export async function fetchAnalysisDefaults(): Promise<AnalysisParameters> {
+  return apiResponse<AnalysisParameters>(
+    await fetch("/api/v1/analysis-parameters/defaults", {
+      headers: { Accept: "application/json" },
+    }),
+  );
+}
+
+export async function startAnalysis(
+  batchId: string,
+  parameters?: AnalysisParameters,
+): Promise<AnalysisRun> {
   return apiResponse<AnalysisRun>(
-    await fetch(`/api/v1/imports/${batchId}/analyses`, { method: "POST" }),
+    await fetch(`/api/v1/imports/${batchId}/analyses`, parameters
+      ? {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(parameters),
+        }
+      : { method: "POST" }),
   );
 }
 

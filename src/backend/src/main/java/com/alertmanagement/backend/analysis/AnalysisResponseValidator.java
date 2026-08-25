@@ -2,7 +2,6 @@ package com.alertmanagement.backend.analysis;
 
 import com.alertmanagement.backend.config.AppProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -16,7 +15,7 @@ import org.springframework.stereotype.Component;
 @Component
 class AnalysisResponseValidator {
 
-    static final String RULE_VERSION = "rules-v1.0.0";
+    static final String RULE_VERSION = "hybrid-v2.0.0";
     private static final Set<String> NOISE_TYPES = Set.of(
             "NORMAL", "DUPLICATE", "CHATTER", "SHORT_LIVED", "PERSISTENT");
     private static final Set<String> ALARM_CLASSES = Set.of("NUISANCE", "ACTIONABLE", "STANDARD");
@@ -66,7 +65,6 @@ class AnalysisResponseValidator {
         require(seen.equals(records.keySet()), "逐记录结果未唯一覆盖全部输入记录");
 
         Set<String> chainIds = new HashSet<>();
-        long chainWindowSeconds = ((Number) request.parameters().get("chain_window_seconds")).longValue();
         for (AlgorithmEventChain chain : response.eventChains()) {
             require(chain != null && chain.chainId() != null && !chain.chainId().isBlank()
                     && chainIds.add(chain.chainId()), "事件链 ID 非法或重复");
@@ -77,9 +75,7 @@ class AnalysisResponseValidator {
                     "事件链起点与首成员不一致");
             require(chain.startTime() != null && chain.endTime() != null
                     && !chain.endTime().isBefore(chain.startTime()), "事件链时间顺序非法");
-            require(Duration.between(chain.startTime(), chain.endTime())
-                    .compareTo(Duration.ofSeconds(chainWindowSeconds)) <= 0, "事件链跨度超过规则窗口");
-            require(chain.associationRule() != null && !chain.associationRule().isBlank(), "事件链关联规则为空");
+            require("MARKOV_TRANSITION_HYBRID_V2".equals(chain.associationRule()), "事件链关联规则非法");
             require(chain.explanation() != null && !chain.explanation().isBlank(), "事件链说明为空");
             Set<UUID> memberIds = new HashSet<>();
             AlarmRecordRequest previous = null;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""基于冻结的 Smoke 场景声明构建 M3 独立黄金预期。
+"""基于冻结的 Smoke 场景声明构建 hybrid-v2 独立黄金预期。
 
 本脚本不导入、不调用算法服务，也不读取算法输出。分类答案只来自本文件内
 冻结的 source_row 场景区间和数据契约枚举；输入文件仅提供原始时间戳用于
@@ -16,16 +16,24 @@ from collections import Counter
 from pathlib import Path
 
 
-RULE_VERSION = "rules-v1.0.0"
-INPUT_SHA256 = "329e260e7330bd5897600bae41ca61bc2f29aca137f9b6fdffa29c4c40199e68"
+RULE_VERSION = "hybrid-v2.0.0"
+ASSOCIATION_RULE = "MARKOV_TRANSITION_HYBRID_V2"
+INPUT_SHA256 = "f8a2b4dcb5a6629839330689681867ee37d82fdc752266ca610bf6ddbf43b8a2"
 PARAMETERS = {
     "duplicate_window_seconds": 30,
     "chatter_window_seconds": 60,
     "chatter_min_count": 4,
+    "chatter_min_transition_ratio": 0.8,
     "short_lived_seconds": 10,
     "persistent_requires_ack": True,
+    "episode_gap_seconds": 60,
     "chain_window_seconds": 60,
     "chain_min_steps": 5,
+    "min_episode_support": 3,
+    "min_transition_probability": 0.6,
+    "min_lift": 2.0,
+    "expert_min_score": 0.35,
+    "expert_min_margin": 0.1,
 }
 
 SCENARIOS = (
@@ -47,7 +55,6 @@ NOISE_BY_SCENARIO = {
     "PERSISTENT": "PERSISTENT",
 }
 CAUSE_BY_SCENARIO = {
-    "ALARM_FLOOD": "PROCESS_DISTURBANCE",
     "PROCESS_CASCADE": "PROCESS_DISTURBANCE",
     "EQUIPMENT_TRIP": "EQUIPMENT_FAULT",
     "INSTRUMENT_DRIFT": "INSTRUMENT_ISSUE",
@@ -66,11 +73,11 @@ EXPECTED_ALARM_CLASS_COUNTS = {
     "ACTIONABLE": 30,
 }
 EXPECTED_CAUSE_COUNTS = {
-    "PROCESS_DISTURBANCE": 90,
+    "PROCESS_DISTURBANCE": 30,
     "EQUIPMENT_FAULT": 30,
     "INSTRUMENT_ISSUE": 30,
     "MAINTENANCE_TEST": 20,
-    "UNKNOWN": 130,
+    "UNKNOWN": 190,
 }
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -122,8 +129,8 @@ def load_input(path: Path) -> list[dict[str, str]]:
 def build_chains(rows_by_source: dict[int, dict[str, str]]) -> list[dict[str, object]]:
     chains = []
     definitions = (
-        ("EQUIPMENT_TRIP", 222, "EQUIPMENT_TRIP_SEQUENCE"),
-        ("PROCESS_CASCADE", 252, "PROCESS_CASCADE_SEQUENCE"),
+        ("EQUIPMENT_TRIP", 222, ASSOCIATION_RULE),
+        ("PROCESS_CASCADE", 252, ASSOCIATION_RULE),
     )
     for category, first_source_row, rule_category in definitions:
         for chain_index in range(6):
@@ -165,7 +172,7 @@ def build_document(input_path: Path = DEFAULT_INPUT) -> dict[str, object]:
         "input": {
             "path": "samples/smoke/synthetic_smoke_utf8.csv",
             "sha256": INPUT_SHA256,
-            "generator_version": "1.0.0",
+            "generator_version": "2.0.0",
             "seed": 20260825,
             "row_count": 300,
         },
@@ -177,8 +184,7 @@ def build_document(input_path: Path = DEFAULT_INPUT) -> dict[str, object]:
             "alarm_class_counts": EXPECTED_ALARM_CLASS_COUNTS,
             "cause_category_counts": EXPECTED_CAUSE_COUNTS,
             "event_chain_counts": {
-                "EQUIPMENT_TRIP_SEQUENCE": 6,
-                "PROCESS_CASCADE_SEQUENCE": 6,
+                ASSOCIATION_RULE: 12,
                 "total": 12,
             },
         },

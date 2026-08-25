@@ -168,12 +168,12 @@ onMounted(loadHealth);
 <template>
   <main class="page-shell">
     <section class="identity" aria-labelledby="page-title">
-      <p class="eyebrow">报警管理系统</p>
-      <h1 id="page-title">2026 年灾后重建 Demo</h1>
+      <p class="eyebrow">工业报警分析与处置</p>
+      <h1 id="page-title">报警管理系统</h1>
       <p class="synthetic-notice">仅使用合成数据</p>
       <p class="demo-identity">本地演示身份 <strong>demo-reviewer</strong></p>
       <p class="identity-copy">
-        从合成文件导入、规则分析、统计查看到人工处置均在本页面完成；规则输出仅供审核演示，不代表已确认工业根因。
+        从报警文件导入、规则分析、统计查看到人工处置均在本页面完成；规则输出提供可解释的分析建议，不代表已确认工业根因。
       </p>
     </section>
 

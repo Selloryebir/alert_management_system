@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
-  "name": "报警管理系统灾后重建阶段工作流",
+  "name": "报警管理系统产品化交付工作流",
   "prompt_train": {
     "start_goal": "automation/prompts/start-goal.md",
     "controller": "automation/prompts/controller.md",
@@ -21,7 +21,12 @@
     "docs/automation/README.md",
     "docs/automation/state-machine.md",
     "docs/automation/git-workflow.md",
-    "docs/verification/automation-audit.md"
+    "docs/verification/automation-audit.md",
+    "docs/planning/productization-blueprint.md",
+    "docs/product/source-coverage.md",
+    "docs/algorithm/model-v2.md",
+    "docs/security/threat-model.md",
+    "docs/releases/versioning.md"
   ],
   "stages": [
     {
@@ -182,6 +187,167 @@
         ],
         "commands": [
           "python3 tests/smoke/run.py --target docker --fresh-volume"
+        ]
+      }
+    },
+    {
+      "id": "M8",
+      "name": "正式产品基线与来源闭环",
+      "depends_on": ["M7"],
+      "references": [
+        "docs/planning/M8-implementation.md",
+        "docs/planning/productization-blueprint.md",
+        "docs/product/requirements.md",
+        "docs/product/source-coverage.md",
+        "docs/product/conflict-register.md",
+        "docs/decisions/README.md",
+        "docs/algorithm/model-v2.md",
+        "docs/security/threat-model.md",
+        "docs/releases/versioning.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "正式运行路径、根说明和发布说明统一使用报警管理系统产品身份，历史证据仍可追溯",
+          "PDF/DOCX 中每项可识别能力均有实现证据、具体后续阶段、明确拒绝或外部重启条件",
+          "产品化阶段、版本标签、算法研究和安全边界形成唯一可执行入口"
+        ],
+        "commands": [
+          "python3 scripts/validate_repository.py",
+          "python3 scripts/validate_automation.py",
+          "python3 scripts/validate_formal_baseline.py",
+          "npm --prefix tools/document-extraction run check",
+          "scripts/dev/test.sh",
+          "scripts/dev/restart-smoke.sh"
+        ]
+      }
+    },
+    {
+      "id": "M9",
+      "name": "可泛化算法模型与解释",
+      "depends_on": ["M8"],
+      "references": [
+        "src/algorithm/README.md",
+        "docs/algorithm/model-v2.md",
+        "docs/product/data-contract.md",
+        "docs/verification/README.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "时序专家规则的分数由输入特征和显式公式计算，不冒充概率或准确率",
+          "关联链由跨 episode 的一阶 Markov 统计发现，不读取合成场景名、固定行号或步骤命名",
+          "未见位号、时间平移、UUID 重映射、乱序和随机负控的泛化验收通过"
+        ],
+        "commands": [
+          "scripts/dev/test.sh",
+          "scripts/dev/m9-algorithm-v2-smoke.sh"
+        ]
+      }
+    },
+    {
+      "id": "M10",
+      "name": "项目化业务与全中文 UX",
+      "depends_on": ["M9"],
+      "references": [
+        "docs/product/requirements.md",
+        "docs/product/data-contract.md",
+        "docs/architecture/README.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "业务人员可在浏览器创建、选择、归档项目且数据和报告按项目隔离",
+          "字段映射无需编辑 JSON，业务枚举、错误、状态和操作提示完整中文化",
+          "首次使用引导能完成样例导入、分析、查看、处置和报告主流程"
+        ],
+        "commands": [
+          "scripts/dev/test.sh",
+          "scripts/dev/m10-business-ux-smoke.sh"
+        ]
+      }
+    },
+    {
+      "id": "M11",
+      "name": "身份权限与安全部署边界",
+      "depends_on": ["M10"],
+      "references": [
+        "docs/architecture/README.md",
+        "docs/verification/README.md",
+        "docs/verification/audit.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "本机模式仅绑定回环地址，网络部署要求 HTTPS 且拒绝缺失安全配置",
+          "最小角色只能访问授权的项目和动作，登录、失败与关键管理动作可审计",
+          "文件大小、行数、请求结构和查询输入均有限制，注入与越权负控返回明确失败"
+        ],
+        "commands": [
+          "scripts/dev/test.sh",
+          "scripts/security/m11-security-smoke.sh"
+        ]
+      }
+    },
+    {
+      "id": "M12",
+      "name": "恢复、质量与运行可靠性",
+      "depends_on": ["M11"],
+      "references": [
+        "docs/verification/README.md",
+        "docs/verification/automation-audit.md",
+        "packaging/native/release/README.txt"
+      ],
+      "acceptance": {
+        "criteria": [
+          "备份可在隔离目标中恢复并对账，安装、停止、卸载只作用于精确发布实例",
+          "格式、静态检查、依赖审计和完整回归通过且没有为通过而跳过规则",
+          "重复运行无持续内存增长、端口进程残留、异常外联、乱码或不可接受的 20000 行退化"
+        ],
+        "commands": [
+          "scripts/dev/test.sh",
+          "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native/verify-release.ps1",
+          "python3 tests/reliability/run.py"
+        ]
+      }
+    },
+    {
+      "id": "M13",
+      "name": "正式说明书与项目过程文件",
+      "depends_on": ["M12"],
+      "references": [
+        "docs/sources/README.md",
+        "docs/product/requirements.md",
+        "docs/verification/README.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "正式 README 和业务手册从先决条件到网页操作、数据库运维和故障处理均可执行",
+          "立项、中期、测试、结项、过程记录和原始方案差距说明与当前代码和证据一致",
+          "Markdown 单一事实源可重复生成可打开、中文正常的 DOCX 和 PDF 交付物"
+        ],
+        "commands": [
+          "python3 tools/deliverables/build.py --check",
+          "python3 scripts/validate_repository.py",
+          "python3 scripts/validate_formal_baseline.py"
+        ]
+      }
+    },
+    {
+      "id": "M14",
+      "name": "Windows 11 业务用户终验与发布候选",
+      "depends_on": ["M13"],
+      "references": [
+        "README.md",
+        "docs/verification/README.md",
+        "docs/verification/automation-audit.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "不了解代码的业务用户可仅按说明完成预检、安装、启动、登录、样例闭环、备份恢复和停止",
+          "Windows 原生包与 HTTPS 容器部署均从干净状态通过正式验收且失败不会假成功",
+          "最终差距矩阵无悬空项，阻断和严重缺陷为零，发布候选标签绑定已验证提交"
+        ],
+        "commands": [
+          "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release/verify-business-release.ps1",
+          "python3 tests/smoke/run.py --target docker --fresh-volume",
+          "python3 scripts/validate_release_candidate.py"
         ]
       }
     }

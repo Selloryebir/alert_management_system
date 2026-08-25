@@ -264,7 +264,7 @@ def assert_frontend() -> None:
     if not match:
         raise VerificationError("首页没有 Vue 构建脚本。")
     script = http_request(match.group(1), expect_json=False).decode("utf-8")
-    for marker in ("2026 年灾后重建 Demo", "仅使用合成数据"):
+    for marker in ("报警管理系统", "仅使用合成数据"):
         if marker not in script:
             raise VerificationError(f"Vue 构建产物缺少标识：{marker}")
 
@@ -377,8 +377,8 @@ def verify_analysis() -> tuple[str, dict[str, Any]]:
     )
     for key, value in (
         ("status", "COMPLETED"),
-        ("contract_version", "v1"),
-        ("algorithm_version", "0.1.0"),
+        ("contract_version", "v2"),
+        ("algorithm_version", "0.2.0"),
         ("rule_version", expected["rule_version"]),
     ):
         if actual.get(key) != value:

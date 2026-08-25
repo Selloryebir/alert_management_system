@@ -9,6 +9,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "../src/App.vue";
+import BusinessWorkflow from "../src/BusinessWorkflow.vue";
 import ReviewOperations from "../src/ReviewOperations.vue";
 
 afterEach(() => {
@@ -24,7 +25,7 @@ describe("M1 状态页", () => {
         status: "UP",
         service: "alert-management-backend",
         version: "0.1.0",
-        identity: "2026 年灾后重建 Demo",
+        identity: "报警管理系统",
         components: {
           system: { status: "UP" },
           database: { status: "UP" },
@@ -37,7 +38,7 @@ describe("M1 状态页", () => {
     render(App);
 
     expect(
-      screen.getByRole("heading", { name: "2026 年灾后重建 Demo" }),
+      screen.getByRole("heading", { name: "报警管理系统" }),
     ).toBeInTheDocument();
     expect(screen.getByText("仅使用合成数据")).toBeInTheDocument();
 
@@ -249,9 +250,9 @@ describe("M4 浏览器业务闭环", () => {
     batch_id: batchId,
     attempt: 1,
     status: "COMPLETED",
-    contract_version: "v1",
-    algorithm_version: "0.1.0",
-    rule_version: "rules-v1.0.0",
+    contract_version: "v2",
+    algorithm_version: "0.2.0",
+    rule_version: "hybrid-v2.0.0",
     parameters: {},
     summary: {
       input_count: 300,
@@ -310,7 +311,7 @@ describe("M4 浏览器业务闭环", () => {
           chain_id: "chain-1",
           start_time: alarmItem.event_time,
           end_time: "2026-01-15T09:41:04+08:00",
-          association_rule: "EQUIPMENT_TRIP_SEQUENCE",
+          association_rule: "MARKOV_TRANSITION_HYBRID_V2",
           explanation: "五步报警按顺序出现；这是关联建议，不代表已确认根因。",
           members: [
             { record_id: recordId, source_row: 222, order: 0 },
@@ -363,7 +364,8 @@ describe("M4 浏览器业务闭环", () => {
           noise_type: body.noise_type,
           alarm_class: body.alarm_class,
           cause_category: body.cause_category,
-        };
+  };
+
         classificationOverride = {
           operator: body.operator,
           reason: body.reason,
@@ -457,6 +459,59 @@ describe("M4 浏览器业务闭环", () => {
     expect(screen.queryByTestId("preview-summary")).not.toBeInTheDocument();
     expect(screen.getByTestId("empty-state")).toHaveTextContent("尚无可分析批次");
     expect(screen.getByTestId("file-input")).toHaveValue("");
+  });
+
+  it("可加载推荐参数、修改并随本次分析提交", async () => {
+    const defaults = {
+      duplicate_window_seconds: 30,
+      chatter_window_seconds: 60,
+      chatter_min_count: 4,
+      chatter_min_transition_ratio: 0.8,
+      short_lived_seconds: 10,
+      persistent_requires_ack: true,
+      episode_gap_seconds: 60,
+      chain_window_seconds: 60,
+      chain_min_steps: 5,
+      min_episode_support: 3,
+      min_transition_probability: 0.6,
+      min_lift: 2,
+      expert_min_score: 0.35,
+      expert_min_margin: 0.1,
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/v1/analysis-parameters/defaults") {
+        return { ok: true, json: async () => defaults } as Response;
+      }
+      if (url === `/api/v1/imports/${batchId}/analyses`) {
+        const submitted = JSON.parse(String(init?.body)) as typeof defaults;
+        expect(submitted.min_lift).toBe(2.5);
+        expect(Object.keys(submitted)).toHaveLength(14);
+        return {
+          ok: true,
+          json: async () => ({
+            ...completedRun,
+            status: "FAILED",
+            failure: "测试结束",
+            parameters: submitted,
+          }),
+        } as Response;
+      }
+      throw new Error(`未处理请求 ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(BusinessWorkflow, {
+      props: { currentBatch: { ...readyBatch, status: "IMPORTED" }, batches: [] },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "加载并调整参数" }));
+    await fireEvent.update(await screen.findByLabelText("最小提升度（倍）"), "2.5");
+    await fireEvent.click(screen.getByTestId("start-analysis"));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/imports/${batchId}/analyses`,
+      expect.objectContaining({ method: "POST" }),
+    ));
   });
 
   it("空状态与算法服务失败都给出可行动中文提示", async () => {

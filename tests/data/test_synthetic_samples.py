@@ -32,8 +32,8 @@ EXPECTED_FIELDS = [
     "source_system",
     "operator",
 ]
-EXPECTED_SMOKE_SHA256 = "329e260e7330bd5897600bae41ca61bc2f29aca137f9b6fdffa29c4c40199e68"
-EXPECTED_DEMO_SHA256 = "bfe646c5a060f9cfef0db7045bb73dc3320176fb76fc4cf0a6f191fbcd1f1221"
+EXPECTED_SMOKE_SHA256 = "f8a2b4dcb5a6629839330689681867ee37d82fdc752266ca610bf6ddbf43b8a2"
+EXPECTED_DEMO_SHA256 = "3eacea1a612f829fa559142ba431832316766bd720a9750efcfb624a1da65cd9"
 REQUIRED_FIELDS = (
     "source_row",
     "event_time",
@@ -173,9 +173,13 @@ def test_smoke_formats_are_equivalent_and_synthetic() -> None:
     assert all("SYNTHETIC" in row["description"] for row in csv_rows)
     duplicate_rows = [row for row in csv_rows if row["tag"].startswith("SYNTHETIC-DUPLICATE-")]
     for first, second in zip(duplicate_rows[::2], duplicate_rows[1::2], strict=True):
-        assert {key: value for key, value in first.items() if key != "source_row"} == {
-            key: value for key, value in second.items() if key != "source_row"
+        assert {key: value for key, value in first.items() if key not in {"source_row", "event_time"}} == {
+            key: value for key, value in second.items() if key not in {"source_row", "event_time"}
         }
+        assert 0 < (
+            datetime.fromisoformat(second["event_time"])
+            - datetime.fromisoformat(first["event_time"])
+        ).total_seconds() <= 30
 
 
 def test_committed_summaries_and_gb18030_sample_are_fixed() -> None:

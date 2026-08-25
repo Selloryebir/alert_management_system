@@ -69,7 +69,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: alert-management-demo-windows-x64
+          name: alert-management-system-windows-x64
           path: |
             .runtime/native/artifacts/**/*.zip
             .runtime/native/artifacts/**/*.zip.sha256

@@ -19,3 +19,5 @@ jobs:
         run: python3 scripts/validate_repository.py
       - name: 验证自动化工作流与状态
         run: python3 scripts/validate_automation.py
+      - name: 验证正式产品基线
+        run: python3 scripts/validate_formal_baseline.py

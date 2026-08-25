@@ -55,8 +55,8 @@ actual = json.load(open(sys.argv[1], encoding="utf-8"))
 expected = json.load(open(sys.argv[2], encoding="utf-8"))
 assert actual["status"] == "COMPLETED", actual
 assert actual.get("failure") is None, actual
-assert actual["contract_version"] == "v1", actual
-assert actual["algorithm_version"] == "0.1.0", actual
+assert actual["contract_version"] == "v2", actual
+assert actual["algorithm_version"] == "0.2.0", actual
 assert actual["rule_version"] == expected["rule_version"], actual
 assert actual["parameters"] == expected["parameters"], actual
 

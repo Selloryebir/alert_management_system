@@ -11,7 +11,6 @@ const dataset = path.resolve(
 );
 
 type PreviewResponse = { batch_id: string; total_rows: number; status: string };
-type AnalysisResponse = { run_id: string; status: string };
 type DashboardResponse = {
   run_id: string;
   total: number;
@@ -20,8 +19,9 @@ type DashboardResponse = {
 };
 
 async function responseJson<T>(response: APIResponse | Response): Promise<T> {
-  expect(response.ok(), await response.text()).toBeTruthy();
-  return (await response.json()) as T;
+  const body = await response.text();
+  expect(response.ok(), body).toBeTruthy();
+  return JSON.parse(body) as T;
 }
 
 async function importAndAnalyze(page: Page): Promise<{ batchId: string; runId: string }> {
@@ -47,16 +47,21 @@ async function importAndAnalyze(page: Page): Promise<{ batchId: string; runId: s
       && response.request().method() === "POST",
   );
   await page.getByTestId("start-analysis").click();
-  const analysis = await responseJson<AnalysisResponse>(await analysisResponse);
-  expect(analysis.status).toBe("COMPLETED");
+  const response = await analysisResponse;
+  expect(response.ok()).toBeTruthy();
+  const status = page.getByRole("status").filter({ hasText: "分析运行" });
+  await expect(status).toContainText(/分析运行 [0-9a-f-]{36} 已加载/);
+  const statusText = (await status.textContent()) ?? "";
+  const runId = statusText.match(/[0-9a-f-]{36}/)?.[0];
+  expect(runId).toBeTruthy();
 
   await expect(page.getByTestId("dashboard-total")).toContainText(String(expectedTotal));
-  return { batchId: preview.batch_id, runId: analysis.run_id };
+  return { batchId: preview.batch_id, runId: runId! };
 }
 
 test("浏览器完成导入、分析、详情、事件链和人工处置闭环", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("2026 年灾后重建 Demo", { exact: false }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "报警管理系统" })).toBeVisible();
 
   const { runId } = await importAndAnalyze(page);
   const dashboardResponse = await page.request.get(`/api/v1/analyses/${runId}/dashboard`);
@@ -76,11 +81,11 @@ test("浏览器完成导入、分析、详情、事件链和人工处置闭环",
     PERSISTENT: 30,
   });
   expect(dashboard.cause_category_counts).toEqual({
-    PROCESS_DISTURBANCE: 90,
+    PROCESS_DISTURBANCE: 30,
     EQUIPMENT_FAULT: 30,
     INSTRUMENT_ISSUE: 30,
     MAINTENANCE_TEST: 20,
-    UNKNOWN: 130,
+    UNKNOWN: 190,
   });
   await expect(page.getByTestId("dashboard-chains")).toContainText("12");
   for (const [name, value] of Object.entries(dashboard.noise_type_counts)) {

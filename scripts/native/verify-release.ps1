@@ -473,6 +473,11 @@ function Assert-ServiceLogsClean {
                 -Pattern '(?i)(^\d{4}[-/].*\s(?:ERROR|FATAL|PANIC)(?:\s|:)|^(?:ERROR|FATAL|PANIC)(?:\s|:)|^Traceback \(|^Unhandled exception|^Exception in thread)' `
                 -ErrorAction SilentlyContinue)
             foreach ($match in $matches) {
+                $expectedStartupProbe = $log.Name -like "postgresql-*.err.log" -and `
+                    $match.Line -match '(?i)FATAL:\s+the database system is starting up\s*$'
+                if ($expectedStartupProbe) {
+                    continue
+                }
                 $badLines += "$($log.Name):$($match.LineNumber):$($match.Line)"
             }
         }

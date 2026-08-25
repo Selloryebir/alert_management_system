@@ -236,6 +236,78 @@ td {
   margin-top: 1.25rem;
 }
 
+.analysis-parameters {
+  margin-top: 1.25rem;
+  border: 1px solid #d8e0e7;
+  border-radius: 0.85rem;
+  padding: 1rem;
+  background: #f7fafc;
+}
+
+.parameter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.parameter-grid label {
+  display: grid;
+  gap: 0.35rem;
+  color: #394d60;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.parameter-grid input[type="number"] {
+  min-height: 2.5rem;
+}
+
+.parameter-grid .parameter-checkbox {
+  display: flex;
+  align-items: center;
+  grid-column: 1 / -1;
+}
+
+.parameter-checkbox input {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.analysis-parameter-summary {
+  margin-top: 1rem;
+  border-top: 1px solid #d8e0e7;
+  padding-top: 0.8rem;
+}
+
+.analysis-parameter-summary summary {
+  cursor: pointer;
+  color: #29435a;
+  font-weight: 800;
+}
+
+.analysis-parameter-summary dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.6rem;
+}
+
+.analysis-parameter-summary dl div {
+  border-radius: 0.5rem;
+  padding: 0.55rem;
+  background: #eef3f7;
+}
+
+.analysis-parameter-summary dt {
+  color: #536678;
+  font-size: 0.78rem;
+}
+
+.analysis-parameter-summary dd {
+  margin: 0.2rem 0 0;
+  font-weight: 800;
+}
+
 .batch-action-card {
   display: flex;
   align-items: center;

@@ -1,6 +1,6 @@
 # Java 后端
 
-本模块是报警管理系统灾后重建 Demo 的 Java 主系统，使用 Java 21、Spring Boot 3.5.16、PostgreSQL JDBC 和 Flyway。当前提供聚合健康、两阶段报警文件导入，以及调用 Python 服务的同步分析编排。
+本模块是报警管理系统的 Java 主系统，使用 Java 21、Spring Boot 3.5.16、PostgreSQL JDBC 和 Flyway。当前提供聚合健康、两阶段报警文件导入，以及调用 Python 服务的同步分析编排。
 
 ## 构建与测试
 
@@ -41,16 +41,16 @@ GET http://127.0.0.1:8080/api/v1/health
 | `IMPORT_MAX_FILE_SIZE` | `50MB` | 单个导入文件上限 |
 | `IMPORT_MAX_REQUEST_SIZE` | `50MB` | 单次 multipart 请求上限 |
 | `ALGORITHM_HEALTH_URL` | `http://127.0.0.1:8001/health` | Python 健康地址 |
-| `ALGORITHM_ANALYSIS_URL` | `http://127.0.0.1:8001/api/v1/analyze` | Python 分析地址 |
+| `ALGORITHM_ANALYSIS_URL` | `http://127.0.0.1:8001/api/v2/analyze` | Python 分析地址 |
 | `ALGORITHM_CONNECT_TIMEOUT` | `500ms` | 算法连接超时 |
 | `ALGORITHM_REQUEST_TIMEOUT` | `1s` | 算法请求总超时 |
 | `ALGORITHM_ANALYSIS_TIMEOUT` | `60s` | 单次同步分析独立超时 |
 | `ALGORITHM_SERVICE` | `algorithm-service` | 预期算法服务身份 |
-| `ALGORITHM_VERSION` | `0.1.0` | 预期算法服务版本 |
-| `ALGORITHM_CONTRACT_VERSION` | `v1` | 预期算法健康契约版本 |
+| `ALGORITHM_VERSION` | `0.2.0` | 预期算法服务版本 |
+| `ALGORITHM_CONTRACT_VERSION` | `v2` | 预期算法健康契约版本 |
 | `APP_SERVICE_NAME` | `alert-management-backend` | 健康响应服务名 |
 | `APP_VERSION` | `0.1.0` | 健康响应版本 |
-| `APP_IDENTITY` | `2026 年灾后重建 Demo` | 审核身份标识 |
+| `APP_IDENTITY` | `报警管理系统` | 产品身份标识 |
 
 算法服务默认监听 `127.0.0.1:8001`。其 `/health` 必须返回 2xx，且 `status`、`service`、`version`、`contract_version` 与配置完全匹配，否则算法组件状态为 `DOWN`。
 
@@ -83,7 +83,7 @@ GET  /api/v1/analyses/{runId}
 
 只有 `IMPORTED` 批次可首次分析；算法调用失败后批次为 `FAILED`，可通过同一 POST 明确重试。调用期间批次为 `ANALYZING`，成功后为 `COMPLETED`；其余状态返回 HTTP 409，已成功批次不会生成重复运行或结果。
 
-Java 按 `source_row` 向 Python 发送全部已导入记录、固定 v1 版本和显式规则参数。Python 的运行 ID、契约/算法/规则版本、规则参数、逐记录唯一全覆盖、摘要计数及事件链成员归属和时间顺序均须通过校验。HTTP 错误、超时、非法 JSON 或契约漂移会保存中文可重试原因，并保证逐记录结果和事件链为零；成功结果、事件链和完成状态在一个 PostgreSQL 事务中提交。查询响应中的逐记录结果带 `source_row`，事件链成员带 `record_id`、`source_row` 和从 0 开始的 `order`，便于审查追溯。
+Java 按 `source_row` 向 Python 发送全部已导入记录、固定 v2 版本和 14 个显式规则参数。浏览器可加载推荐预设并为本次分析调整参数，Java 在创建运行前校验范围；不提交参数时使用同一推荐预设。Python 的运行 ID、契约/算法/规则版本、规则参数、逐记录唯一全覆盖、摘要计数及事件链成员归属和时间顺序均须通过校验。HTTP 错误、超时、非法 JSON 或契约漂移会保存中文可重试原因，并保证逐记录结果和事件链为零；成功结果、事件链和完成状态在一个 PostgreSQL 事务中提交。查询响应中的逐记录结果带 `source_row`，事件链成员带 `record_id`、`source_row` 和从 0 开始的 `order`，便于审查追溯。
 
 ## 看板、报警详情与处置
 
@@ -111,7 +111,7 @@ POST  /api/v1/demo/reset
 
 人工分类修订同时提交完整的 `noise_type`、`alarm_class`、`cause_category`、`operator` 和 `reason`；原始算法结果保持不变，看板、报警列表、详情和报告使用当前有效分类。详情顶层分类字段为有效值，`algorithm_classification` 保留算法原值，`classification_override` 显示修订者、理由和时间。
 
-报告请求为 `{"operator":"审核员A"}`，仅导出整次 `COMPLETED` 分析。PDF 是带“2026 年灾后重建 Demo”和合成数据声明的汇总报告；XLSX 包含概要、报警明细、关联事件链和处置历史。审计 API 支持按事件类型、目标类型和目标 UUID 分页筛选。
+报告请求为 `{"operator":"审核员A"}`，仅导出整次 `COMPLETED` 分析。PDF 带“报警管理系统”和合成数据声明；XLSX 包含概要、报警明细、关联事件链和处置历史。审计 API 支持按事件类型、目标类型和目标 UUID 分页筛选。
 
 复位请求为 `{"operator":"demo-reviewer","confirmation":"RESET_DEMO"}`。复位只清空 Flyway 明确管理的演示业务表，保留 `app_metadata`、`flyway_schema_history`、项目文件和其他数据库表；存在 `ANALYZING` 运行时拒绝复位。
 

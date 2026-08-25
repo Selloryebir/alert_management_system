@@ -64,7 +64,7 @@ class AnalysisIntegrationTest {
         registry.add("spring.datasource.username", () -> "postgres");
         registry.add("spring.datasource.password", () -> "");
         registry.add("app.algorithm.analysis-url",
-                () -> "http://127.0.0.1:" + ALGORITHM.getAddress().getPort() + "/api/v1/analyze");
+                () -> "http://127.0.0.1:" + ALGORITHM.getAddress().getPort() + "/api/v2/analyze");
         registry.add("app.algorithm.analysis-timeout", () -> "250ms");
     }
 
@@ -92,9 +92,9 @@ class AnalysisIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.failure").doesNotExist())
-                .andExpect(jsonPath("$.contract_version").value("v1"))
-                .andExpect(jsonPath("$.algorithm_version").value("0.1.0"))
-                .andExpect(jsonPath("$.rule_version").value("rules-v1.0.0"))
+                .andExpect(jsonPath("$.contract_version").value("v2"))
+                .andExpect(jsonPath("$.algorithm_version").value("0.2.0"))
+                .andExpect(jsonPath("$.rule_version").value("hybrid-v2.0.0"))
                 .andExpect(jsonPath("$.results.length()").value(5))
                 .andExpect(jsonPath("$.results[0].source_row").value(2))
                 .andExpect(jsonPath("$.event_chains[0].members[0].order").value(0))
@@ -105,9 +105,17 @@ class AnalysisIntegrationTest {
 
         JsonNode request = LAST_REQUEST.get();
         assertThat(request.get("rule_version")).isNull();
+        assertThat(request.path("parameters").size()).isEqualTo(14);
         assertThat(request.path("parameters").path("duplicate_window_seconds").asInt()).isEqualTo(30);
         assertThat(request.path("parameters").path("chatter_min_count").asInt()).isEqualTo(4);
+        assertThat(request.path("parameters").path("chatter_min_transition_ratio").asDouble()).isEqualTo(0.8);
         assertThat(request.path("parameters").path("persistent_requires_ack").asBoolean()).isTrue();
+        assertThat(request.path("parameters").path("episode_gap_seconds").asInt()).isEqualTo(60);
+        assertThat(request.path("parameters").path("min_episode_support").asInt()).isEqualTo(3);
+        assertThat(request.path("parameters").path("min_transition_probability").asDouble()).isEqualTo(0.6);
+        assertThat(request.path("parameters").path("min_lift").asDouble()).isEqualTo(2.0);
+        assertThat(request.path("parameters").path("expert_min_score").asDouble()).isEqualTo(0.35);
+        assertThat(request.path("parameters").path("expert_min_margin").asDouble()).isEqualTo(0.10);
         assertThat(request.path("records").size()).isEqualTo(5);
         assertThat(request.path("records").get(0).path("raw_payload").isObject()).isTrue();
         assertThat(jdbcTemplate.queryForObject(
@@ -125,6 +133,34 @@ class AnalysisIntegrationTest {
                 .andExpect(status().isConflict());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM analysis_run WHERE batch_id = ?", Integer.class, batchId)).isOne();
+    }
+
+    @Test
+    void acceptsExplicitValidatedParametersAndRejectsOutOfRangeValuesBeforeStarting() throws Exception {
+        UUID validBatch = importedBatch();
+        ObjectNode parameters = objectMapper.valueToTree(AnalysisParameters.defaults().validatedMap());
+        parameters.put("duplicate_window_seconds", 45);
+        parameters.put("expert_min_margin", 0.2);
+
+        mockMvc.perform(post("/api/v1/imports/{batchId}/analyses", validBatch)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(parameters)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.parameters.duplicate_window_seconds").value(45))
+                .andExpect(jsonPath("$.parameters.expert_min_margin").value(0.2));
+        assertThat(LAST_REQUEST.get().path("parameters")).isEqualTo(parameters);
+
+        UUID invalidBatch = importedBatch();
+        parameters.put("min_lift", 0.9);
+        mockMvc.perform(post("/api/v1/imports/{batchId}/analyses", invalidBatch)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(parameters)))
+                .andExpect(status().isBadRequest());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM analysis_run WHERE batch_id = ?", Integer.class, invalidBatch)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM import_batch WHERE batch_id = ?", String.class, invalidBatch)).isEqualTo("IMPORTED");
     }
 
     @Test
@@ -185,13 +221,19 @@ class AnalysisIntegrationTest {
     }
 
     @Test
-    void eventChainBeyondConfiguredWindowFailsWithoutPersistingResultsOrChain() throws Exception {
-        UUID batchId = importedBatch(20);
+    void eventChainWithWrongAssociationRuleFailsWithoutPersistingResultsOrChain() throws Exception {
+        UUID batchId = importedBatch();
+        RESPONDER.set(request -> {
+            ObjectNode response = (ObjectNode) parse(successResponse(request).body());
+            ((ObjectNode) response.path("event_chains").get(0))
+                    .put("association_rule", "LEGACY_TIME_WINDOW_RULE");
+            return jsonResponse(response);
+        });
 
         String body = mockMvc.perform(post("/api/v1/imports/{batchId}/analyses", batchId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("FAILED"))
-                .andExpect(jsonPath("$.failure").value("事件链跨度超过规则窗口，可重试"))
+                .andExpect(jsonPath("$.failure").value("事件链关联规则非法，可重试"))
                 .andExpect(jsonPath("$.results").isEmpty())
                 .andExpect(jsonPath("$.event_chains").isEmpty())
                 .andReturn().getResponse().getContentAsString();
@@ -503,9 +545,9 @@ class AnalysisIntegrationTest {
     private static StubResponse successResponse(JsonNode request) {
         ObjectNode response = JSON.createObjectNode();
         response.set("analysis_run_id", request.get("analysis_run_id"));
-        response.put("contract_version", "v1");
-        response.put("algorithm_version", "0.1.0");
-        response.put("rule_version", "rules-v1.0.0");
+        response.put("contract_version", "v2");
+        response.put("algorithm_version", "0.2.0");
+        response.put("rule_version", "hybrid-v2.0.0");
         response.set("parameters", request.get("parameters"));
 
         ArrayNode results = response.putArray("record_results");
@@ -528,8 +570,8 @@ class AnalysisIntegrationTest {
         chain.set("start_time", records.get(0).get("event_time"));
         chain.set("end_time", records.get(records.size() - 1).get("event_time"));
         chain.set("start_record_id", records.get(0).get("record_id"));
-        chain.put("association_rule", "同区域时间序列");
-        chain.put("explanation", "五条记录按时间形成事件链");
+        chain.put("association_rule", "MARKOV_TRANSITION_HYBRID_V2");
+        chain.put("explanation", "五条记录按时间形成事件链；" + "可解释统计证据".repeat(80));
 
         ObjectNode summary = response.putObject("summary");
         summary.put("input_count", records.size());
@@ -579,7 +621,7 @@ class AnalysisIntegrationTest {
     private static HttpServer startAlgorithm() {
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-            server.createContext("/api/v1/analyze", exchange -> {
+            server.createContext("/api/v2/analyze", exchange -> {
                 try {
                     JsonNode request = JSON.readTree(exchange.getRequestBody());
                     LAST_REQUEST.set(request);

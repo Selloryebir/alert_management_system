@@ -1,7 +1,7 @@
 第三方组件声明
 ==============
 
-本演示包组合下列第三方组件。精确版本、文件清单和 SHA-256 见 release-manifest.json。
+报警管理系统运行包组合下列第三方组件。精确版本、文件清单和 SHA-256 见 release-manifest.json。
 各组件仍受其原许可证约束。
 
 - Microsoft OpenJDK：GPL-2.0 with Classpath Exception。
@@ -14,4 +14,4 @@
 - Apache PDFBox、Apache POI：Apache License 2.0。
 - Noto Sans SC：SIL Open Font License 1.1；字体许可随 JAR 一并提供。
 
-本文件是演示包的汇总声明，不替代第三方组件自带的完整许可证文本。
+本文件是运行包的汇总声明，不替代第三方组件自带的完整许可证文本。

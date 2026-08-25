@@ -1,6 +1,6 @@
 {
   "synthetic": true,
-  "generator_version": "1.0.0",
+  "generator_version": "2.0.0",
   "seed": 20260825,
   "row_count": 300,
   "scenario_counts": {
@@ -14,5 +14,5 @@
     "PROCESS_CASCADE": 30,
     "SHORT_LIVED": 30
   },
-  "utf8_csv_sha256": "329e260e7330bd5897600bae41ca61bc2f29aca137f9b6fdffa29c4c40199e68"
+  "utf8_csv_sha256": "f8a2b4dcb5a6629839330689681867ee37d82fdc752266ca610bf6ddbf43b8a2"
 }

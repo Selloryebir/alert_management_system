@@ -180,7 +180,7 @@ try {
         "http://127.0.0.1:" + [string]$context.Config.ports.algorithm + "/health") {
             param($body)
             return $body.status -eq "UP" -and $body.service -eq "algorithm-service" -and
-                $body.version -eq "0.1.0" -and $body.contract_version -eq "v1"
+                $body.version -eq "0.2.0" -and $body.contract_version -eq "v2"
         } 90 "算法服务"
 
     $backendOut = Join-Path $context.Logs ("backend-" + $stamp + ".out.log")
@@ -195,7 +195,7 @@ try {
         DB_PASSWORD = [string]$context.Config.database.password
         APP_IDENTITY = [string]$context.Config.identity
         ALGORITHM_HEALTH_URL = "http://127.0.0.1:$($context.Config.ports.algorithm)/health"
-        ALGORITHM_ANALYSIS_URL = "http://127.0.0.1:$($context.Config.ports.algorithm)/api/v1/analyze"
+        ALGORITHM_ANALYSIS_URL = "http://127.0.0.1:$($context.Config.ports.algorithm)/api/v2/analyze"
     }
     $backendStarted = $true
     Save-RunningProcess "backend" $backendProcess.Id $backendExpectedExecutables $workingRoot @(
