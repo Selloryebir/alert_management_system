@@ -30,6 +30,7 @@
 ## 4. 允许修改路径
 
 - `packaging/docker/`
+- `.dockerignore`
 - `compose.yaml`
 - `tests/smoke/`
 - `.github/workflows/docker-compose-check.yml`
