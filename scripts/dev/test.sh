@@ -9,13 +9,17 @@ python3 "$REPOSITORY_ROOT/scripts/validate_automation.py"
 if command -v java >/dev/null 2>&1; then
   "$REPOSITORY_ROOT/mvnw" -f "$REPOSITORY_ROOT/src/backend/pom.xml" test
 else
-  cmd.exe /d /c "mvnw.cmd -f src\\backend\\pom.xml test" </dev/null
+  cmd.exe /d /c "set DEBUG=false&& mvnw.cmd -f src\\backend\\pom.xml test" </dev/null
 fi
 
 (
   cd "$REPOSITORY_ROOT/src/algorithm"
   "$PYTHON_VENV/bin/python" -m pytest
 )
+(
+  cd "$REPOSITORY_ROOT"
+  "$PYTHON_VENV/bin/python" -m pytest tests/data -q -s -p no:cacheprovider
+)
 npm --prefix "$REPOSITORY_ROOT/src/frontend" test -- --run
 
-echo "M1 仓库、后端、算法和前端测试通过。"
+echo "仓库、后端、算法、合成数据和前端测试通过。"

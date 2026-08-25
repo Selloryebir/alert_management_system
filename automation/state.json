@@ -24,10 +24,21 @@
       "automation/state.json",
       "docs/verification/evidence/M2.md"
     ],
-    "checks": [],
-    "failures": [],
-    "decision": "按 G2 建立可审计的两阶段导入；Java 负责格式解析、全量校验和 PostgreSQL 原子落库，样例生成与业务实现目录分离。",
-    "next_action": "并行实现固定种子多格式样例和 Java 导入闭环，随后集成数据库与格式等价验收。",
+    "checks": [
+      "2026-08-25 Windows 11 x64/WSL2：scripts/dev/test.sh 退出码 0；Java 17、Python 算法 9、合成数据 4、前端 3 项测试通过。",
+      "2026-08-25 Windows 11 x64/PostgreSQL 17.6：scripts/dev/m2-import-smoke.sh 退出码 0；CSV/TXT/XLSX 各 300 行规范化摘要 f51aaa1a28a57440bfd42853434e7316 一致。",
+      "2026-08-25 PostgreSQL 17.6：GB18030 12 行导入成功；六类非法样例共 42 行均 REJECTED 且 staging/alarm 均为 0；重复确认返回 409 和稳定中文错误。",
+      "2026-08-25 PostgreSQL 17.6：固定 seed 20260825 的 20000 行、4852439 bytes Demo，预览校验 1993ms、确认落库 1102ms、总计 3095ms。",
+      "2026-08-25 事务与迁移：嵌入式 PostgreSQL 14.22 的强制失败回滚、重复确认和 Flyway V1/V2 测试通过；项目 PostgreSQL 17.6 实际应用 V2 并完成 API 闭环。"
+    ],
+    "failures": [
+      "正式数据测试最初依赖系统 Python pytest，但目标 WSL 未安装；已收敛到 bootstrap 管理的项目虚拟环境。",
+      "Windows 嵌入式 PostgreSQL 退出后，pytest 默认捕获文件在 DrvFS 消失；无捕获模式稳定 4/4，并固定到 test.sh。",
+      "首次 20000 行耗时使用墙上时钟，WSL 时间跳变产生无效数字；已改用单调时钟并重新执行，旧数字不进入证据。",
+      "重复确认最初只有 Spring 英文框架错误；已补 code/message/trace_id 中文错误契约并通过 API 测试。"
+    ],
+    "decision": "M2 作者门槛已在同一工作树通过，格式、编码、校验、原子落库和 20000 行闭环均有实际证据；进入固定候选与独立审查。",
+    "next_action": "提交并推送 M2 集成候选，等待固定 SHA 的独立审查和 CI。",
     "resume_status": null
   },
   "stages": {
@@ -54,13 +65,13 @@
       "note": "四组件骨架、健康契约、迁移、状态页和启停闭环已通过本机、独立审查及 dev 远端 CI。"
     },
     "M2": {
-      "status": "in_progress",
+      "status": "review",
       "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "并行实现固定种子多格式样例和 Java 两阶段原子导入闭环。",
-      "note": "已从远端核验的 dev 检查点建立 feat/m2-import-pipeline，范围限定于 PRD-007/008/015 主闭环。"
+      "next_action": "提交并推送 M2 集成候选，完成固定 SHA 独立审查和 CI。",
+      "note": "G2 作者检查已通过；尚未建立和远端核验最终检查点，不得解锁 M3。"
     },
     "M3": {
       "status": "blocked",

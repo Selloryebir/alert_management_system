@@ -165,7 +165,10 @@ class ImportIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("IMPORTED"));
         mockMvc.perform(post("/api/v1/imports/{batchId}/confirm", batchId))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IMPORT_STATUS_CONFLICT"))
+                .andExpect(jsonPath("$.message").value("批次已经确认导入，不能重复确认"))
+                .andExpect(jsonPath("$.trace_id").isNotEmpty());
         assertThat(countAlarms(batchId)).isEqualTo(2);
     }
 

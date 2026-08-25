@@ -64,4 +64,6 @@ GET  /api/v1/imports/{batchId}
 
 预览会校验全文件并把批次置为 `READY` 或 `REJECTED`。错误包含 `source_row`、`field`、稳定错误码和中文说明。只有 `READY` 批次可确认；确认在单一 PostgreSQL 事务中把全部暂存记录写入 `alarm_record`。重复确认返回 HTTP 409，不会重复写入。
 
+业务 API 的 HTTP 失败响应包含稳定的 `code`、中文 `message` 和 `trace_id`；例如重复确认使用 `IMPORT_STATUS_CONFLICT`，不得把英文框架错误直接交给界面。
+
 文件大小默认上限为 50 MB，可通过 `IMPORT_MAX_FILE_SIZE` 和 `IMPORT_MAX_REQUEST_SIZE` 调整。集成测试使用真实嵌入式 PostgreSQL，首次运行会下载对应平台测试二进制。

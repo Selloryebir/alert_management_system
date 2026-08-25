@@ -53,6 +53,12 @@ scripts/dev/stop.sh
 
 启动成功后访问 `http://127.0.0.1:8080`。`status.sh` 在任一进程、数据库或健康状态异常时返回非零。`scripts/dev/restart-smoke.sh` 会连续执行两轮启停，验证三项聚合健康、Vue 静态资源和 Flyway 重复迁移。
 
+M2 的合成导入样例位于 `samples/`。以下命令会在 PostgreSQL 17.6 上验证 CSV/TXT/XLSX 等价导入、GB18030、非法批次零落库、重复确认冲突，并生成和导入固定种子的 20,000 行 Demo：
+
+```bash
+scripts/dev/m2-import-smoke.sh
+```
+
 ## 交付约束
 
 - Windows 11 x64 原生启动包为首要交付物，应提供环境预检、启动、停止、演示数据复位和日志定位入口。
