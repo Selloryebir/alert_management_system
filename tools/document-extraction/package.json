@@ -1,0 +1,16 @@
+{
+  "name": "alert-management-document-extraction",
+  "version": "1.0.0",
+  "private": true,
+  "description": "报警管理系统历史材料的可重复提取工具",
+  "type": "module",
+  "scripts": {
+    "extract": "node extract.mjs",
+    "check": "node extract.mjs --check"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "0.1.80",
+    "mammoth": "1.12.1",
+    "pdfjs-dist": "5.4.624"
+  }
+}

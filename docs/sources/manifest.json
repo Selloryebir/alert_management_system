@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "purpose": "报警管理系统灾后重建的历史来源索引",
+  "statementsPolicy": "历史完成、测试、性能和合规性结论均为 unverified，须由当前实现重新验证",
+  "sources": [
+    {
+      "path": "docs/backgrounds/报警管理系统V1.0研发项目.pdf",
+      "bytes": 58958664,
+      "sha256": "681a73c441b5fdf4c5b61151e8d5f3e8aec9d5db6374f3db9bd2f8b85cd18564"
+    },
+    {
+      "path": "docs/backgrounds/2025年RD1、RD2、RD4、RD5全套备查完整文档.docx",
+      "bytes": 69066,
+      "sha256": "e8627b8c3afc2df57172560552d0f2a31c99b1e044a4a802920e44db78b319d2"
+    },
+    {
+      "path": "docs/backgrounds/2025RD3立项报告书彭磊.docx",
+      "bytes": 40672,
+      "sha256": "bbd07c4ae2f461b532794cc33f2902257bd9a1612523b43af05cb8762badce56"
+    },
+    {
+      "path": "docs/backgrounds/2025RD3结项报告彭磊.docx",
+      "bytes": 15836915,
+      "sha256": "aeff70df534e8aa0b12a4e315e86e5b744e45f79141d0a2c58ad410f39287a8e"
+    }
+  ]
+}

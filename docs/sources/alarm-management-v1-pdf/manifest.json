@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "path": "docs/backgrounds/报警管理系统V1.0研发项目.pdf",
+    "bytes": 58958664,
+    "sha256": "681a73c441b5fdf4c5b61151e8d5f3e8aec9d5db6374f3db9bd2f8b85cd18564"
+  },
+  "sourceClassification": "related-historical-material",
+  "currentVerificationStatus": "unverified",
+  "pageCount": 131,
+  "segments": [
+    {
+      "pages": "1-17",
+      "status": "extracted",
+      "output": "01-project-records.md",
+      "description": "立项与结项历史记录"
+    },
+    {
+      "pages": "18-30",
+      "status": "extracted",
+      "output": "02-requirements-and-design.md",
+      "description": "需求规格与概要设计历史记录"
+    },
+    {
+      "pages": "31-51",
+      "status": "extracted-as-images",
+      "output": "03-user-manual.md; images/manual-page-031.png through manual-page-051.png",
+      "description": "图片化用户手册与历史界面"
+    },
+    {
+      "pages": "52-64",
+      "status": "extracted",
+      "output": "04-process-and-test-records.md",
+      "description": "中期和测试历史记录；结论未经当前项目复核"
+    },
+    {
+      "pages": "65",
+      "status": "reference-only",
+      "output": "05-software-registration-reference.md",
+      "description": "软件著作权材料索引，不作为实现或验收依据"
+    },
+    {
+      "pages": "66-131",
+      "status": "excluded",
+      "output": null,
+      "description": "图片化占位代码；用户已确认不具备实际恢复价值，故不提取文字或图片"
+    }
+  ]
+}
