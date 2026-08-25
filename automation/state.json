@@ -2,7 +2,33 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M9",
-  "active_run": null,
+  "active_run": {
+    "stage": "M9",
+    "base_commit": "242eb5aafe6cc527ed0fef98ffe3c90627d5c46f",
+    "requirements": [
+      "PRD-004",
+      "PRD-009",
+      "PRD-010",
+      "PRD-011",
+      "PRD-031"
+    ],
+    "allowed_paths": [
+      "src/algorithm/",
+      "src/backend/",
+      "tests/",
+      "scripts/dev/",
+      "docs/algorithm/",
+      "docs/product/",
+      "docs/planning/",
+      "docs/verification/",
+      "automation/state.json"
+    ],
+    "checks": [],
+    "failures": [],
+    "decision": "依照已冻结 model-v2 契约，以显式数学规则、一阶 Markov 统计和可弃权专家分类替换 v1 固定分数及场景命名耦合。",
+    "next_action": "完成 Python 核心、Java 契约和独立泛化验收后固定候选提交。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -104,13 +130,13 @@
       "note": "第三固定候选经 PR #2 合入 dev；合并树与候选一致，dev 的仓库、应用、Windows 原生和 Docker 四条远端检查全部成功。"
     },
     "M9": {
-      "status": "ready",
-      "attempt": 0,
+      "status": "in_progress",
+      "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "按 model-v2 和 M9 工作流建立单一可泛化 hybrid-v2 实现增量。",
-      "note": "M8 正式产品和模型契约已通过；尚未选择 M9 活动增量。"
+      "next_action": "在 feat/m9-hybrid-v2 实现并验证可泛化 hybrid-v2 算法与跨组件契约。",
+      "note": "M8 正式产品和模型契约已通过；M9 第一轮固定增量已启动。"
     },
     "M10": {
       "status": "blocked",
