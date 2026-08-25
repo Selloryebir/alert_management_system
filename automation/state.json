@@ -1,42 +1,8 @@
 {
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
-  "current_stage": "M4",
-  "active_run": {
-    "stage": "M4",
-    "base_commit": "f3660b00867e5f4a466dd73c99ddf2dc320b654e",
-    "requirements": [
-      "PRD-006",
-      "PRD-012",
-      "PRD-013",
-      "PRD-018"
-    ],
-    "allowed_paths": [
-      "src/backend/",
-      "src/frontend/",
-      "tests/e2e/",
-      "scripts/dev/",
-      ".github/workflows/",
-      "README.md",
-      "automation/workflow.json",
-      "automation/state.json",
-      "docs/verification/evidence/M4.md"
-    ],
-    "checks": [
-      "scripts/dev/test.sh：后端 31、算法 28、合成数据 5、跨组件契约 4、前端 8 项通过",
-      "scripts/dev/m4-browser-smoke.sh：300 行真实浏览器主流程通过，耗时 9715 ms",
-      "scripts/dev/m4-browser-smoke.sh：20000 行页面上传、分析和看板首屏通过，耗时 14461 ms",
-      "固定抽样精确核对噪声类型、原因类别、12 条事件链成员、原始行证据、处置状态和历史",
-      "git diff --check 与 M4 路径白名单检查通过"
-    ],
-    "failures": [
-      "WSL 初次运行缺少 Chromium 动态库；已改为仅在 .runtime 解压所需运行库，未修改系统环境",
-      "DrvFS 上 Vitest threads worker 曾启动超时；改用单 worker forks 后单测及全量测试稳定通过"
-    ],
-    "decision": "M4 保持单页 Vue 与 Java 单体边界；统计和处置状态只来自 PostgreSQL，不在前端复制业务规则。实现与作者验收完成，进入固定候选独立审查。",
-    "next_action": "固定候选提交并推送，等待全新智能体独立复跑全量测试、真实浏览器验收和范围审计。",
-    "resume_status": null
-  },
+  "current_stage": "M5",
+  "active_run": null,
   "stages": {
     "M0": {
       "status": "passed",
@@ -83,22 +49,24 @@
       "note": "可解释规则、关系/时间窗事件链、Java 契约与原子保存已通过本机、第二次独立审查及 dev 远端 CI。"
     },
     "M4": {
-      "status": "review",
+      "status": "passed",
+      "attempt": 1,
+      "evidence_files": [
+        "docs/verification/evidence/M4.md"
+      ],
+      "checkpoint_commit": "937320e8df2e7959f368f4c4074621dd66a922f2",
+      "remote_verified": true,
+      "next_action": "无；M4 已通过并解锁 M5。",
+      "note": "看板、详情、事件链和人工处置已通过作者检查、独立审查及 dev 远端真实浏览器回归。"
+    },
+    "M5": {
+      "status": "ready",
       "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "固定并推送候选，完成独立复核及远端 CI 后非快进合并至 dev。",
-      "note": "业务实现及作者验收完成；真实 Chromium 已覆盖 300 行完整闭环和 20000 行演示流程。"
-    },
-    "M5": {
-      "status": "blocked",
-      "attempt": 0,
-      "evidence_files": [],
-      "checkpoint_commit": null,
-      "remote_verified": false,
-      "next_action": "等待 M4 通过。",
-      "note": "等待 M4 通过。"
+      "next_action": "从远端核验的 M4 检查点建立 feat/m5-report-audit-reset 并冻结 V5/API/验收。",
+      "note": "M4 已通过；M5 范围由 PRD-001/014/016/018 和 G5 固定。"
     },
     "M6": {
       "status": "blocked",

@@ -82,4 +82,4 @@ scripts/dev/m4-browser-smoke.sh
 
 ## 当前状态
 
-M0、M1、M2、M3 已通过；M4 业务实现及作者验收已完成，正在执行固定候选的独立审查与远端检查。状态以 `automation/state.json` 及对应阶段的当前提交证据为准。
+M0 至 M4 已通过；M5 报告、统一业务审计、人工分类修订和演示复位已解锁。状态以 `automation/state.json` 及对应阶段的当前提交证据为准。
