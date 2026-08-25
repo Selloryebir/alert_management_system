@@ -1,6 +1,6 @@
 # 报警管理系统（灾后重建）
 
-本仓库用于重建报警管理系统的可演示版本。M1 已建立 Java、Python、Vue 和 PostgreSQL 的可运行工程骨架；M2 已实现合成样例及文件导入闭环，分析、处置和报告按后续里程碑实现。
+本仓库用于重建报警管理系统的可演示版本。M1 已建立 Java、Python、Vue 和 PostgreSQL 的可运行工程骨架；M2 已实现合成样例及文件导入闭环，M3 正在实现可解释规则分析，处置和报告按后续里程碑实现。
 
 阶段目标是交付一个可重复演示的最小闭环：导入报警样例文件，完成校验、分析和展示，并能导出处置结果。实现与验收以稳定、可解释、可复现为优先，不把历史材料中未经验证的指标直接作为承诺。
 
@@ -59,6 +59,12 @@ M2 的合成导入样例位于 `samples/`。以下命令会在 PostgreSQL 17.6 �
 scripts/dev/m2-import-smoke.sh
 ```
 
+M3 的独立黄金预期位于 `samples/expected/analysis-smoke-expected.json`。以下命令会使用实际 Java、Python 和 PostgreSQL 17.6，逐行核对 300 行规则结果与 12 条关联事件链，验证算法中断后的失败零结果和恢复重试，并完成 20,000 行分析：
+
+```bash
+scripts/dev/m3-analysis-smoke.sh
+```
+
 ## 交付约束
 
 - Windows 11 x64 原生启动包为首要交付物，应提供环境预检、启动、停止、演示数据复位和日志定位入口。
@@ -68,4 +74,4 @@ scripts/dev/m2-import-smoke.sh
 
 ## 当前状态
 
-M0、M1 已通过；M2 正在按[自动化开发入口](automation/)进行独立审查和远端验收。状态以 `automation/state.json` 及对应阶段的当前提交证据为准。
+M0、M1、M2 已通过；M3 正在按[自动化开发入口](automation/)实施和验收。状态以 `automation/state.json` 及对应阶段的当前提交证据为准。

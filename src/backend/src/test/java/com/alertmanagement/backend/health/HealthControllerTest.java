@@ -19,8 +19,10 @@ class HealthControllerTest {
             "2026 年灾后重建 Demo",
             new AppProperties.Algorithm(
                     URI.create("http://127.0.0.1:8001/health"),
+                    URI.create("http://127.0.0.1:8001/api/v1/analyze"),
                     Duration.ofMillis(500),
                     Duration.ofSeconds(1),
+                    Duration.ofSeconds(60),
                     "algorithm-service",
                     "0.1.0",
                     "v1"));

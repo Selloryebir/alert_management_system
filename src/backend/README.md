@@ -1,6 +1,6 @@
 # Java 后端
 
-本模块是报警管理系统灾后重建 Demo 的 Java 主系统，使用 Java 21、Spring Boot 3.5.16、PostgreSQL JDBC 和 Flyway。当前提供聚合健康接口，以及 CSV、制表符 TXT、XLSX 的两阶段报警文件导入。
+本模块是报警管理系统灾后重建 Demo 的 Java 主系统，使用 Java 21、Spring Boot 3.5.16、PostgreSQL JDBC 和 Flyway。当前提供聚合健康、两阶段报警文件导入，以及调用 Python 服务的同步分析编排。
 
 ## 构建与测试
 
@@ -41,8 +41,10 @@ GET http://127.0.0.1:8080/api/v1/health
 | `IMPORT_MAX_FILE_SIZE` | `50MB` | 单个导入文件上限 |
 | `IMPORT_MAX_REQUEST_SIZE` | `50MB` | 单次 multipart 请求上限 |
 | `ALGORITHM_HEALTH_URL` | `http://127.0.0.1:8001/health` | Python 健康地址 |
+| `ALGORITHM_ANALYSIS_URL` | `http://127.0.0.1:8001/api/v1/analyze` | Python 分析地址 |
 | `ALGORITHM_CONNECT_TIMEOUT` | `500ms` | 算法连接超时 |
 | `ALGORITHM_REQUEST_TIMEOUT` | `1s` | 算法请求总超时 |
+| `ALGORITHM_ANALYSIS_TIMEOUT` | `60s` | 单次同步分析独立超时 |
 | `ALGORITHM_SERVICE` | `algorithm-service` | 预期算法服务身份 |
 | `ALGORITHM_VERSION` | `0.1.0` | 预期算法服务版本 |
 | `ALGORITHM_CONTRACT_VERSION` | `v1` | 预期算法健康契约版本 |
@@ -71,3 +73,14 @@ GET  /api/v1/imports/{batchId}/records?page=0&size=20
 业务 API 的 HTTP 失败响应包含稳定的 `code`、中文 `message` 和 `trace_id`；例如重复确认使用 `IMPORT_STATUS_CONFLICT`，不得把英文框架错误直接交给界面。
 
 文件大小默认上限为 50 MB，可通过 `IMPORT_MAX_FILE_SIZE` 和 `IMPORT_MAX_REQUEST_SIZE` 调整。集成测试使用真实嵌入式 PostgreSQL，首次运行会下载对应平台测试二进制。
+
+## 同步分析
+
+```text
+POST /api/v1/imports/{batchId}/analyses
+GET  /api/v1/analyses/{runId}
+```
+
+只有 `IMPORTED` 批次可首次分析；算法调用失败后批次为 `FAILED`，可通过同一 POST 明确重试。调用期间批次为 `ANALYZING`，成功后为 `COMPLETED`；其余状态返回 HTTP 409，已成功批次不会生成重复运行或结果。
+
+Java 按 `source_row` 向 Python 发送全部已导入记录、固定 v1 版本和显式规则参数。Python 的运行 ID、契约/算法/规则版本、规则参数、逐记录唯一全覆盖、摘要计数及事件链成员归属和时间顺序均须通过校验。HTTP 错误、超时、非法 JSON 或契约漂移会保存中文可重试原因，并保证逐记录结果和事件链为零；成功结果、事件链和完成状态在一个 PostgreSQL 事务中提交。查询响应中的逐记录结果带 `source_row`，事件链成员带 `record_id`、`source_row` 和从 0 开始的 `order`，便于审查追溯。

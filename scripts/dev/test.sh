@@ -20,6 +20,10 @@ fi
   cd "$REPOSITORY_ROOT"
   "$PYTHON_VENV/bin/python" -m pytest tests/data -q -s -p no:cacheprovider
 )
+(
+  cd "$REPOSITORY_ROOT"
+  "$PYTHON_VENV/bin/python" -m pytest tests/contract -q -s -p no:cacheprovider
+)
 npm --prefix "$REPOSITORY_ROOT/src/frontend" test -- --run
 
-echo "仓库、后端、算法、合成数据和前端测试通过。"
+echo "仓库、后端、算法、合成数据、跨组件契约和前端测试通过。"

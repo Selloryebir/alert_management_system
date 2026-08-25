@@ -101,8 +101,8 @@
           "算法不可用或响应非法时明确失败且不产生部分结果"
         ],
         "commands": [
-          "python3 -m pytest src/algorithm tests/contract",
-          "./mvnw -f src/backend/pom.xml test -Dtest=*Analysis*Test"
+          "scripts/dev/test.sh",
+          "scripts/dev/m3-analysis-smoke.sh"
         ]
       }
     },

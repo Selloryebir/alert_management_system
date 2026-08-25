@@ -13,8 +13,10 @@ public record AppProperties(
 
     public record Algorithm(
             URI healthUrl,
+            URI analysisUrl,
             Duration connectTimeout,
             Duration requestTimeout,
+            Duration analysisTimeout,
             String service,
             String version,
             String contractVersion) {
