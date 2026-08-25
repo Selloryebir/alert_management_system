@@ -24,8 +24,10 @@ class ImportController {
     @PostMapping(path = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ImportBatchSummary preview(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "mapping", required = false) String mapping) {
-        return importService.preview(file, mapping);
+            @RequestParam("project_id") UUID projectId,
+            @RequestParam(value = "mapping", required = false) String mapping,
+            @RequestParam(value = "corrections", required = false) String corrections) {
+        return importService.preview(projectId, file, mapping, corrections);
     }
 
     @PostMapping("/{batchId}/confirm")
@@ -35,8 +37,9 @@ class ImportController {
 
     @GetMapping
     List<ImportBatchSummary> list(
+            @RequestParam("project_id") UUID projectId,
             @RequestParam(value = "limit", defaultValue = "20") int limit) {
-        return importService.list(limit);
+        return importService.list(projectId, limit);
     }
 
     @GetMapping("/{batchId}")

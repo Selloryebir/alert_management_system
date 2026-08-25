@@ -2,6 +2,9 @@ package com.alertmanagement.backend.analysis;
 
 import com.alertmanagement.backend.api.BusinessApiException;
 import com.alertmanagement.backend.audit.AuditService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -33,15 +37,19 @@ class ReportService {
     private static final String SYNTHETIC_NOTICE = "仅使用合成数据，不代表真实工业准确率";
     private static final String FONT_RESOURCE = "/fonts/NotoSansSC-VF.ttf";
     private static final int UNSUPPORTED_GLYPH_PLACEHOLDER = '?';
+    private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() { };
 
     private final JdbcTemplate jdbcTemplate;
     private final AnalysisWorkflowService workflowService;
     private final AuditService auditService;
+    private final ObjectMapper objectMapper;
 
-    ReportService(JdbcTemplate jdbcTemplate, AnalysisWorkflowService workflowService, AuditService auditService) {
+    ReportService(JdbcTemplate jdbcTemplate, AnalysisWorkflowService workflowService, AuditService auditService,
+            ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.workflowService = workflowService;
         this.auditService = auditService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
@@ -63,29 +71,37 @@ class ReportService {
         String extension = format.toLowerCase();
         String mediaType = "PDF".equals(format) ? "application/pdf"
                 : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        return new ReportFile(content, "alert-report-" + runId + "." + extension, mediaType);
+        return new ReportFile(content, run.projectCode() + "-alert-report-" + runId + "." + extension, mediaType);
     }
 
     private byte[] pdf(RunReportInfo run, DashboardView dashboard, long chainCount, String operator) {
         List<String> lines = new ArrayList<>();
         lines.add(IDENTITY);
         lines.add(SYNTHETIC_NOTICE);
+        lines.add(run.reportTitle());
+        lines.add("项目：" + run.projectName() + "（" + run.projectCode() + "）");
+        lines.add("客户：" + run.clientName() + "  厂区：" + run.site() + "  装置：" + run.unitName());
         lines.add("分析运行：" + run.runId());
         lines.add("导入批次：" + run.batchId());
         lines.add("算法版本：" + run.algorithmVersion() + "  规则版本：" + run.ruleVersion());
         lines.add("契约版本：" + run.contractVersion());
         lines.add("导出操作者：" + operator + "  导出时间：" + OffsetDateTime.now());
-        lines.add("报警总数：" + dashboard.total());
-        lines.add("处置状态：" + dashboard.dispositionCounts());
-        lines.add("优先级：" + dashboard.priorityCounts());
-        lines.add("区域：" + dashboard.areaCounts());
-        lines.add("单元：" + dashboard.unitCounts());
-        lines.add("噪声类型：" + dashboard.noiseTypeCounts());
-        lines.add("原因类别：" + dashboard.causeCategoryCounts());
-        lines.add("关联事件链数：" + chainCount);
-        lines.add("趋势：");
-        for (TrendPoint point : dashboard.trend()) {
-            lines.add("  " + point.bucket() + "  " + point.count());
+        Set<String> fields = Set.copyOf(run.reportFields());
+        if (fields.contains("summary")) {
+            lines.add("报警总数：" + dashboard.total());
+            lines.add("趋势：");
+            for (TrendPoint point : dashboard.trend()) {
+                lines.add("  " + point.bucket() + "  " + point.count());
+            }
+        }
+        addPdfField(lines, fields, "disposition", "处置状态：", dashboard.dispositionCounts());
+        addPdfField(lines, fields, "priority", "优先级：", dashboard.priorityCounts());
+        addPdfField(lines, fields, "area", "区域：", dashboard.areaCounts());
+        addPdfField(lines, fields, "unit", "单元：", dashboard.unitCounts());
+        addPdfField(lines, fields, "noise", "噪声类型：", dashboard.noiseTypeCounts());
+        addPdfField(lines, fields, "cause", "原因类别：", dashboard.causeCategoryCounts());
+        if (fields.contains("chains")) {
+            lines.add("关联事件链数：" + chainCount);
         }
         try (PDDocument document = new PDDocument();
                 InputStream fontStream = ReportService.class.getResourceAsStream(FONT_RESOURCE);
@@ -130,6 +146,12 @@ class ReportService {
         }
     }
 
+    private void addPdfField(List<String> lines, Set<String> fields, String field, String label, Object value) {
+        if (fields.contains(field)) {
+            lines.add(label + value);
+        }
+    }
+
     private String pdfText(String value, PDType0Font font) {
         StringBuilder normalized = new StringBuilder(value.length());
         for (int offset = 0; offset < value.length();) {
@@ -161,9 +183,16 @@ class ReportService {
         workbook.setCompressTempFiles(true);
         try (workbook; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             summarySheet(workbook, run, dashboard, operator);
-            alarmSheet(workbook, alarms);
-            chainSheet(workbook, chains);
-            dispositionSheet(workbook, dispositions);
+            Set<String> fields = Set.copyOf(run.reportFields());
+            if (fields.stream().anyMatch(Set.of("priority", "area", "unit", "noise", "cause")::contains)) {
+                alarmSheet(workbook, alarms);
+            }
+            if (fields.contains("chains")) {
+                chainSheet(workbook, chains);
+            }
+            if (fields.contains("disposition")) {
+                dispositionSheet(workbook, dispositions);
+            }
             workbook.write(output);
             return output.toByteArray();
         } catch (IOException exception) {
@@ -178,6 +207,12 @@ class ReportService {
         int row = 0;
         row = pair(sheet, row, "产品标识", IDENTITY);
         row = pair(sheet, row, "数据声明", SYNTHETIC_NOTICE);
+        row = pair(sheet, row, "报告抬头", run.reportTitle());
+        row = pair(sheet, row, "项目", run.projectName());
+        row = pair(sheet, row, "项目编号", run.projectCode());
+        row = pair(sheet, row, "客户", run.clientName());
+        row = pair(sheet, row, "厂区", run.site());
+        row = pair(sheet, row, "装置", run.unitName());
         row = pair(sheet, row, "分析运行", run.runId());
         row = pair(sheet, row, "导入批次", run.batchId());
         row = pair(sheet, row, "契约版本", run.contractVersion());
@@ -185,13 +220,14 @@ class ReportService {
         row = pair(sheet, row, "规则版本", run.ruleVersion());
         row = pair(sheet, row, "导出操作者", operator);
         row = pair(sheet, row, "导出时间", OffsetDateTime.now());
-        row = pair(sheet, row, "报警总数", dashboard.total());
-        pair(sheet, row++, "处置状态", dashboard.dispositionCounts());
-        pair(sheet, row++, "优先级", dashboard.priorityCounts());
-        pair(sheet, row++, "区域", dashboard.areaCounts());
-        pair(sheet, row++, "单元", dashboard.unitCounts());
-        pair(sheet, row++, "噪声类型", dashboard.noiseTypeCounts());
-        pair(sheet, row, "原因类别", dashboard.causeCategoryCounts());
+        Set<String> fields = Set.copyOf(run.reportFields());
+        if (fields.contains("summary")) row = pair(sheet, row, "报警总数", dashboard.total());
+        if (fields.contains("disposition")) row = pair(sheet, row, "处置状态", dashboard.dispositionCounts());
+        if (fields.contains("priority")) row = pair(sheet, row, "优先级", dashboard.priorityCounts());
+        if (fields.contains("area")) row = pair(sheet, row, "区域", dashboard.areaCounts());
+        if (fields.contains("unit")) row = pair(sheet, row, "单元", dashboard.unitCounts());
+        if (fields.contains("noise")) row = pair(sheet, row, "噪声类型", dashboard.noiseTypeCounts());
+        if (fields.contains("cause")) pair(sheet, row, "原因类别", dashboard.causeCategoryCounts());
         sheet.setColumnWidth(0, 20 * 256);
         sheet.setColumnWidth(1, 100 * 256);
     }
@@ -227,12 +263,12 @@ class ReportService {
     private void dispositionSheet(SXSSFWorkbook workbook, List<ReportDispositionRow> dispositions) {
         Sheet sheet = workbook.createSheet("处置历史");
         writeRow(sheet.createRow(0), "record_id", "source_row", "from_status", "to_status", "operator",
-                "note", "occurred_at");
+                "assignee", "note", "occurred_at");
         int index = 1;
         for (ReportDispositionRow disposition : dispositions) {
             writeRow(sheet.createRow(index++), disposition.recordId(), disposition.sourceRow(),
-                    disposition.fromStatus(), disposition.toStatus(), disposition.operator(), disposition.note(),
-                    disposition.occurredAt());
+                    disposition.fromStatus(), disposition.toStatus(), disposition.operator(), disposition.assignee(),
+                    disposition.note(), disposition.occurredAt());
         }
     }
 
@@ -255,12 +291,20 @@ class ReportService {
 
     private RunReportInfo runInfo(UUID runId) {
         return jdbcTemplate.queryForObject("""
-                SELECT run_id, batch_id, contract_version, algorithm_version, rule_version
-                  FROM analysis_run WHERE run_id = ? AND status = 'COMPLETED'
+                SELECT r.run_id, r.batch_id, r.contract_version, r.algorithm_version, r.rule_version,
+                       p.project_id, p.code, p.name, p.client_name, p.site, p.unit_name,
+                       p.report_title, p.report_fields::text
+                  FROM analysis_run r
+                  JOIN import_batch b ON b.batch_id=r.batch_id
+                  JOIN business_project p ON p.project_id=b.project_id
+                 WHERE r.run_id = ? AND r.status = 'COMPLETED'
                 """, (resultSet, rowNumber) -> new RunReportInfo(
                 resultSet.getObject("run_id", UUID.class), resultSet.getObject("batch_id", UUID.class),
                 resultSet.getString("contract_version"), resultSet.getString("algorithm_version"),
-                resultSet.getString("rule_version")), runId);
+                resultSet.getString("rule_version"), resultSet.getObject("project_id", UUID.class),
+                resultSet.getString("code"), resultSet.getString("name"), resultSet.getString("client_name"),
+                resultSet.getString("site"), resultSet.getString("unit_name"),
+                resultSet.getString("report_title"), readJson(resultSet.getString("report_fields"))), runId);
     }
 
     private List<ReportAlarmRow> reportAlarms(UUID runId) {
@@ -309,14 +353,14 @@ class ReportService {
     private List<ReportDispositionRow> reportDispositions(UUID runId) {
         return jdbcTemplate.query("""
                 SELECT h.record_id, a.source_row, h.from_status, h.to_status,
-                       h.operator_name, h.note, h.occurred_at
+                       h.operator_name, h.assignee, h.note, h.occurred_at
                   FROM disposition_history h
                   JOIN alarm_record a ON a.record_id = h.record_id
                  WHERE h.run_id = ? ORDER BY h.occurred_at, h.history_id
                 """, (resultSet, rowNumber) -> new ReportDispositionRow(
                 resultSet.getObject("record_id", UUID.class), resultSet.getInt("source_row"),
                 resultSet.getString("from_status"), resultSet.getString("to_status"),
-                resultSet.getString("operator_name"), resultSet.getString("note"),
+                resultSet.getString("operator_name"), resultSet.getString("note"), resultSet.getString("assignee"),
                 resultSet.getObject("occurred_at", OffsetDateTime.class)), runId);
     }
 
@@ -333,7 +377,9 @@ class ReportService {
     }
 
     private record RunReportInfo(
-            UUID runId, UUID batchId, String contractVersion, String algorithmVersion, String ruleVersion) {
+            UUID runId, UUID batchId, String contractVersion, String algorithmVersion, String ruleVersion,
+            UUID projectId, String projectCode, String projectName, String clientName, String site,
+            String unitName, String reportTitle, List<String> reportFields) {
     }
 
     private record ReportAlarmRow(
@@ -351,6 +397,14 @@ class ReportService {
 
     private record ReportDispositionRow(
             UUID recordId, int sourceRow, String fromStatus, String toStatus, String operator,
-            String note, OffsetDateTime occurredAt) {
+            String note, String assignee, OffsetDateTime occurredAt) {
+    }
+
+    private List<String> readJson(String value) {
+        try {
+            return objectMapper.readValue(value, STRING_LIST);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("报告配置 JSON 反序列化失败", exception);
+        }
     }
 }

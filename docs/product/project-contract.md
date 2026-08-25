@@ -23,23 +23,26 @@
 
 ## 项目作用域接口
 
-- `POST /api/v1/imports/preview` multipart 增加必填 `project_id`；响应增加 `project_id`。
+- `POST /api/v1/imports/preview` multipart 增加必填 `project_id`，可选 `corrections` 使用“源行号 → 目标字段 → 修正文本”的 JSON 对象；响应增加 `project_id` 和本次原始 `source_rows`，便于页面内修正后连同原文件重新校验。`mapping` 仍是兼容的已识别映射响应字段。
 - `GET /api/v1/imports` 增加必填 `project_id`，只返回该项目批次。
 - `GET/POST /api/v1/imports/{batchId}/...` 通过批次确定项目；不存在跨项目枚举入口。
 - 报告从分析运行反查项目，使用项目报告抬头和 `report_fields`。允许字段固定为 `summary`、`priority`、`area`、`unit`、`noise`、`cause`、`disposition`、`chains`；不提供任意模板语言。
 
-字段映射继续使用稳定的“目标字段到源表头”对象传输，但页面用中文字段和下拉框生成，业务人员不接触 JSON。首次预览即使因缺少映射失败，也必须返回源表头、已识别映射和逐行中文错误，供页面重新映射后再次预览。
+字段映射继续使用稳定的“目标字段到源表头”对象传输，但页面用中文字段和下拉框生成，业务人员不接触 JSON。首次预览即使因缺少映射失败，也必须返回源表头、已识别映射和逐行中文错误，供页面重新映射后再次预览。逐行错误可在页面填写目标字段修正值；重新预览时 Java 把修正只应用到指定源行和字段并重新执行全量校验，原文件及 `raw_payload` 保持可追溯。
 
 项目级校验规则仅支持业务可解释且当前导入器可执行的两类：附加必填字段，以及 `value`/`threshold` 的最小值和最大值。规则在预览阶段执行并返回规则名称；不建设表达式平台。
 
 ## 报警补录、修订与任务
 
 - `POST /api/v1/projects/{projectId}/manual-alarms`：按规范化字段补录单条报警，建立来源为 `MANUAL_ENTRY` 的已导入批次，保留原值并可直接发起分析。
+- `GET /api/v1/projects/{projectId}/manual-alarms`：列出该项目人工补录及作废状态，使刷新页面后仍可继续合法修订或作废。
 - `PATCH /api/v1/projects/{projectId}/manual-alarms/{recordId}`：只允许修订人工补录且尚未分析的记录；保存修订前后值和理由。
 - `POST /api/v1/projects/{projectId}/manual-alarms/{recordId}/invalidate`：受控作废，要求操作者和理由，不物理删除；已作废记录不进入新分析。
 - 报警责任人保存在处置记录中；列表支持 `assignee` 筛选。未分配、处理中和待关闭报警构成项目待办，不引入通用工作流引擎或外部通知。
 
 所有状态、枚举和错误在 API 中保持稳定机器值，在页面以中文词典显示。专有名词 PostgreSQL、hybrid-v2、PDF、XLSX 可保留原文。
+
+“复位全部演示数据”清空业务表，并删除默认演示项目之外的项目、恢复默认项目的初始资料和使用中状态。重复复位结果一致，避免多次演示留下无法清理的空项目。
 
 ## 首次使用路径
 

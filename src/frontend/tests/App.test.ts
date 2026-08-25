@@ -12,6 +12,33 @@ import App from "../src/App.vue";
 import BusinessWorkflow from "../src/BusinessWorkflow.vue";
 import ReviewOperations from "../src/ReviewOperations.vue";
 
+vi.mock("../src/projects", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/projects")>();
+  const project = {
+    project_id: "00000000-0000-0000-0000-000000000001",
+    code: "DEFAULT-DEMO",
+    name: "默认演示项目",
+    client_name: "合成客户",
+    site: "合成厂区",
+    unit_name: "合成装置",
+    status: "ACTIVE" as const,
+    report_title: "报警分析报告",
+    report_fields: ["summary", "priority", "area", "unit", "noise", "cause", "disposition", "chains"],
+    validation_rules: { required_fields: [] },
+    created_at: "2026-08-25T00:00:00+08:00",
+    updated_at: "2026-08-25T00:00:00+08:00",
+  };
+  return {
+    ...actual,
+    listProjects: async () => [project],
+    fetchProjectOverview: async () => ({
+      project_id: project.project_id,
+      statistics: { batch_count: 0, alarm_count: 0, valid_alarm_count: 0, invalid_alarm_count: 0, pending_disposition_count: 0 },
+      recent_tasks: [],
+    }),
+  };
+});
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -43,7 +70,7 @@ describe("M1 状态页", () => {
     expect(screen.getByText("仅使用合成数据")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText("所有基础服务正常")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "所有基础服务正常" })).toBeInTheDocument();
     });
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/health", {
       headers: { Accept: "application/json" },
@@ -51,7 +78,7 @@ describe("M1 状态页", () => {
     for (const label of ["主系统", "PostgreSQL", "算法服务"]) {
       const card = screen.getByRole("heading", { name: label }).closest("article");
       expect(card).not.toBeNull();
-      expect(within(card as HTMLElement).getByText("UP")).toBeInTheDocument();
+      expect(within(card as HTMLElement).getByText("正常")).toBeInTheDocument();
     }
   });
 
@@ -65,7 +92,7 @@ describe("M1 状态页", () => {
         "无法访问主系统健康接口。请确认主系统已启动，然后点击“重新检查”。",
       ),
     ).toHaveAttribute("role", "alert");
-    expect(screen.getAllByText("UNKNOWN")).toHaveLength(3);
+    expect(screen.getAllByText("未知")).toHaveLength(3);
     expect(screen.getByRole("button", { name: "重新检查" })).toBeEnabled();
   });
 
@@ -88,14 +115,14 @@ describe("M1 状态页", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByLabelText("PostgreSQL状态 DOWN"),
+        screen.getByLabelText("PostgreSQL状态 不可用"),
       ).toBeInTheDocument();
     });
-    expect(screen.getByText("部分服务不可用")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "部分服务不可用" })).toBeInTheDocument();
     expect(
       screen.getByText(/请确认 PostgreSQL 进程已启动且连接配置正确/),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("UNKNOWN")).toHaveLength(1);
+    expect(screen.getAllByText("未知")).toHaveLength(1);
   });
 });
 
@@ -152,18 +179,19 @@ describe("M2 导入向导", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(App);
+    await waitFor(() => expect(screen.getByLabelText("报警文件")).toBeEnabled());
     const fileInput = screen.getByLabelText("报警文件");
     await fireEvent.change(fileInput, {
       target: {
         files: [new File(["header\nvalue"], "alarm.csv", { type: "text/csv" })],
       },
     });
-    await fireEvent.click(screen.getByRole("button", { name: "校验并预览" }));
+    await fireEvent.click(screen.getByRole("button", { name: "读取表头并预览" }));
 
     expect(await screen.findByText("alarm.csv")).toBeInTheDocument();
     expect(screen.getByText("PT-001")).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "确认导入" }));
-    expect(await screen.findByText(/已导入/)).toBeInTheDocument();
+    expect(await screen.findByText(`批次 ${readyBatch.batch_id} 已导入当前项目。`)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "确认导入" })).not.toBeInTheDocument();
   });
 
@@ -195,7 +223,7 @@ describe("M2 导入向导", () => {
         if (url === "/api/v1/imports/preview") {
           return { ok: true, json: async () => rejectedBatch } as Response;
         }
-        if (url === "/api/v1/imports?limit=20") {
+        if (url.startsWith("/api/v1/imports?")) {
           return { ok: true, json: async () => [rejectedBatch] } as Response;
         }
         throw new Error(`未处理请求 ${url}`);
@@ -203,21 +231,23 @@ describe("M2 导入向导", () => {
     );
 
     render(App);
+    await waitFor(() => expect(screen.getByLabelText("报警文件")).toBeEnabled());
+    const fileInput = screen.getByLabelText("报警文件");
     await fireEvent.change(
-      screen.getByLabelText("报警文件"),
+      fileInput,
       {
         target: {
           files: [new File(["invalid"], "invalid.csv", { type: "text/csv" })],
         },
       },
     );
-    await fireEvent.click(screen.getByRole("button", { name: "校验并预览" }));
-    expect(await screen.findByText("INVALID_ENUM")).toBeInTheDocument();
-    expect(screen.getByText("priority")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "读取表头并预览" }));
+    expect(await screen.findByText("选项值无效")).toBeInTheDocument();
+    expect(screen.getByText("优先级")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "确认导入" })).not.toBeInTheDocument();
 
     await fireEvent.click(screen.getByRole("button", { name: "刷新批次" }));
-    const table = await screen.findByText("最近导入批次");
+    const table = await screen.findByText("当前项目最近导入批次");
     expect(table.closest("table")).toHaveTextContent("invalid.csv");
   });
 });
@@ -391,6 +421,7 @@ describe("M4 浏览器业务闭环", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(App);
+    await waitFor(() => expect(screen.getByTestId("file-input")).toBeEnabled());
     await fireEvent.change(screen.getByTestId("file-input"), {
       target: { files: [new File(["synthetic"], "synthetic_smoke.csv", { type: "text/csv" })] },
     });
@@ -418,7 +449,7 @@ describe("M4 浏览器业务闭环", () => {
     expect(screen.getByTestId("detail-evidence")).toHaveTextContent("关联事件链规则");
     expect(screen.getByTestId("detail-event-chains")).toHaveTextContent("关联建议，不代表已确认根因");
 
-    expect(screen.getByTestId("classification-original")).toHaveTextContent("NORMAL / STANDARD / EQUIPMENT_FAULT");
+    expect(screen.getByTestId("classification-original")).toHaveTextContent("一般报警 / 标准报警 / 设备故障");
     await fireEvent.update(screen.getByTestId("classification-noise"), "CHATTER");
     await fireEvent.click(screen.getByTestId("classification-save"));
     expect(await screen.findByTestId("service-error")).toHaveTextContent("操作者和修订理由");
@@ -428,10 +459,11 @@ describe("M4 浏览器业务闭环", () => {
     await fireEvent.update(screen.getByTestId("classification-operator"), "审核员A");
     await fireEvent.update(screen.getByTestId("classification-reason"), "依据合成事件序列复核");
     await fireEvent.click(screen.getByTestId("classification-save"));
-    await waitFor(() => expect(screen.getByTestId("classification-effective")).toHaveTextContent("CHATTER / NUISANCE / INSTRUMENT_ISSUE"));
-    expect(screen.getByTestId("classification-original")).toHaveTextContent("NORMAL / STANDARD / EQUIPMENT_FAULT");
+    await waitFor(() => expect(screen.getByTestId("classification-effective")).toHaveTextContent("抖动报警 / 干扰报警 / 仪表问题"));
+    expect(screen.getByTestId("classification-original")).toHaveTextContent("一般报警 / 标准报警 / 设备故障");
 
     await fireEvent.update(screen.getByTestId("disposition-operator"), "审核员A");
+    await fireEvent.update(screen.getByTestId("disposition-assignee"), "甲班值长");
     await fireEvent.click(screen.getByTestId("disposition-start"));
     expect(await screen.findByTestId("service-error")).toHaveTextContent("请填写处置说明");
     expect(
@@ -447,17 +479,17 @@ describe("M4 浏览器业务闭环", () => {
     await fireEvent.update(screen.getByTestId("disposition-note"), "已完成合成报警处置");
     await fireEvent.click(screen.getByTestId("disposition-close"));
     await waitFor(() => {
-      expect(screen.getByTestId("alarm-detail")).toHaveTextContent("CLOSED");
+      expect(screen.getByTestId("alarm-detail")).toHaveTextContent("已关闭");
     });
-    expect(screen.getByTestId("disposition-history")).toHaveTextContent("OPEN → IN_PROGRESS");
-    expect(screen.getByTestId("disposition-history")).toHaveTextContent("IN_PROGRESS → CLOSED");
+    expect(screen.getByTestId("disposition-history")).toHaveTextContent("待处理 → 处理中");
+    expect(screen.getByTestId("disposition-history")).toHaveTextContent("处理中 → 已关闭");
 
     await fireEvent.update(screen.getByTestId("reset-confirmation"), "RESET_DEMO");
     await fireEvent.click(screen.getByTestId("reset-button"));
     expect(await screen.findByTestId("reset-message")).toHaveTextContent("演示数据已复位");
     expect(screen.queryByTestId("dashboard-total")).not.toBeInTheDocument();
     expect(screen.queryByTestId("preview-summary")).not.toBeInTheDocument();
-    expect(screen.getByTestId("empty-state")).toHaveTextContent("尚无可分析批次");
+    expect(await screen.findByTestId("empty-state")).toHaveTextContent("尚无可分析批次");
     expect(screen.getByTestId("file-input")).toHaveValue("");
   });
 
@@ -521,7 +553,7 @@ describe("M4 浏览器业务闭环", () => {
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url === "/api/v1/health") return { ok: true, json: async () => healthPayload } as Response;
-        if (url === "/api/v1/imports?limit=20") return { ok: true, json: async () => [importedBatch] } as Response;
+        if (url.startsWith("/api/v1/imports?")) return { ok: true, json: async () => [importedBatch] } as Response;
         if (url === `/api/v1/imports/${batchId}/analyses`) {
           return {
             ok: true,
@@ -533,9 +565,9 @@ describe("M4 浏览器业务闭环", () => {
     );
 
     render(App);
-    expect(screen.getByTestId("empty-state")).toHaveTextContent("尚无可分析批次");
+    expect(await screen.findByTestId("empty-state")).toHaveTextContent("尚无可分析批次");
     await fireEvent.click(screen.getByRole("button", { name: "刷新批次" }));
-    await fireEvent.click(await screen.findByRole("button", { name: "开始分析" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "分析此历史批次" }));
 
     expect(await screen.findByTestId("service-error")).toHaveTextContent("算法服务不可用");
     expect(screen.getByTestId("service-error")).toHaveTextContent("恢复后重试");
@@ -548,7 +580,7 @@ describe("M4 浏览器业务闭环", () => {
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url === "/api/v1/health") return { ok: true, json: async () => healthPayload } as Response;
-        if (url === "/api/v1/imports?limit=20") return { ok: true, json: async () => [completedBatch] } as Response;
+        if (url.startsWith("/api/v1/imports?")) return { ok: true, json: async () => [completedBatch] } as Response;
         if (url === `/api/v1/imports/${batchId}/analyses/latest`) {
           return { ok: true, json: async () => ({ ...completedRun, summary: { ...completedRun.summary, input_count: 0, success_count: 0, event_chain_count: 0 } }) } as Response;
         }
@@ -678,7 +710,7 @@ describe("M5 报告、审计与演示复位", () => {
     await fireEvent.update(screen.getByTestId("audit-filter"), "RESULT_OVERRIDDEN");
     await fireEvent.click(screen.getByTestId("audit-refresh"));
 
-    expect(await screen.findByTestId("audit-table")).toHaveTextContent("RESULT_OVERRIDDEN");
+    expect(await screen.findByTestId("audit-table")).toHaveTextContent("人工修订分类");
     expect(screen.getByTestId("audit-table")).toHaveTextContent("审核员A");
     expect(fetchMock).toHaveBeenLastCalledWith(
       expect.stringContaining("event_type=RESULT_OVERRIDDEN"),

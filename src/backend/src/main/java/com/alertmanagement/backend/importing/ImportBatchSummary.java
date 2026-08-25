@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public record ImportBatchSummary(
         @JsonProperty("batch_id") UUID batchId,
+        @JsonProperty("project_id") UUID projectId,
         @JsonProperty("file_name") String fileName,
         ImportFormat format,
         ImportBatchStatus status,
@@ -16,7 +17,9 @@ public record ImportBatchSummary(
         @JsonProperty("error_count") int errorCount,
         List<String> headers,
         Map<String, String> mapping,
+        Map<Integer, Map<String, String>> corrections,
         List<ImportError> errors,
+        @JsonProperty("source_rows") List<ImportSourceRow> sourceRows,
         @JsonProperty("preview_rows") List<AlarmPreview> previewRows,
         @JsonProperty("created_at") OffsetDateTime createdAt,
         @JsonProperty("imported_at") OffsetDateTime importedAt) {

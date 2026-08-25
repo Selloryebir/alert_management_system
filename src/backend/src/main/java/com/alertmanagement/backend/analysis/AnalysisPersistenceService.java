@@ -39,13 +39,21 @@ class AnalysisPersistenceService {
     @Transactional
     public StartedAnalysis begin(UUID batchId, String contractVersion, String algorithmVersion,
             Map<String, Object> parameters) {
-        String status;
+        BatchState batchState;
         try {
-            status = jdbcTemplate.queryForObject(
-                    "SELECT status FROM import_batch WHERE batch_id = ? FOR UPDATE", String.class, batchId);
+            batchState = jdbcTemplate.queryForObject("""
+                    SELECT b.status, p.status AS project_status
+                      FROM import_batch b JOIN business_project p ON p.project_id=b.project_id
+                     WHERE b.batch_id = ? FOR UPDATE OF b
+                    """, (resultSet, rowNumber) -> new BatchState(
+                    resultSet.getString("status"), resultSet.getString("project_status")), batchId);
         } catch (EmptyResultDataAccessException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "导入批次不存在");
         }
+        if (!"ACTIVE".equals(batchState.projectStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "项目已归档，不能启动分析");
+        }
+        String status = batchState.status();
         if (!"IMPORTED".equals(status) && !"FAILED".equals(status)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "只有 IMPORTED 或 FAILED 批次可以开始分析，当前状态为 " + status);
@@ -71,8 +79,8 @@ class AnalysisPersistenceService {
                 SELECT record_id, batch_id, source_row, event_time, return_time, ack_time,
                        site, area, unit_name, tag, description, priority, alarm_state,
                        alarm_value, threshold, engineering_unit, source_system, operator_name, raw_payload::text
-                  FROM alarm_record
-                 WHERE batch_id = ?
+                 FROM alarm_record
+                 WHERE batch_id = ? AND invalidated_at IS NULL
                  ORDER BY source_row
                 """, (resultSet, rowNumber) -> new AlarmRecordRequest(
                 resultSet.getObject("record_id", UUID.class),
@@ -320,5 +328,8 @@ class AnalysisPersistenceService {
             String failureReason,
             OffsetDateTime startedAt,
             OffsetDateTime completedAt) {
+    }
+
+    private record BatchState(String status, String projectStatus) {
     }
 }

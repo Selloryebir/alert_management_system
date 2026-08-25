@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from "vue";
 
 import ReviewOperations from "./ReviewOperations.vue";
+import { fieldLabel, localizedEvidence, priorityLabel, zh } from "./labels";
 import {
   fetchAlarmDetail,
   fetchAnalysisDefaults,
@@ -27,8 +28,14 @@ import type { ImportBatch } from "./imports";
 const props = defineProps<{
   currentBatch?: ImportBatch;
   batches: ImportBatch[];
+  readOnly?: boolean;
 }>();
-const emit = defineEmits<{ demoReset: [] }>();
+const emit = defineEmits<{
+  demoReset: [];
+  analysisCompleted: [];
+  dispositionCompleted: [];
+  reportDownloaded: [];
+}>();
 
 const PAGE_SIZE = 20;
 const analysisBusy = ref(false);
@@ -40,6 +47,7 @@ const dashboard = ref<Dashboard>();
 const alarmPage = ref<AlarmPage>();
 const selectedAlarm = ref<AlarmDetail>();
 const dispositionOperator = ref("");
+const dispositionAssignee = ref("");
 const dispositionNote = ref("");
 const classificationNoise = ref<NoiseType>("NORMAL");
 const classificationClass = ref<AlarmClass>("STANDARD");
@@ -55,6 +63,7 @@ const filters = reactive<AlarmFilters>({
   noise_type: "",
   cause_category: "",
   disposition_status: "",
+  assignee: "",
 });
 
 type NumericParameter = Exclude<keyof AnalysisParameters, "persistent_requires_ack">;
@@ -108,7 +117,7 @@ function actionLabel(batch: ImportBatch): string {
   if (currentStatus === "COMPLETED") return "查看分析";
   if (currentStatus === "ANALYZING") return "刷新分析";
   if (currentStatus === "FAILED") return "重试分析";
-  return "开始分析";
+  return props.currentBatch?.batch_id === batch.batch_id ? "开始分析" : "分析此历史批次";
 }
 
 function actionTestId(batch: ImportBatch): string {
@@ -117,8 +126,13 @@ function actionTestId(batch: ImportBatch): string {
     : `batch-analysis-${batch.batch_id}`;
 }
 
+function actionDisabled(batch: ImportBatch): boolean {
+  if (analysisBusy.value) return true;
+  return Boolean(props.readOnly && ["IMPORTED", "FAILED"].includes(batch.status));
+}
+
 function entries(values: Record<string, number> | undefined): [string, number][] {
-  return Object.entries(values ?? {}).sort(([first], [second]) => first.localeCompare(second));
+  return Object.entries(values ?? {}).sort(([, first], [, second]) => second - first);
 }
 
 function barWidth(count: number): string {
@@ -159,6 +173,7 @@ async function openCompletedAnalysis(run: AnalysisRun) {
   dashboard.value = loadedDashboard;
   alarmPage.value = loadedAlarms;
   businessMessage.value = `分析运行 ${run.run_id} 已加载。`;
+  emit("analysisCompleted");
 }
 
 async function handleBatchAction(batch: ImportBatch) {
@@ -213,6 +228,7 @@ function resetFilters() {
   filters.noise_type = "";
   filters.cause_category = "";
   filters.disposition_status = "";
+  filters.assignee = "";
   void refreshAlarms(0);
 }
 
@@ -223,6 +239,7 @@ async function selectAlarm(recordId: string) {
   try {
     selectedAlarm.value = await fetchAlarmDetail(analysis.value.run_id, recordId);
     dispositionOperator.value = selectedAlarm.value.disposition.operator ?? "";
+    dispositionAssignee.value = selectedAlarm.value.disposition.assignee ?? selectedAlarm.value.assignee ?? "";
     dispositionNote.value = "";
     classificationNoise.value = selectedAlarm.value.noise_type as NoiseType;
     classificationClass.value = selectedAlarm.value.alarm_class as AlarmClass;
@@ -283,6 +300,7 @@ function handleDemoReset() {
   businessError.value = "";
   businessMessage.value = "";
   dispositionOperator.value = "";
+  dispositionAssignee.value = "";
   dispositionNote.value = "";
   classificationOperator.value = "";
   classificationReason.value = "";
@@ -292,6 +310,7 @@ function handleDemoReset() {
   filters.noise_type = "";
   filters.cause_category = "";
   filters.disposition_status = "";
+  filters.assignee = "";
   emit("demoReset");
 }
 
@@ -299,12 +318,17 @@ async function changeDisposition(status: DispositionStatus) {
   if (!analysis.value || !selectedAlarm.value) return;
   const operator = dispositionOperator.value.trim();
   const note = dispositionNote.value.trim();
+  const assignee = dispositionAssignee.value.trim();
   if (!operator) {
     businessError.value = "请填写操作者后再提交处置。";
     return;
   }
   if (!note) {
     businessError.value = "请填写处置说明后再提交处置。";
+    return;
+  }
+  if (!assignee) {
+    businessError.value = "请填写责任人后再提交处置。";
     return;
   }
   detailBusy.value = true;
@@ -315,6 +339,7 @@ async function changeDisposition(status: DispositionStatus) {
       selectedAlarm.value.record_id,
       status,
       operator,
+      assignee,
       note,
     );
     selectedAlarm.value = await fetchAlarmDetail(
@@ -322,14 +347,41 @@ async function changeDisposition(status: DispositionStatus) {
       selectedAlarm.value.record_id,
     );
     dispositionNote.value = "";
-    businessMessage.value = `处置状态已更新为 ${status}。`;
+    businessMessage.value = status === "IN_PROGRESS"
+      ? "处置已保存，当前已进入处理中。"
+      : `处置已保存，当前状态为“${zh(status)}”。`;
     const page = alarmPage.value?.page ?? 0;
     alarmPage.value = await listAlarms(analysis.value.run_id, page, PAGE_SIZE, filters);
+    emit("dispositionCompleted");
   } catch (error) {
     businessError.value = `处置更新失败：${error instanceof Error ? error.message : "未知错误"}。请核对当前状态后重试。`;
   } finally {
     detailBusy.value = false;
   }
+}
+
+function printDashboard() {
+  window.print();
+}
+
+function exportDashboardData() {
+  if (!dashboard.value) return;
+  const rows = [
+    ["统计维度", "分类", "数量"],
+    ...entries(dashboard.value.priority_counts).map(([label, count]) => ["优先级", priorityLabel(label), String(count)]),
+    ...entries(dashboard.value.area_counts).map(([label, count]) => ["区域排名", label, String(count)]),
+    ...entries(dashboard.value.unit_counts).map(([label, count]) => ["装置分布", label, String(count)]),
+    ...entries(dashboard.value.noise_type_counts).map(([label, count]) => ["报警类型", zh(label), String(count)]),
+    ...entries(dashboard.value.cause_category_counts).map(([label, count]) => ["原因建议", zh(label), String(count)]),
+  ];
+  const content = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\r\n");
+  const blob = new Blob(["\ufeff", content], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `报警分析看板-${analysis.value?.run_id ?? "当前"}.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 </script>
 
@@ -337,7 +389,7 @@ async function changeDisposition(status: DispositionStatus) {
   <section class="business-panel" aria-labelledby="business-title">
     <div class="panel-heading">
       <div>
-        <p class="eyebrow">M3–M4 · 分析与审核</p>
+        <p class="eyebrow">分析与审核</p>
         <h2 id="business-title">报警业务闭环</h2>
       </div>
     </div>
@@ -379,12 +431,12 @@ async function changeDisposition(status: DispositionStatus) {
       <article v-for="batch in actionableBatches" :key="batch.batch_id" class="batch-action-card">
         <div>
           <strong>{{ batch.file_name }}</strong>
-          <span>{{ batch.status }} · {{ batch.total_rows }} 行</span>
+          <span>{{ zh(batch.status) }} · {{ batch.total_rows }} 行</span>
         </div>
         <button
           type="button"
           :data-testid="actionTestId(batch)"
-          :disabled="analysisBusy"
+          :disabled="actionDisabled(batch)"
           @click="handleBatchAction(batch)"
         >
           {{ actionLabel(batch) }}
@@ -404,7 +456,7 @@ async function changeDisposition(status: DispositionStatus) {
             <p class="eyebrow">固定事实源统计</p>
             <h3 id="dashboard-title">分析总览</h3>
           </div>
-          <p>规则版本 {{ analysis.rule_version }}</p>
+          <div class="dashboard-actions"><button type="button" class="secondary-button" @click="printDashboard">打印或保存为 PDF</button><button type="button" class="secondary-button" @click="exportDashboardData">导出看板数据</button></div>
         </div>
 
         <div class="summary-cards">
@@ -443,14 +495,14 @@ async function changeDisposition(status: DispositionStatus) {
             <h4>{{ group.title }}</h4>
             <div v-if="entries(group.values).length" class="metric-list">
               <div v-for="[label, count] in entries(group.values)" :key="label" class="metric-row">
-                <span>{{ label }}</span><span class="bar-track"><i :style="{ width: barWidth(count) }" /></span><strong>{{ count }}</strong>
+                <span>{{ group.title === '优先级分布' ? priorityLabel(label) : label }}</span><span class="bar-track"><i :style="{ width: barWidth(count) }" /></span><strong>{{ count }}</strong>
               </div>
             </div>
             <p v-else class="empty-copy">暂无数据。</p>
           </article>
 
           <article class="metric-panel">
-            <h4>噪声类型分布</h4>
+            <h4>报警类型占比</h4>
             <div class="metric-list">
               <div
                 v-for="[label, count] in entries(dashboard.noise_type_counts)"
@@ -458,7 +510,7 @@ async function changeDisposition(status: DispositionStatus) {
                 class="metric-row"
                 :data-testid="`dashboard-noise-${label}`"
               >
-                <span>{{ label }}</span><span class="bar-track"><i :style="{ width: barWidth(count) }" /></span><strong>{{ count }}</strong>
+                <span>{{ zh(label) }}</span><span class="bar-track"><i :style="{ width: barWidth(count) }" /></span><strong>{{ count }}</strong>
               </div>
             </div>
           </article>
@@ -472,7 +524,7 @@ async function changeDisposition(status: DispositionStatus) {
                 class="metric-row"
                 :data-testid="`dashboard-cause-${label}`"
               >
-                <span>{{ label }}</span><span class="bar-track"><i :style="{ width: barWidth(count) }" /></span><strong>{{ count }}</strong>
+                <span>{{ zh(label) }}</span><span class="bar-track"><i :style="{ width: barWidth(count) }" /></span><strong>{{ count }}</strong>
               </div>
             </div>
           </article>
@@ -482,12 +534,13 @@ async function changeDisposition(status: DispositionStatus) {
       <section class="alarm-browser" aria-labelledby="alarm-list-title">
         <h3 id="alarm-list-title">报警列表</h3>
         <form class="filter-grid" @submit.prevent="refreshAlarms(0)">
-          <label>优先级<select v-model="filters.priority"><option value="">全部</option><option v-for="value in ['P1','P2','P3','P4']" :key="value">{{ value }}</option></select></label>
+          <label>优先级<select v-model="filters.priority"><option value="">全部</option><option v-for="value in ['P1','P2','P3','P4']" :key="value" :value="value">{{ priorityLabel(value) }}</option></select></label>
           <label>区域<input v-model="filters.area" placeholder="精确区域" /></label>
           <label>单元<input v-model="filters.unit" placeholder="精确单元" /></label>
-          <label>噪声类型<select v-model="filters.noise_type" data-testid="filter-noise"><option value="">全部</option><option v-for="value in ['NORMAL','DUPLICATE','CHATTER','SHORT_LIVED','PERSISTENT']" :key="value">{{ value }}</option></select></label>
-          <label>原因建议<select v-model="filters.cause_category" data-testid="filter-cause"><option value="">全部</option><option v-for="value in ['PROCESS_DISTURBANCE','EQUIPMENT_FAULT','INSTRUMENT_ISSUE','MAINTENANCE_TEST','UNKNOWN']" :key="value">{{ value }}</option></select></label>
-          <label>处置状态<select v-model="filters.disposition_status"><option value="">全部</option><option v-for="value in ['OPEN','IN_PROGRESS','CLOSED']" :key="value">{{ value }}</option></select></label>
+          <label>报警类型<select v-model="filters.noise_type" data-testid="filter-noise"><option value="">全部</option><option v-for="value in ['NORMAL','DUPLICATE','CHATTER','SHORT_LIVED','PERSISTENT']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
+          <label>原因建议<select v-model="filters.cause_category" data-testid="filter-cause"><option value="">全部</option><option v-for="value in ['PROCESS_DISTURBANCE','EQUIPMENT_FAULT','INSTRUMENT_ISSUE','MAINTENANCE_TEST','UNKNOWN']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
+          <label>处置状态<select v-model="filters.disposition_status"><option value="">全部</option><option v-for="value in ['OPEN','IN_PROGRESS','CLOSED']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
+          <label>负责人筛选<input v-model="filters.assignee" placeholder="输入精确姓名" /></label>
           <div class="filter-actions"><button type="submit" :disabled="analysisBusy">应用筛选</button><button type="button" class="secondary-button" :disabled="analysisBusy" @click="resetFilters">清空筛选</button></div>
         </form>
 
@@ -501,8 +554,8 @@ async function changeDisposition(status: DispositionStatus) {
             <tbody>
               <tr v-for="item in alarmPage.items" :key="item.record_id">
                 <td>{{ item.source_row }}</td><td>{{ item.event_time }}</td><td>{{ item.site }} / {{ item.area }} / {{ item.unit || '—' }}</td>
-                <td><button type="button" class="table-link" :data-testid="`alarm-row-${item.source_row}`" @click="selectAlarm(item.record_id)">{{ item.tag }}<small>{{ item.description }}</small></button></td>
-                <td>{{ item.priority }} / {{ item.alarm_state }}</td><td>{{ item.noise_type }}<small>{{ item.cause_category }} · {{ item.score }}</small></td><td>{{ item.disposition_status }}</td>
+                <td><button type="button" class="table-link" :data-testid="`alarm-row-${item.source_row}`" @click="selectAlarm(item.record_id)">{{ item.tag }}<small>{{ item.description }}</small><small>查看详情</small></button></td>
+                <td>{{ priorityLabel(item.priority) }} / {{ zh(item.alarm_state) }}</td><td>{{ zh(item.noise_type) }}<small>{{ zh(item.cause_category) }} · 分数 {{ item.score }}</small></td><td>{{ zh(item.disposition_status) }}</td>
               </tr>
             </tbody>
           </table>
@@ -511,19 +564,20 @@ async function changeDisposition(status: DispositionStatus) {
       </section>
 
       <article v-if="selectedAlarm" class="alarm-detail" data-testid="alarm-detail">
-        <div class="panel-heading compact-heading"><div><p class="eyebrow">规范化详情</p><h3>{{ selectedAlarm.tag }}</h3></div><span class="status-badge" :class="`disposition-${selectedAlarm.disposition.status.toLowerCase()}`">{{ selectedAlarm.disposition.status }}</span></div>
+        <div class="panel-heading compact-heading"><div><p class="eyebrow">报警详情</p><h3>{{ selectedAlarm.tag }}</h3></div><span class="status-badge" :class="`disposition-${selectedAlarm.disposition.status.toLowerCase()}`">{{ zh(selectedAlarm.disposition.status) }}</span></div>
         <dl class="detail-grid">
           <div><dt>源行</dt><dd data-testid="detail-source-row">{{ selectedAlarm.source_row }}</dd></div><div><dt>发生时间</dt><dd>{{ selectedAlarm.event_time }}</dd></div>
           <div><dt>恢复时间</dt><dd>{{ selectedAlarm.return_time || '—' }}</dd></div><div><dt>确认时间</dt><dd>{{ selectedAlarm.ack_time || '—' }}</dd></div>
           <div><dt>位置</dt><dd>{{ selectedAlarm.site }} / {{ selectedAlarm.area }} / {{ selectedAlarm.unit || '—' }}</dd></div><div><dt>描述</dt><dd>{{ selectedAlarm.description }}</dd></div>
-          <div><dt>优先级/状态</dt><dd>{{ selectedAlarm.priority }} / {{ selectedAlarm.alarm_state }}</dd></div><div><dt>分析标签</dt><dd>{{ selectedAlarm.noise_type }} / {{ selectedAlarm.alarm_class }}</dd></div>
-          <div><dt>原因建议</dt><dd>{{ selectedAlarm.cause_category }}</dd></div><div><dt>规则分数</dt><dd>{{ selectedAlarm.score }}</dd></div>
+          <div><dt>优先级/状态</dt><dd>{{ priorityLabel(selectedAlarm.priority) }} / {{ zh(selectedAlarm.alarm_state) }}</dd></div><div><dt>分析标签</dt><dd>{{ zh(selectedAlarm.noise_type) }} / {{ zh(selectedAlarm.alarm_class) }}</dd></div>
+          <div><dt>原因建议</dt><dd>{{ zh(selectedAlarm.cause_category) }}</dd></div><div><dt>规则分数</dt><dd>{{ selectedAlarm.score }}</dd></div>
           <div><dt>值/阈值</dt><dd>{{ selectedAlarm.value ?? '—' }} / {{ selectedAlarm.threshold ?? '—' }} {{ selectedAlarm.engineering_unit || '' }}</dd></div><div><dt>来源/源操作员</dt><dd>{{ selectedAlarm.source_system || '—' }} / {{ selectedAlarm.operator || '—' }}</dd></div>
+          <div><dt>当前责任人</dt><dd>{{ selectedAlarm.disposition.assignee || selectedAlarm.assignee || '未分配' }}</dd></div>
         </dl>
 
         <div class="detail-columns">
-          <section data-testid="raw-payload"><h4>原始行</h4><dl class="raw-grid"><div v-for="[key, value] in Object.entries(selectedAlarm.raw_payload)" :key="key"><dt>{{ key }}</dt><dd>{{ value }}</dd></div></dl></section>
-          <section data-testid="detail-evidence"><h4>规则证据</h4><ul data-testid="evidence-list"><li v-for="item in selectedAlarm.evidence" :key="item">{{ item }}</li></ul></section>
+          <details data-testid="raw-payload"><summary>查看原始行（按原值展示）</summary><dl class="raw-grid"><div v-for="[key, value] in Object.entries(selectedAlarm.raw_payload)" :key="key"><dt>{{ fieldLabel(key) }}</dt><dd>{{ value }}</dd></div></dl></details>
+          <section data-testid="detail-evidence"><h4>规则证据</h4><ul data-testid="evidence-list"><li v-for="item in selectedAlarm.evidence" :key="item">{{ localizedEvidence(item) }}</li></ul></section>
         </div>
 
         <section class="chain-section" data-testid="detail-event-chains">
@@ -531,7 +585,7 @@ async function changeDisposition(status: DispositionStatus) {
           <p class="association-warning">以下内容是关联建议，不代表已确认根因。</p>
           <p v-if="selectedAlarm.event_chains.length === 0" class="empty-copy">该报警未关联事件链。</p>
           <article v-for="chain in selectedAlarm.event_chains" :key="chain.chain_id" class="chain-card" data-testid="event-chain">
-            <strong>{{ chain.association_rule }}</strong><p>{{ chain.start_time }} 至 {{ chain.end_time }}</p><p>{{ chain.explanation }}</p>
+            <strong>{{ chain.association_rule }}</strong><p>{{ chain.start_time }} 至 {{ chain.end_time }}</p><p>{{ localizedEvidence(chain.explanation) }}</p>
             <p>成员源行：{{ chain.members.map((member) => member.source_row).join(' → ') }}</p>
           </article>
         </section>
@@ -542,21 +596,21 @@ async function changeDisposition(status: DispositionStatus) {
           <div class="classification-comparison">
             <div data-testid="classification-original">
               <strong>算法原值</strong>
-              <span>{{ selectedAlarm.algorithm_classification.noise_type }} / {{ selectedAlarm.algorithm_classification.alarm_class }} / {{ selectedAlarm.algorithm_classification.cause_category }}</span>
+              <span>{{ zh(selectedAlarm.algorithm_classification.noise_type) }} / {{ zh(selectedAlarm.algorithm_classification.alarm_class) }} / {{ zh(selectedAlarm.algorithm_classification.cause_category) }}</span>
             </div>
             <div data-testid="classification-effective">
               <strong>当前有效值</strong>
-              <span>{{ selectedAlarm.noise_type }} / {{ selectedAlarm.alarm_class }} / {{ selectedAlarm.cause_category }}</span>
+              <span>{{ zh(selectedAlarm.noise_type) }} / {{ zh(selectedAlarm.alarm_class) }} / {{ zh(selectedAlarm.cause_category) }}</span>
             </div>
           </div>
           <p v-if="selectedAlarm.classification_override" class="empty-copy">
             最近修订：{{ selectedAlarm.classification_override.operator }} · {{ selectedAlarm.classification_override.updated_at }} · {{ selectedAlarm.classification_override.reason }}
           </p>
           <div class="classification-grid">
-            <label>噪声类型<select v-model="classificationNoise" data-testid="classification-noise" :disabled="detailBusy"><option v-for="value in ['NORMAL','DUPLICATE','CHATTER','SHORT_LIVED','PERSISTENT']" :key="value" :value="value">{{ value }}</option></select></label>
-            <label>报警分类<select v-model="classificationClass" data-testid="classification-alarm-class" :disabled="detailBusy"><option v-for="value in ['NUISANCE','ACTIONABLE','STANDARD']" :key="value" :value="value">{{ value }}</option></select></label>
-            <label>原因建议<select v-model="classificationCause" data-testid="classification-cause" :disabled="detailBusy"><option v-for="value in ['PROCESS_DISTURBANCE','EQUIPMENT_FAULT','INSTRUMENT_ISSUE','MAINTENANCE_TEST','UNKNOWN']" :key="value" :value="value">{{ value }}</option></select></label>
-            <label>操作者（必填）<input v-model="classificationOperator" data-testid="classification-operator" :disabled="detailBusy" /></label>
+            <label>报警类型<select v-model="classificationNoise" data-testid="classification-noise" :disabled="detailBusy"><option v-for="value in ['NORMAL','DUPLICATE','CHATTER','SHORT_LIVED','PERSISTENT']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
+            <label>报警分类<select v-model="classificationClass" data-testid="classification-alarm-class" :disabled="detailBusy"><option v-for="value in ['NUISANCE','ACTIONABLE','STANDARD']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
+            <label>原因建议<select v-model="classificationCause" data-testid="classification-cause" :disabled="detailBusy"><option v-for="value in ['PROCESS_DISTURBANCE','EQUIPMENT_FAULT','INSTRUMENT_ISSUE','MAINTENANCE_TEST','UNKNOWN']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
+            <label>分类审核人（必填）<input v-model="classificationOperator" data-testid="classification-operator" :disabled="detailBusy" /></label>
             <label class="classification-reason">修订理由（必填）<textarea v-model="classificationReason" rows="2" data-testid="classification-reason" :disabled="detailBusy" /></label>
           </div>
           <button type="button" data-testid="classification-save" :disabled="detailBusy" @click="saveClassification">保存分类修订</button>
@@ -565,24 +619,25 @@ async function changeDisposition(status: DispositionStatus) {
         <section class="disposition-editor">
           <h4>人工处置</h4>
           <div class="editor-grid">
-            <label>操作者<input v-model="dispositionOperator" data-testid="disposition-operator" :disabled="detailBusy" /></label>
+            <label>责任人（必填）<input v-model="dispositionAssignee" data-testid="disposition-assignee" :disabled="detailBusy" /></label>
+            <label>处置操作者（必填）<input v-model="dispositionOperator" data-testid="disposition-operator" :disabled="detailBusy" /></label>
             <label>处置说明（必填）<textarea v-model="dispositionNote" rows="2" data-testid="disposition-note" :disabled="detailBusy" /></label>
           </div>
           <div class="disposition-actions">
-            <button v-if="selectedAlarm.disposition.status === 'OPEN'" type="button" data-testid="disposition-start" :disabled="detailBusy" @click="changeDisposition('IN_PROGRESS')">标记处理中</button>
+            <button v-if="selectedAlarm.disposition.status === 'OPEN'" type="button" data-testid="disposition-start" :disabled="detailBusy" @click="changeDisposition('IN_PROGRESS')">开始处理</button>
             <template v-if="selectedAlarm.disposition.status === 'IN_PROGRESS'">
               <button type="button" data-testid="disposition-close" :disabled="detailBusy" @click="changeDisposition('CLOSED')">关闭报警</button>
               <button type="button" class="secondary-button" data-testid="disposition-reopen" :disabled="detailBusy" @click="changeDisposition('OPEN')">退回待处理</button>
             </template>
           </div>
           <div class="table-wrap" data-testid="disposition-history">
-            <table><caption>处置历史</caption><thead><tr><th>时间</th><th>状态流转</th><th>操作者</th><th>说明</th></tr></thead><tbody><tr v-for="(item, index) in selectedAlarm.disposition_history" :key="`${item.occurred_at}-${index}`"><td>{{ item.occurred_at }}</td><td>{{ item.from_status }} → {{ item.to_status }}</td><td>{{ item.operator }}</td><td>{{ item.note || '—' }}</td></tr><tr v-if="selectedAlarm.disposition_history.length === 0"><td colspan="4">暂无处置历史。</td></tr></tbody></table>
+            <table><caption>处置历史</caption><thead><tr><th>时间</th><th>状态流转</th><th>责任人</th><th>操作者</th><th>说明</th></tr></thead><tbody><tr v-for="(item, index) in selectedAlarm.disposition_history" :key="`${item.occurred_at}-${index}`"><td>{{ item.occurred_at }}</td><td>{{ zh(item.from_status) }} → {{ zh(item.to_status) }}</td><td>{{ item.assignee || '未分配' }}</td><td>{{ item.operator }}</td><td>{{ item.note || '—' }}</td></tr><tr v-if="selectedAlarm.disposition_history.length === 0"><td colspan="5">暂无处置历史。</td></tr></tbody></table>
           </div>
         </section>
       </article>
       <p v-if="detailBusy" class="import-message" role="status">正在加载或更新报警详情…</p>
     </template>
 
-    <ReviewOperations :run-id="analysis?.status === 'COMPLETED' ? analysis.run_id : undefined" @demo-reset="handleDemoReset" />
+    <ReviewOperations v-if="!selectedAlarm || selectedAlarm.disposition.status !== 'OPEN'" :run-id="analysis?.status === 'COMPLETED' ? analysis.run_id : undefined" @report-downloaded="emit('reportDownloaded')" @demo-reset="handleDemoReset" />
   </section>
 </template>

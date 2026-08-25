@@ -27,6 +27,8 @@ class ImportPersistenceService {
     private static final int PREVIEW_LIMIT = 20;
     private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() { };
     private static final TypeReference<Map<String, String>> STRING_MAP = new TypeReference<>() { };
+    private static final TypeReference<Map<Integer, Map<String, String>>> CORRECTIONS_MAP =
+            new TypeReference<>() { };
     private static final TypeReference<List<ImportError>> ERROR_LIST = new TypeReference<>() { };
 
     private final JdbcTemplate jdbcTemplate;
@@ -40,15 +42,18 @@ class ImportPersistenceService {
     }
 
     @Transactional
-    public ImportBatchSummary savePreview(String fileName, ValidatedImport validated) {
+    public ImportBatchSummary savePreview(UUID projectId, String fileName, ValidatedImport validated,
+            Map<Integer, Map<String, String>> corrections, List<ImportSourceRow> sourceRows) {
         UUID batchId = UUID.randomUUID();
         jdbcTemplate.update("""
                 INSERT INTO import_batch (
-                    batch_id, file_name, file_format, status, total_rows, valid_rows, error_count,
-                    headers, field_mapping, errors
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), CAST(? AS jsonb))
+                    batch_id, project_id, file_name, file_format, status, total_rows, valid_rows, error_count,
+                    headers, field_mapping, corrections, errors
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb),
+                          CAST(? AS jsonb), CAST(? AS jsonb))
                 """,
                 batchId,
+                projectId,
                 fileName,
                 validated.format().name(),
                 validated.status().name(),
@@ -57,25 +62,34 @@ class ImportPersistenceService {
                 validated.errors().size(),
                 writeJson(validated.headers()),
                 writeJson(validated.mapping()),
+                writeJson(corrections),
                 writeJson(validated.errors()));
 
         if (validated.status() == ImportBatchStatus.READY) {
             insertStaging(batchId, validated.records());
         }
         auditService.record("IMPORT_CREATED", AuditService.DEMO_OPERATOR, "IMPORT_BATCH", batchId, "SUCCESS",
-                Map.of("file_name", fileName, "format", validated.format().name(),
-                        "record_count", validated.totalRows()));
+                Map.of("project_id", projectId, "file_name", fileName, "format", validated.format().name(),
+                        "record_count", validated.totalRows(), "corrections", corrections,
+                        "corrected_row_count", corrections.size()));
         if (validated.status() == ImportBatchStatus.REJECTED) {
             auditService.record("IMPORT_REJECTED", AuditService.DEMO_OPERATOR, "IMPORT_BATCH", batchId, "FAILURE",
                     Map.of("error_count", validated.errors().size(), "error_codes",
                             new LinkedHashSet<>(validated.errors().stream().map(ImportError::code).toList())));
         }
-        return find(batchId);
+        ImportBatchSummary saved = find(batchId);
+        return new ImportBatchSummary(saved.batchId(), saved.projectId(), saved.fileName(), saved.format(),
+                saved.status(), saved.totalRows(), saved.validRows(), saved.errorCount(), saved.headers(),
+                saved.mapping(), saved.corrections(), saved.errors(), sourceRows, saved.previewRows(),
+                saved.createdAt(), saved.importedAt());
     }
 
     @Transactional
     public ImportBatchSummary confirm(UUID batchId) {
         LockedBatch batch = lockBatch(batchId);
+        if (!"ACTIVE".equals(batch.projectStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "项目已归档，不能确认导入");
+        }
         if (batch.status() == ImportBatchStatus.IMPORTED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "批次已经确认导入，不能重复确认");
         }
@@ -115,25 +129,35 @@ class ImportPersistenceService {
     public ImportBatchSummary find(UUID batchId) {
         try {
             BatchRow row = jdbcTemplate.queryForObject("""
-                    SELECT batch_id, file_name, file_format, status, total_rows, valid_rows, error_count,
-                           headers::text, field_mapping::text, errors::text, created_at, imported_at
+                    SELECT batch_id, project_id, file_name, file_format, status, total_rows, valid_rows, error_count,
+                           headers::text, field_mapping::text, corrections::text, errors::text,
+                           created_at, imported_at
                       FROM import_batch
                      WHERE batch_id = ?
                     """, (resultSet, rowNumber) -> batchRow(resultSet), batchId);
-            return summary(row, previewRows(batchId));
+            return summary(row, List.of(), previewRows(batchId));
         } catch (EmptyResultDataAccessException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "导入批次不存在");
         }
     }
 
-    public List<ImportBatchSummary> list(int limit) {
+    public List<ImportBatchSummary> list(UUID projectId, int limit) {
+        String where = projectId == null ? "" : " WHERE project_id = ?";
+        List<Object> arguments = new java.util.ArrayList<>();
+        if (projectId != null) {
+            arguments.add(projectId);
+        }
+        arguments.add(limit);
         return jdbcTemplate.query("""
-                SELECT batch_id, file_name, file_format, status, total_rows, valid_rows, error_count,
-                       headers::text, field_mapping::text, errors::text, created_at, imported_at
+                SELECT batch_id, project_id, file_name, file_format, status, total_rows, valid_rows, error_count,
+                       headers::text, field_mapping::text, corrections::text, errors::text,
+                       created_at, imported_at
                   FROM import_batch
+                """ + where + """
                  ORDER BY created_at DESC, batch_id DESC
                  LIMIT ?
-                """, (resultSet, rowNumber) -> summary(batchRow(resultSet), List.of()), limit);
+                """, (resultSet, rowNumber) -> summary(batchRow(resultSet), List.of(), List.of()),
+                arguments.toArray());
     }
 
     public ImportRecordPage records(UUID batchId, int page, int size) {
@@ -151,13 +175,13 @@ class ImportPersistenceService {
     private LockedBatch lockBatch(UUID batchId) {
         try {
             return jdbcTemplate.queryForObject("""
-                    SELECT status, valid_rows
-                      FROM import_batch
-                     WHERE batch_id = ?
+                    SELECT b.status, b.valid_rows, p.status AS project_status
+                      FROM import_batch b JOIN business_project p ON p.project_id=b.project_id
+                     WHERE b.batch_id = ?
                      FOR UPDATE
                     """, (resultSet, rowNumber) -> new LockedBatch(
                     ImportBatchStatus.valueOf(resultSet.getString("status")),
-                    resultSet.getInt("valid_rows")), batchId);
+                    resultSet.getInt("valid_rows"), resultSet.getString("project_status")), batchId);
         } catch (EmptyResultDataAccessException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "导入批次不存在");
         }
@@ -239,6 +263,7 @@ class ImportPersistenceService {
     private BatchRow batchRow(ResultSet resultSet) throws SQLException {
         return new BatchRow(
                 resultSet.getObject("batch_id", UUID.class),
+                resultSet.getObject("project_id", UUID.class),
                 resultSet.getString("file_name"),
                 ImportFormat.valueOf(resultSet.getString("file_format")),
                 ImportBatchStatus.valueOf(resultSet.getString("status")),
@@ -247,15 +272,17 @@ class ImportPersistenceService {
                 resultSet.getInt("error_count"),
                 readJson(resultSet.getString("headers"), STRING_LIST),
                 readJson(resultSet.getString("field_mapping"), STRING_MAP),
+                readJson(resultSet.getString("corrections"), CORRECTIONS_MAP),
                 readJson(resultSet.getString("errors"), ERROR_LIST),
                 resultSet.getObject("created_at", OffsetDateTime.class),
                 resultSet.getObject("imported_at", OffsetDateTime.class));
     }
 
-    private ImportBatchSummary summary(BatchRow row, List<AlarmPreview> previewRows) {
+    private ImportBatchSummary summary(BatchRow row, List<ImportSourceRow> sourceRows,
+            List<AlarmPreview> previewRows) {
         return new ImportBatchSummary(
-                row.batchId(), row.fileName(), row.format(), row.status(), row.totalRows(), row.validRows(),
-                row.errorCount(), row.headers(), row.mapping(), row.errors(), previewRows,
+                row.batchId(), row.projectId(), row.fileName(), row.format(), row.status(), row.totalRows(), row.validRows(),
+                row.errorCount(), row.headers(), row.mapping(), row.corrections(), row.errors(), sourceRows, previewRows,
                 row.createdAt(), row.importedAt());
     }
 
@@ -283,11 +310,12 @@ class ImportPersistenceService {
         }
     }
 
-    private record LockedBatch(ImportBatchStatus status, int validRows) {
+    private record LockedBatch(ImportBatchStatus status, int validRows, String projectStatus) {
     }
 
     private record BatchRow(
             UUID batchId,
+            UUID projectId,
             String fileName,
             ImportFormat format,
             ImportBatchStatus status,
@@ -296,6 +324,7 @@ class ImportPersistenceService {
             int errorCount,
             List<String> headers,
             Map<String, String> mapping,
+            Map<Integer, Map<String, String>> corrections,
             List<ImportError> errors,
             OffsetDateTime createdAt,
             OffsetDateTime importedAt) {

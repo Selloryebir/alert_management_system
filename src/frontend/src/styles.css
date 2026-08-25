@@ -103,7 +103,10 @@ h1 {
 
 .status-panel,
 .import-panel,
-.business-panel {
+.business-panel,
+.project-panel,
+.onboarding-panel,
+.manual-panel {
   margin-top: 3rem;
   border: 1px solid #d8e0e7;
   border-radius: 1rem;
@@ -118,6 +121,234 @@ h1 {
 
 .business-panel {
   margin-top: 1.5rem;
+}
+
+.project-panel,
+.onboarding-panel,
+.manual-panel {
+  margin-top: 1.5rem;
+}
+
+.project-form,
+.settings-grid,
+.mapping-grid,
+.correction-grid,
+.manual-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.project-form label,
+.project-search label,
+.settings-grid label,
+.mapping-grid label,
+.correction-grid label,
+.manual-form label,
+.invalidation-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: #394d60;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.project-search {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) auto auto;
+  align-items: end;
+  gap: 0.8rem;
+  margin-top: 1.2rem;
+}
+
+.inline-check {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.45rem !important;
+  margin-right: 1rem;
+}
+
+.inline-check input {
+  width: 1rem;
+  height: 1rem;
+}
+
+.project-list,
+.manual-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.project-card,
+.manual-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid #d8e0e7;
+  border-radius: 0.7rem;
+  padding: 0.85rem;
+  background: #fff;
+}
+
+.project-card.selected {
+  border-color: #0f5b66;
+  box-shadow: inset 0.25rem 0 #0f5b66;
+}
+
+.project-card > div,
+.manual-list article > div {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.project-card > div:first-child,
+.manual-list article > div:first-child {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.project-card span,
+.project-card small,
+.manual-list span,
+.manual-list small {
+  color: #536678;
+}
+
+.project-current,
+.mapping-editor,
+.correction-editor,
+.project-delete,
+.invalidation-form {
+  margin-top: 1.25rem;
+  border-top: 1px solid #d8e0e7;
+  padding-top: 1.25rem;
+}
+
+.correction-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+
+.project-delete {
+  border-top-color: #d8a9ad;
+}
+
+.project-delete label {
+  display: grid;
+  max-width: 28rem;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  color: #5d3034;
+  font-weight: 700;
+}
+
+.project-actions,
+.dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.project-overview {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.project-overview span {
+  display: grid;
+  gap: 0.2rem;
+  border-radius: 0.55rem;
+  padding: 0.65rem;
+  background: #eef3f7;
+  font-size: 0.8rem;
+}
+
+.project-settings fieldset {
+  margin: 1rem 0;
+  border: 1px solid #d8e0e7;
+  border-radius: 0.6rem;
+  padding: 0.8rem;
+}
+
+.project-settings legend {
+  color: #394d60;
+  font-weight: 800;
+}
+
+.wide-field {
+  grid-column: span 2;
+}
+
+.archive-notice {
+  margin: 1rem 0 0;
+  border-left: 0.3rem solid #8a2028;
+  padding: 0.75rem;
+  color: #721f25;
+  background: #fdebed;
+}
+
+.onboarding-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onboarding-steps li {
+  display: flex;
+  gap: 0.7rem;
+  border: 1px solid #d8e0e7;
+  border-radius: 0.65rem;
+  padding: 0.8rem;
+  background: #f7fafc;
+}
+
+.onboarding-steps li > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  color: #fff;
+  background: #65798b;
+  font-weight: 800;
+}
+
+.onboarding-steps li.done {
+  border-color: #72b294;
+  background: #edf8f2;
+}
+
+.onboarding-steps li.done > span {
+  background: #1f7a52;
+}
+
+.onboarding-steps div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.onboarding-steps small {
+  color: #536678;
+}
+
+.mapping-editor > p {
+  color: #536678;
+}
+
+.manual-panel {
+  border-color: #bdccd7;
 }
 
 .secondary-button {
@@ -770,6 +1001,29 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .project-form,
+  .project-search,
+  .settings-grid,
+  .mapping-grid,
+  .correction-grid,
+  .manual-form,
+  .onboarding-steps,
+  .project-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .wide-field {
+    grid-column: auto;
+  }
+
+  .project-card,
+  .manual-list article,
+  .project-card > div,
+  .manual-list article > div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .classification-reason {
     grid-column: auto;
   }
@@ -784,4 +1038,24 @@ dd {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+@media print {
+  body { background: #fff; }
+  .page-shell { width: 100%; padding: 0; }
+  .identity,
+  .project-panel,
+  .onboarding-panel,
+  .status-panel,
+  .import-panel,
+  .analysis-parameters,
+  .batch-actions,
+  .alarm-browser,
+  .alarm-detail,
+  .review-operations,
+  .manual-panel,
+  .dashboard-actions { display: none !important; }
+  .business-panel { margin: 0; border: 0; box-shadow: none; }
+  .dashboard { margin: 0; border: 0; }
+  .metric-panel { break-inside: avoid; }
 }
