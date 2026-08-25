@@ -24,16 +24,18 @@
 ## 工作流程
 
 1. 阅读根目录 `AGENTS.md`、本文件及当前任务涉及目录的说明。
-2. 检查工作区状态，保留他人的未提交修改。
-3. 明确本次改动能被哪项检查或演示流程验证。
-4. 实施最小完整改动并运行针对性检查。
-5. 检查 `git diff --check` 和实际差异，再创建阶段性提交。
-6. 仅在获得当前任务授权时推送；记录提交与验证结果。
+2. 自动化阶段任务还应读取 [`automation/README.md`](automation/README.md)及当前状态。
+3. 检查工作区状态，保留他人的未提交修改。
+4. 明确本次改动能被哪项检查或演示流程验证。
+5. 实施最小完整改动并运行针对性检查。
+6. 检查 `git diff --check` 和实际差异，再创建阶段性提交。
+7. 仅在获得当前任务授权时推送；记录提交与验证结果。
 
 仓库基础检查：
 
 ```powershell
-py -3 scripts/validate_repository.py
+wsl.exe python3 scripts/validate_repository.py
+wsl.exe python3 scripts/validate_automation.py
 git diff --check
 ```
 

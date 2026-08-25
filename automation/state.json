@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "workflow_id": "alert-management-rebuild",
+  "current_stage": "M1",
+  "active_run": null,
+  "stages": {
+    "M0": {
+      "status": "passed",
+      "attempt": 1,
+      "evidence_files": [
+        "docs/verification/evidence/M0.md"
+      ],
+      "checkpoint_commit": "6d10fc175044a53f9c3d457e23f93962bdee2f95",
+      "remote_verified": true,
+      "next_action": "无；M0 已通过并解锁 M1。",
+      "note": "来源隔离、产品事实、架构、计划和验收基线已落盘，检查点已在 origin/dev 核验。"
+    },
+    "M1": {
+      "status": "ready",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "按 M1 验收标准初始化可运行工程骨架。",
+      "note": "依赖 M0 已通过，可开始工程骨架实现。"
+    },
+    "M2": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M1 通过。",
+      "note": "等待 M1 通过。"
+    },
+    "M3": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M2 通过。",
+      "note": "等待 M2 通过。"
+    },
+    "M4": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M3 通过。",
+      "note": "等待 M3 通过。"
+    },
+    "M5": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M4 通过。",
+      "note": "等待 M4 通过。"
+    },
+    "M6": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M5 通过。",
+      "note": "等待 M5 通过。"
+    },
+    "M7": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M6 通过。",
+      "note": "等待 M6 通过。"
+    }
+  }
+}
