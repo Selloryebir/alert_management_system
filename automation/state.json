@@ -23,10 +23,22 @@
       "docs/planning/M5-implementation.md",
       "docs/verification/evidence/M5.md"
     ],
-    "checks": [],
-    "failures": [],
-    "decision": "M5 只实现整次分析 PDF/XLSX、统一业务审计、最小人工分类修订和限定业务表的演示复位；原始算法结果不可变，不建设报告任务、文件仓库、消息队列、权限系统或通用工作流。",
-    "next_action": "按已冻结的 V5、HTTP 契约和 G5 验收并行实现后端、前端与真实浏览器门槛。",
+    "checks": [
+      "scripts/dev/test.sh：后端 34、算法 28、合成数据 5、跨组件契约 4、前端 12 项通过",
+      "M5 两轮 300 行真实 Chromium 报告、审计、分类修订、处置和复位闭环通过，规范化摘要一致，耗时 14977 ms",
+      "20000 行页面分析与两类报告通过，整轮 20138 ms；PDF 1039 ms/21432 bytes，XLSX 2160 ms/2346964 bytes",
+      "PostgreSQL 自定义格式备份可读；复位后业务表为零，非业务 SQL 哨兵保留",
+      "成功和失败退出均停止 PostgreSQL/Java/Python，PID 文件为零且 8080 不可达",
+      "Shell 语法、git diff --check 和 M5 变更路径白名单通过"
+    ],
+    "failures": [
+      "首次分类白名单遗漏 ACTIONABLE；按 Python v1 契约补齐 Java、V5 CHECK 和成功/非法零写入测试",
+      "首次浏览器测试因页面存在两个 demo-reviewer 文本导致选择器歧义；限定首个身份标识后业务流程继续",
+      "第二次浏览器测试把复位成功文案错误限定为含成功二字；改为断言稳定语义已复位",
+      "DrvFS 上第二个 Vitest worker 偶发启动超时；将同范围 M5 用例并入既有单文件后 12 项稳定通过"
+    ],
+    "decision": "M5 只实现整次分析 PDF/XLSX、统一业务审计、最小人工分类修订和限定业务表的演示复位；原始算法结果不可变，不建设报告任务、文件仓库、消息队列、权限系统或通用工作流。实现及作者验收完成，进入固定候选独立审查。",
+    "next_action": "固定候选并推送，由未参与 M5 实现的智能体复跑全量测试、真实 G5、报告内容对账和复位范围审计。",
     "resume_status": null
   },
   "stages": {
@@ -86,13 +98,13 @@
       "note": "看板、详情、事件链和人工处置已通过作者检查、独立审查及 dev 远端真实浏览器回归。"
     },
     "M5": {
-      "status": "in_progress",
+      "status": "review",
       "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "按目录所有权实现报告、统一审计、人工分类修订、备份和演示复位。",
-      "note": "活动分支 feat/m5-report-audit-reset 已从远端核验的 M4 状态转换提交建立；接口、事务边界和验收已冻结。"
+      "next_action": "固定并推送候选，完成独立复核及远端 CI 后非快进合并至 dev。",
+      "note": "报告、审计、人工修订、备份和双复位实现完成；83 项测试及真实 Chromium 300/20000 行门槛通过。"
     },
     "M6": {
       "status": "blocked",

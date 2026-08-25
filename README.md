@@ -40,7 +40,7 @@ python3 scripts/validate_automation.py
 
 这些命令只验证仓库基础结构、文档链接和自动化状态定义；它们不代表业务功能已经实现或通过验收。
 
-## 开发启动与 M2 验证
+## 开发启动与阶段验证
 
 当前 Windows 11 + WSL2 开发路径要求 Docker Desktop 已启动，并在 WSL 中提供 Node.js 22.12+、`curl`、`tar`、`sha256sum`；Windows 侧提供 JDK 21。Docker 在 M1 只承载 PostgreSQL 17.6，不是最终原生交付方案。脚本会在忽略的 `.runtime/` 中准备固定 Python 3.12 环境：
 
@@ -73,6 +73,14 @@ scripts/dev/m4-browser-smoke.sh
 
 脚本会在 WSL 缺少 Chromium 运行库时把所需 Debian 包解压到忽略的 `.runtime/`，不会修改系统软件；首次运行需联网下载浏览器。运行结束后自动停止应用，失败时保留 `.runtime/logs/` 供定位。
 
+M5 在同一真实环境生成 PDF/XLSX、查询统一业务审计、验证人工分类修订，并连续执行两轮 300 行复位闭环和一次 20,000 行报告流程。脚本先为本项目 PostgreSQL 生成可读备份，再用非业务表哨兵确认复位不越界：
+
+```bash
+scripts/dev/m5-report-audit-reset-smoke.sh
+```
+
+单独备份当前项目数据库可执行 `scripts/dev/backup.sh`；备份写入忽略的 `.runtime/backups/`，不会覆盖同名文件。浏览器报告和指标保存在 `.runtime/m5/results/`，仅作为当前机器验收产物，不提交 Git。
+
 ## 交付约束
 
 - Windows 11 x64 原生启动包为首要交付物，应提供环境预检、启动、停止、演示数据复位和日志定位入口。
@@ -82,4 +90,4 @@ scripts/dev/m4-browser-smoke.sh
 
 ## 当前状态
 
-M0 至 M4 已通过；M5 报告、统一业务审计、人工分类修订和演示复位已解锁。状态以 `automation/state.json` 及对应阶段的当前提交证据为准。
+M0 至 M4 已通过；M5 报告、统一业务审计、人工分类修订和演示复位已完成作者验收，正在执行固定候选的独立审查与远端检查。状态以 `automation/state.json` 及对应阶段的当前提交证据为准。
