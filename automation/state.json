@@ -27,20 +27,23 @@
     "checks": [
       "2026-08-25 Windows 11 x64/WSL2：scripts/dev/test.sh 退出码 0；Java 17、Python 算法 9、合成数据 4、前端 3 项测试通过。",
       "2026-08-25 Windows 11 x64/PostgreSQL 17.6：scripts/dev/m2-import-smoke.sh 退出码 0；CSV/TXT/XLSX 各 300 行规范化摘要 f51aaa1a28a57440bfd42853434e7316 一致。",
-      "2026-08-25 PostgreSQL 17.6：GB18030 12 行导入成功；六类非法样例共 42 行均 REJECTED 且 staging/alarm 均为 0；重复确认返回 409 和稳定中文错误。",
+      "2026-08-25 PostgreSQL 17.6：GB18030 12 行导入成功；非法样例精确命中 1 个文件级错误和 36 个逐行错误，六批 valid_rows、staging、alarm 均为 0。",
       "2026-08-25 PostgreSQL 17.6：固定 seed 20260825 的 20000 行、4852439 bytes Demo，预览校验 1993ms、确认落库 1102ms、总计 3095ms。",
-      "2026-08-25 事务与迁移：嵌入式 PostgreSQL 14.22 的强制失败回滚、重复确认和 Flyway V1/V2 测试通过；项目 PostgreSQL 17.6 实际应用 V2 并完成 API 闭环。"
+      "2026-08-25 事务与迁移：嵌入式 PostgreSQL 14.22 的强制失败回滚、重复确认和 Flyway V1/V2 测试通过；项目 PostgreSQL 17.6 实际应用 V2 并完成 API 闭环。",
+      "2026-08-25 修复后作者检查：scripts/dev/test.sh 通过后端 21、算法 9、合成数据 5、前端交互 5 项测试；前端生产构建通过。",
+      "2026-08-25 修复后 PostgreSQL 17.6：批次列表和 300 行分页原始记录首尾追溯通过；20000 行 Demo 预览 2346ms、确认 1325ms、总计 3671ms。"
     ],
     "failures": [
       "正式数据测试最初依赖系统 Python pytest，但目标 WSL 未安装；已收敛到 bootstrap 管理的项目虚拟环境。",
       "Windows 嵌入式 PostgreSQL 退出后，pytest 默认捕获文件在 DrvFS 消失；无捕获模式稳定 4/4，并固定到 test.sh。",
       "首次 20000 行耗时使用墙上时钟，WSL 时间跳变产生无效数字；已改用单调时钟并重新执行，旧数字不进入证据。",
-      "重复确认最初只有 Spring 英文框架错误；已补 code/message/trace_id 中文错误契约并通过 API 测试。"
-      ,"独立审查发现非法样例清单与实际校验不一致：部分枚举和时间值被接受，缺表头文件仍报告有效行；需按 source_row、field、code 精确固化。"
-      ,"独立审查发现 M2 计划中的批次列表、分页原始行追溯 API 和前端最小导入向导尚未实现。"
+      "重复确认最初只有 Spring 英文框架错误；已补 code/message/trace_id 中文错误契约并通过 API 测试。",
+      "候选 3099b9e 独立审查发现非法样例清单与实际校验不一致；已用精确清单、严格枚举、全局错误有效行归零和集成门槛修复。",
+      "候选 3099b9e 独立审查发现批次列表、分页追溯 API 和前端导入向导缺失；已按 M2 步骤 4 补齐。",
+      "首次在 shell 环境变量中传递较大的批次/追溯响应触发参数长度上限；已改用运行时 JSON 文件传递并重跑通过。"
     ],
-    "decision": "固定候选 3099b9e 的独立审查结论为 FAIL；保留已通过的导入核心，在原分支做最小范围修复后重新冻结候选。",
-    "next_action": "精确修复非法样例契约与断言，补齐批次列表、分页原始行追溯 API 和前端最小导入向导，然后重跑 G2。",
+    "decision": "独立审查的两个阻断项已按原 M2 范围修复，修复后作者测试和 PostgreSQL 17.6 门槛均通过；进入第二次固定候选审查。",
+    "next_action": "提交并推送第二次 M2 固定候选，等待独立审查和远端 CI。",
     "resume_status": null
   },
   "stages": {
@@ -67,13 +70,13 @@
       "note": "四组件骨架、健康契约、迁移、状态页和启停闭环已通过本机、独立审查及 dev 远端 CI。"
     },
     "M2": {
-      "status": "failed",
-      "attempt": 1,
+      "status": "review",
+      "attempt": 2,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "修复独立审查阻断项后重新执行作者检查、固定 SHA 审查和 CI。",
-      "note": "候选 3099b9e 独立审查失败；M2 保持锁定，不得解锁 M3。"
+      "next_action": "完成第二次固定 SHA 独立审查和远端 CI。",
+      "note": "首次审查阻断项已修复并通过作者门槛；M2 在独立审查与远端核验前仍保持锁定。"
     },
     "M3": {
       "status": "blocked",
