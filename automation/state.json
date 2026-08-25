@@ -46,7 +46,7 @@
   "stages": {
     "M0": {
       "status": "passed",
-      "attempt": 3,
+      "attempt": 2,
       "evidence_files": [
         "docs/verification/evidence/M0.md"
       ],
@@ -101,7 +101,7 @@
     },
     "M5": {
       "status": "review",
-      "attempt": 2,
+      "attempt": 3,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
