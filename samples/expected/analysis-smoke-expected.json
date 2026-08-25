@@ -1,0 +1,2021 @@
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "oracle": "independent-smoke-scenario-contract",
+  "input": {
+    "path": "samples/smoke/synthetic_smoke_utf8.csv",
+    "sha256": "476f4c7cded5709cd1b6a4e91f0f24f9efdb1499715494a9f0ea34e2b9bf76c3",
+    "generator_version": "1.0.0",
+    "seed": 20260825,
+    "row_count": 300
+  },
+  "rule_version": "rules-v1.0.0",
+  "parameters": {
+    "duplicate_window_seconds": 30,
+    "chatter_window_seconds": 60,
+    "chatter_min_count": 4,
+    "short_lived_seconds": 10,
+    "persistent_requires_ack": true,
+    "chain_window_seconds": 60,
+    "chain_min_steps": 5
+  },
+  "summary": {
+    "input_count": 300,
+    "noise_type_counts": {
+      "NORMAL": 170,
+      "DUPLICATE": 30,
+      "CHATTER": 40,
+      "SHORT_LIVED": 30,
+      "PERSISTENT": 30
+    },
+    "alarm_class_counts": {
+      "STANDARD": 170,
+      "NUISANCE": 100,
+      "ACTIONABLE": 30
+    },
+    "cause_category_counts": {
+      "PROCESS_DISTURBANCE": 90,
+      "EQUIPMENT_FAULT": 30,
+      "INSTRUMENT_ISSUE": 30,
+      "MAINTENANCE_TEST": 20,
+      "UNKNOWN": 130
+    },
+    "event_chain_counts": {
+      "EQUIPMENT_TRIP_SEQUENCE": 6,
+      "PROCESS_CASCADE_SEQUENCE": 6,
+      "total": 12
+    }
+  },
+  "records": [
+    {
+      "source_row": 2,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 3,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 4,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 5,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 6,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 7,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 8,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 9,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 10,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 11,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 12,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 13,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 14,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 15,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 16,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 17,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 18,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 19,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 20,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 21,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 22,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 23,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 24,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 25,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 26,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 27,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 28,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 29,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 30,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 31,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 32,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 33,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 34,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 35,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 36,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 37,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 38,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 39,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 40,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 41,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 42,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 43,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 44,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 45,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 46,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 47,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 48,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 49,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 50,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 51,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 52,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 53,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 54,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 55,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 56,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 57,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 58,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 59,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 60,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 61,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 62,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 63,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 64,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 65,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 66,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 67,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 68,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 69,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 70,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 71,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 72,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 73,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 74,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 75,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 76,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 77,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 78,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 79,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 80,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 81,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 82,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 83,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 84,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 85,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 86,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 87,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 88,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 89,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 90,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 91,
+      "noise_type": "DUPLICATE",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 92,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 93,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 94,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 95,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 96,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 97,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 98,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 99,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 100,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 101,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 102,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 103,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 104,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 105,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 106,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 107,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 108,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 109,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 110,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 111,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 112,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 113,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 114,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 115,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 116,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 117,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 118,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 119,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 120,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 121,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 122,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 123,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 124,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 125,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 126,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 127,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 128,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 129,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 130,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 131,
+      "noise_type": "CHATTER",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 132,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 133,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 134,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 135,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 136,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 137,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 138,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 139,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 140,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 141,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 142,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 143,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 144,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 145,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 146,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 147,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 148,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 149,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 150,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 151,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 152,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 153,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 154,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 155,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 156,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 157,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 158,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 159,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 160,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 161,
+      "noise_type": "SHORT_LIVED",
+      "alarm_class": "NUISANCE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 162,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 163,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 164,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 165,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 166,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 167,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 168,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 169,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 170,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 171,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 172,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 173,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 174,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 175,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 176,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 177,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 178,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 179,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 180,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 181,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 182,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 183,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 184,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 185,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 186,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 187,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 188,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 189,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 190,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 191,
+      "noise_type": "PERSISTENT",
+      "alarm_class": "ACTIONABLE",
+      "cause_category": "UNKNOWN"
+    },
+    {
+      "source_row": 192,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 193,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 194,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 195,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 196,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 197,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 198,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 199,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 200,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 201,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 202,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 203,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 204,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 205,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 206,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 207,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 208,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 209,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 210,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 211,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 212,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 213,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 214,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 215,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 216,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 217,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 218,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 219,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 220,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 221,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "INSTRUMENT_ISSUE"
+    },
+    {
+      "source_row": 222,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 223,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 224,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 225,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 226,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 227,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 228,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 229,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 230,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 231,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 232,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 233,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 234,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 235,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 236,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 237,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 238,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 239,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 240,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 241,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 242,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 243,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 244,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 245,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 246,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 247,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 248,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 249,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 250,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 251,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "EQUIPMENT_FAULT"
+    },
+    {
+      "source_row": 252,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 253,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 254,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 255,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 256,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 257,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 258,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 259,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 260,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 261,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 262,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 263,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 264,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 265,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 266,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 267,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 268,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 269,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 270,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 271,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 272,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 273,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 274,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 275,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 276,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 277,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 278,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 279,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 280,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 281,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "PROCESS_DISTURBANCE"
+    },
+    {
+      "source_row": 282,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 283,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 284,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 285,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 286,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 287,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 288,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 289,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 290,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 291,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 292,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 293,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 294,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 295,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 296,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 297,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 298,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 299,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 300,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    },
+    {
+      "source_row": 301,
+      "noise_type": "NORMAL",
+      "alarm_class": "STANDARD",
+      "cause_category": "MAINTENANCE_TEST"
+    }
+  ],
+  "event_chains": [
+    {
+      "chain_id": "SYNTHETIC_CHAIN_EQUIPMENT_TRIP_01",
+      "scenario": "EQUIPMENT_TRIP",
+      "member_source_rows": [
+        222,
+        223,
+        224,
+        225,
+        226
+      ],
+      "start_time": "2026-01-15T09:40:20+08:00",
+      "end_time": "2026-01-15T09:41:04+08:00",
+      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+    },
+    {
+      "chain_id": "SYNTHETIC_CHAIN_EQUIPMENT_TRIP_02",
+      "scenario": "EQUIPMENT_TRIP",
+      "member_source_rows": [
+        227,
+        228,
+        229,
+        230,
+        231
+      ],
+      "start_time": "2026-01-15T09:41:15+08:00",
+      "end_time": "2026-01-15T09:41:59+08:00",
+      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+    },
+    {
+      "chain_id": "SYNTHETIC_CHAIN_EQUIPMENT_TRIP_03",
+      "scenario": "EQUIPMENT_TRIP",
+      "member_source_rows": [
+        232,
+        233,
+        234,
+        235,
+        236
+      ],
+      "start_time": "2026-01-15T09:42:10+08:00",
+      "end_time": "2026-01-15T09:42:54+08:00",
+      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+    },
+    {
+      "chain_id": "SYNTHETIC_CHAIN_EQUIPMENT_TRIP_04",
+      "scenario": "EQUIPMENT_TRIP",
+      "member_source_rows": [
+        237,
+        238,
+        239,
+        240,
+        241
+      ],
+      "start_time": "2026-01-15T09:43:05+08:00",
+      "end_time": "2026-01-15T09:43:49+08:00",
+      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+    },
+    {
+      "chain_id": "SYNTHETIC_CHAIN_EQUIPMENT_TRIP_05",
+      "scenario": "EQUIPMENT_TRIP",
+      "member_source_rows": [
+        242,
+        243,
+        244,
+        245,
+        246
+      ],
+      "start_time": "2026-01-15T09:44:00+08:00",
+      "end_time": "2026-01-15T09:44:44+08:00",
+      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+    },
+    {
+      "chain_id": "SYNTHETIC_CHAIN_EQUIPMENT_TRIP_06",
+      "scenario": "EQUIPMENT_TRIP",
+      "member_source_rows": [
+        247,
+        248,
+        249,
+        250,
+        251
+      ],
+      "start_time": "2026-01-15T09:44:55+08:00",
+      "end_time": "2026-01-15T09:45:39+08:00",
+      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+    },
+    {
+      "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_01",
+      "scenario": "PROCESS_CASCADE",
+      "member_source_rows": [
+        252,
+        253,
+        254,
+        255,
+        256
+      ],
+      "start_time": "2026-01-15T09:45:50+08:00",
+      "end_time": "2026-01-15T09:46:34+08:00",
+      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+    },
+    {
+      "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_02",
+      "scenario": "PROCESS_CASCADE",
+      "member_source_rows": [
+        257,
+        258,
+        259,
+        260,
+        261
+      ],
+      "start_time": "2026-01-15T09:46:45+08:00",
+      "end_time": "2026-01-15T09:47:29+08:00",
+      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+    },
+    {
+      "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_03",
+      "scenario": "PROCESS_CASCADE",
+      "member_source_rows": [
+        262,
+        263,
+        264,
+        265,
+        266
+      ],
+      "start_time": "2026-01-15T09:47:40+08:00",
+      "end_time": "2026-01-15T09:48:24+08:00",
+      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+    },
+    {
+      "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_04",
+      "scenario": "PROCESS_CASCADE",
+      "member_source_rows": [
+        267,
+        268,
+        269,
+        270,
+        271
+      ],
+      "start_time": "2026-01-15T09:48:35+08:00",
+      "end_time": "2026-01-15T09:49:19+08:00",
+      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+    },
+    {
+      "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_05",
+      "scenario": "PROCESS_CASCADE",
+      "member_source_rows": [
+        272,
+        273,
+        274,
+        275,
+        276
+      ],
+      "start_time": "2026-01-15T09:49:30+08:00",
+      "end_time": "2026-01-15T09:50:14+08:00",
+      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+    },
+    {
+      "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_06",
+      "scenario": "PROCESS_CASCADE",
+      "member_source_rows": [
+        277,
+        278,
+        279,
+        280,
+        281
+      ],
+      "start_time": "2026-01-15T09:50:25+08:00",
+      "end_time": "2026-01-15T09:51:09+08:00",
+      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+    }
+  ]
+}
