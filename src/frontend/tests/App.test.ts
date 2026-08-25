@@ -9,6 +9,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "../src/App.vue";
+import ReviewOperations from "../src/ReviewOperations.vue";
 
 afterEach(() => {
   cleanup();
@@ -283,9 +284,22 @@ describe("M4 浏览器业务闭环", () => {
 
   it("完成导入、分析、看板筛选、详情及处理关闭主路径", async () => {
     let disposition = "OPEN";
+    let effectiveClassification = {
+      noise_type: alarmItem.noise_type,
+      alarm_class: alarmItem.alarm_class,
+      cause_category: alarmItem.cause_category,
+    };
+    let classificationOverride: Record<string, string> | null = null;
     const history: Array<Record<string, string>> = [];
     const detail = () => ({
       ...alarmItem,
+      ...effectiveClassification,
+      algorithm_classification: {
+        noise_type: alarmItem.noise_type,
+        alarm_class: alarmItem.alarm_class,
+        cause_category: alarmItem.cause_category,
+      },
+      classification_override: classificationOverride,
       disposition_status: disposition,
       raw_payload: { source_row: "222", tag: alarmItem.tag },
       evidence: ["命中 EQUIPMENT_TRIP_SEQUENCE 关联事件链规则。"],
@@ -343,8 +357,32 @@ describe("M4 浏览器业务闭环", () => {
         disposition = body.status;
         return { ok: true, json: async () => ({ status: disposition, operator: body.operator, note: body.note }) } as Response;
       }
+      if (url.endsWith(`/${recordId}/classification`)) {
+        const body = JSON.parse(String(init?.body)) as Record<string, string>;
+        effectiveClassification = {
+          noise_type: body.noise_type,
+          alarm_class: body.alarm_class,
+          cause_category: body.cause_category,
+        };
+        classificationOverride = {
+          operator: body.operator,
+          reason: body.reason,
+          updated_at: "2026-08-25T10:03:00+08:00",
+        };
+        return { ok: true, json: async () => detail() } as Response;
+      }
       if (url === `/api/v1/analyses/${runId}/alarms/${recordId}`) {
         return { ok: true, json: async () => detail() } as Response;
+      }
+      if (url === "/api/v1/demo/reset") {
+        return {
+          ok: true,
+          json: async () => ({
+            completed_at: "2026-08-25T10:10:00+08:00",
+            business_state: "EMPTY",
+            deleted_counts: { alarm_record: 300, audit_event: 12 },
+          }),
+        } as Response;
       }
       throw new Error(`未处理请求 ${url}`);
     });
@@ -378,6 +416,19 @@ describe("M4 浏览器业务闭环", () => {
     expect(screen.getByTestId("detail-evidence")).toHaveTextContent("关联事件链规则");
     expect(screen.getByTestId("detail-event-chains")).toHaveTextContent("关联建议，不代表已确认根因");
 
+    expect(screen.getByTestId("classification-original")).toHaveTextContent("NORMAL / STANDARD / EQUIPMENT_FAULT");
+    await fireEvent.update(screen.getByTestId("classification-noise"), "CHATTER");
+    await fireEvent.click(screen.getByTestId("classification-save"));
+    expect(await screen.findByTestId("service-error")).toHaveTextContent("操作者和修订理由");
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/classification"))).toHaveLength(0);
+    await fireEvent.update(screen.getByTestId("classification-alarm-class"), "NUISANCE");
+    await fireEvent.update(screen.getByTestId("classification-cause"), "INSTRUMENT_ISSUE");
+    await fireEvent.update(screen.getByTestId("classification-operator"), "审核员A");
+    await fireEvent.update(screen.getByTestId("classification-reason"), "依据合成事件序列复核");
+    await fireEvent.click(screen.getByTestId("classification-save"));
+    await waitFor(() => expect(screen.getByTestId("classification-effective")).toHaveTextContent("CHATTER / NUISANCE / INSTRUMENT_ISSUE"));
+    expect(screen.getByTestId("classification-original")).toHaveTextContent("NORMAL / STANDARD / EQUIPMENT_FAULT");
+
     await fireEvent.update(screen.getByTestId("disposition-operator"), "审核员A");
     await fireEvent.click(screen.getByTestId("disposition-start"));
     expect(await screen.findByTestId("service-error")).toHaveTextContent("请填写处置说明");
@@ -398,6 +449,14 @@ describe("M4 浏览器业务闭环", () => {
     });
     expect(screen.getByTestId("disposition-history")).toHaveTextContent("OPEN → IN_PROGRESS");
     expect(screen.getByTestId("disposition-history")).toHaveTextContent("IN_PROGRESS → CLOSED");
+
+    await fireEvent.update(screen.getByTestId("reset-confirmation"), "RESET_DEMO");
+    await fireEvent.click(screen.getByTestId("reset-button"));
+    expect(await screen.findByTestId("reset-message")).toHaveTextContent("演示数据已复位");
+    expect(screen.queryByTestId("dashboard-total")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("preview-summary")).not.toBeInTheDocument();
+    expect(screen.getByTestId("empty-state")).toHaveTextContent("尚无可分析批次");
+    expect(screen.getByTestId("file-input")).toHaveValue("");
   });
 
   it("空状态与算法服务失败都给出可行动中文提示", async () => {
@@ -469,5 +528,139 @@ describe("M4 浏览器业务闭环", () => {
     expect(await screen.findByTestId("dashboard-total")).toHaveTextContent("0");
     expect(screen.getByText("当前条件下没有报警记录，请清空或调整筛选。")).toBeInTheDocument();
     expect(screen.getByText("暂无趋势数据。")).toBeInTheDocument();
+  });
+});
+
+describe("M5 报告、审计与演示复位", () => {
+  it("显示固定本地身份并在复位确认值不精确时不发送请求", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(ReviewOperations);
+
+    expect(screen.getByText(/本地演示身份/)).toHaveTextContent("demo-reviewer");
+    expect(screen.getByTestId("reset-operator")).toHaveValue("demo-reviewer");
+    await fireEvent.update(screen.getByTestId("reset-confirmation"), "reset_demo");
+    await fireEvent.click(screen.getByTestId("reset-button"));
+
+    expect(screen.getByTestId("reset-message")).toHaveTextContent("精确确认值 RESET_DEMO");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("下载真实 PDF 和 XLSX Blob 并反馈服务端文件名与大小", async () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const createObjectURL = vi.fn(() => "blob:report");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
+    let attempts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      attempts += 1;
+      if (attempts === 1) {
+        return new Response(JSON.stringify({ message: "报告生成暂不可用" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const format = String(input).endsWith("/pdf") ? "pdf" : "xlsx";
+      return new Response(new Blob([format === "pdf" ? "PDF-DATA" : "XLSX-DATA"]), {
+        status: 200,
+        headers: { "Content-Disposition": `attachment; filename="analysis.${format}"` },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(ReviewOperations, { props: { runId: "run-1" } });
+
+    await fireEvent.click(screen.getByTestId("report-pdf"));
+    expect(screen.getByTestId("report-message")).toHaveTextContent("请填写报告导出操作者");
+    expect(fetchMock).not.toHaveBeenCalled();
+    await fireEvent.update(screen.getByTestId("report-operator"), "审核员A");
+    await fireEvent.click(screen.getByTestId("report-pdf"));
+    expect(await screen.findByTestId("report-message")).toHaveTextContent("报告生成暂不可用");
+    expect(clickSpy).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByTestId("report-pdf"));
+    expect(await screen.findByTestId("report-message")).toHaveTextContent("analysis.pdf 已下载");
+    await fireEvent.click(screen.getByTestId("report-xlsx"));
+    expect(await screen.findByTestId("report-message")).toHaveTextContent("analysis.xlsx 已下载");
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/analyses/run-1/reports/pdf", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/v1/analyses/run-1/reports/xlsx", expect.objectContaining({ method: "POST" }));
+    expect(clickSpy).toHaveBeenCalledTimes(2);
+    expect(createObjectURL).toHaveBeenCalledTimes(2);
+    expect(revokeObjectURL).toHaveBeenCalledTimes(2);
+  });
+
+  it("审计失败可独立重试，并按固定事件类型分页查询", async () => {
+    let attempts = 0;
+    const fetchMock = vi.fn(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        return new Response(JSON.stringify({ message: "数据库暂不可用" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({
+        page: 0,
+        size: 50,
+        total: 1,
+        items: [{
+          event_id: "event-1",
+          event_type: "RESULT_OVERRIDDEN",
+          occurred_at: "2026-08-25T20:00:00+08:00",
+          operator: "审核员A",
+          target_type: "ALARM_RECORD",
+          target_id: "record-1",
+          result: "SUCCESS",
+          trace_id: "trace-1",
+          details: { reason: "复核" },
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(ReviewOperations);
+
+    await fireEvent.click(screen.getByTestId("audit-refresh"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("数据库暂不可用");
+    await fireEvent.update(screen.getByTestId("audit-filter"), "RESULT_OVERRIDDEN");
+    await fireEvent.click(screen.getByTestId("audit-refresh"));
+
+    expect(await screen.findByTestId("audit-table")).toHaveTextContent("RESULT_OVERRIDDEN");
+    expect(screen.getByTestId("audit-table")).toHaveTextContent("审核员A");
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining("event_type=RESULT_OVERRIDDEN"),
+      expect.anything(),
+    );
+  });
+
+  it("复位失败保留状态，重试成功后才通知上层清空业务状态", async () => {
+    let attempts = 0;
+    const fetchMock = vi.fn(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        return new Response(JSON.stringify({ message: "存在进行中的分析" }), {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({
+        completed_at: "2026-08-25T20:10:00+08:00",
+        business_state: "EMPTY",
+        deleted_counts: { alarm_record: 300, audit_event: 12 },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const view = render(ReviewOperations, { props: { runId: "run-1" } });
+
+    await fireEvent.update(screen.getByTestId("reset-confirmation"), "RESET_DEMO");
+    await fireEvent.click(screen.getByTestId("reset-button"));
+    expect(await screen.findByTestId("reset-message")).toHaveTextContent("存在进行中的分析");
+    expect(screen.getByTestId("report-pdf")).toBeEnabled();
+    expect(view.emitted().demoReset).toBeUndefined();
+
+    await fireEvent.click(screen.getByTestId("reset-button"));
+    await waitFor(() => expect(view.emitted().demoReset).toHaveLength(1));
+    expect(screen.getByTestId("reset-message")).toHaveTextContent("演示数据已复位");
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/v1/demo/reset", expect.objectContaining({
+      body: JSON.stringify({ operator: "demo-reviewer", confirmation: "RESET_DEMO" }),
+    }));
   });
 });

@@ -99,6 +99,27 @@ export interface EventChain {
   members: EventChainMember[];
 }
 
+export type NoiseType = "NORMAL" | "DUPLICATE" | "CHATTER" | "SHORT_LIVED" | "PERSISTENT";
+export type AlarmClass = "NUISANCE" | "ACTIONABLE" | "STANDARD";
+export type CauseCategory =
+  | "PROCESS_DISTURBANCE"
+  | "EQUIPMENT_FAULT"
+  | "INSTRUMENT_ISSUE"
+  | "MAINTENANCE_TEST"
+  | "UNKNOWN";
+
+export interface Classification {
+  noise_type: NoiseType;
+  alarm_class: AlarmClass;
+  cause_category: CauseCategory;
+}
+
+export interface ClassificationOverride {
+  operator: string;
+  reason: string;
+  updated_at: string;
+}
+
 export interface AlarmDetail extends AlarmListItem {
   return_time?: string;
   ack_time?: string;
@@ -112,6 +133,8 @@ export interface AlarmDetail extends AlarmListItem {
   disposition: Disposition;
   disposition_history: DispositionHistory[];
   event_chains: EventChain[];
+  algorithm_classification: Classification;
+  classification_override?: ClassificationOverride | null;
 }
 
 export interface AlarmFilters {
@@ -194,6 +217,22 @@ export async function updateDisposition(
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ status, operator, note }),
+    }),
+  );
+}
+
+export async function updateClassification(
+  runId: string,
+  recordId: string,
+  classification: Classification,
+  operator: string,
+  reason: string,
+): Promise<AlarmDetail> {
+  return apiResponse<AlarmDetail>(
+    await fetch(`/api/v1/analyses/${runId}/alarms/${recordId}/classification`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ ...classification, operator, reason }),
     }),
   );
 }

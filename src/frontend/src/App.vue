@@ -48,6 +48,7 @@ const importBusy = ref(false);
 const importMessage = ref("");
 const currentBatch = ref<ImportBatch>();
 const recentBatches = ref<ImportBatch[]>([]);
+const fileInputKey = ref(0);
 
 const statusText: Record<HealthStatus, string> = {
   UP: "UP",
@@ -151,6 +152,16 @@ async function refreshBatches() {
   }
 }
 
+function handleDemoReset() {
+  selectedFile.value = undefined;
+  mappingText.value = "";
+  currentBatch.value = undefined;
+  recentBatches.value = [];
+  importMessage.value = "";
+  importBusy.value = false;
+  fileInputKey.value += 1;
+}
+
 onMounted(loadHealth);
 </script>
 
@@ -160,6 +171,7 @@ onMounted(loadHealth);
       <p class="eyebrow">报警管理系统</p>
       <h1 id="page-title">2026 年灾后重建 Demo</h1>
       <p class="synthetic-notice">仅使用合成数据</p>
+      <p class="demo-identity">本地演示身份 <strong>demo-reviewer</strong></p>
       <p class="identity-copy">
         从合成文件导入、规则分析、统计查看到人工处置均在本页面完成；规则输出仅供审核演示，不代表已确认工业根因。
       </p>
@@ -211,7 +223,7 @@ onMounted(loadHealth);
       <div class="import-form">
         <label>
           <span>报警文件</span>
-          <input data-testid="file-input" type="file" accept=".csv,.txt,.xlsx" :disabled="importBusy" @change="selectFile" />
+          <input :key="fileInputKey" data-testid="file-input" type="file" accept=".csv,.txt,.xlsx" :disabled="importBusy" @change="selectFile" />
         </label>
         <label>
           <span>可选字段映射（目标字段到源表头的 JSON）</span>
@@ -294,6 +306,6 @@ onMounted(loadHealth);
       </div>
     </section>
 
-    <BusinessWorkflow :current-batch="currentBatch" :batches="recentBatches" />
+    <BusinessWorkflow :current-batch="currentBatch" :batches="recentBatches" @demo-reset="handleDemoReset" />
   </main>
 </template>
