@@ -1,0 +1,32 @@
+{
+  "synthetic": true,
+  "generator_version": "1.0.0",
+  "seed": 20260825,
+  "total_data_rows": 42,
+  "files": {
+    "missing_header.csv": {
+      "data_rows": 6,
+      "expected_error_code": "MISSING_HEADER"
+    },
+    "required_value_missing.csv": {
+      "data_rows": 8,
+      "expected_error_code": "REQUIRED_VALUE_MISSING"
+    },
+    "invalid_time.csv": {
+      "data_rows": 7,
+      "expected_error_code": "INVALID_TIME"
+    },
+    "invalid_enum.csv": {
+      "data_rows": 7,
+      "expected_error_code": "INVALID_ENUM"
+    },
+    "invalid_number.csv": {
+      "data_rows": 7,
+      "expected_error_code": "INVALID_NUMBER"
+    },
+    "time_order_invalid.csv": {
+      "data_rows": 7,
+      "expected_error_code": "TIME_ORDER_INVALID"
+    }
+  }
+}
