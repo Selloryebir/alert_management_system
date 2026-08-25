@@ -8,8 +8,10 @@
 - `smoke/synthetic_smoke_utf8.txt`：UTF-8、制表符分隔，与 CSV 同逻辑。
 - `smoke/synthetic_smoke.xlsx`：与 CSV 同逻辑；首个工作表是隐藏合成元数据，首个可见工作表是 300 条报警。
 - `smoke/synthetic_smoke_gb18030.csv`：GB18030 编码的 12 条中文导入小样例。
-- `invalid/*.csv`：六类可达输入错误，共 42 条数据行。
-- `expected/*.json`：格式、场景计数和确定性摘要，不代表真实工业准确率。
+- `invalid/*.csv`：六类可达输入错误，共 42 条数据行；除缺表头为文件级失败外，其余每行恰有一个明确错误。
+- `expected/*.json`：格式、场景计数和确定性摘要；无效集清单精确列出文件级错误及每行的 `source_row`、字段和错误码，不代表真实工业准确率。
+
+无效集清单中的 `valid_rows` 表示通过文件级与逐行校验、可进入 `READY` 的数据行数。`missing_header.csv` 在文件级即阻断，因此不继续制造逐行派生错误，`valid_rows` 为 0。
 
 场景覆盖报警洪泛、重复、抖动、短时恢复、长期未恢复、仪表漂移、设备跳停序列、工艺扰动级联和维护测试。位号、地点、操作员和描述均带有 `SYNTHETIC` 标识。
 

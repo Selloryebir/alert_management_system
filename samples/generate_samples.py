@@ -313,6 +313,7 @@ def generate_invalid(seed: int) -> None:
     invalid_dir = ROOT / "samples" / "invalid"
     invalid_dir.mkdir(parents=True, exist_ok=True)
     files: dict[str, list[dict[str, str]]] = {}
+    row_errors: dict[str, list[dict[str, object]]] = {}
 
     missing_header = [valid_invalid_base(index, seed) for index in range(6)]
     write_delimited(
@@ -323,6 +324,7 @@ def generate_invalid(seed: int) -> None:
         fields=[field for field in FIELDS if field != "description"],
     )
     files["missing_header.csv"] = missing_header
+    row_errors["missing_header.csv"] = []
 
     missing_rows = [valid_invalid_base(index, seed) for index in range(8)]
     for row, field in zip(
@@ -332,48 +334,72 @@ def generate_invalid(seed: int) -> None:
     ):
         row[field] = ""
     files["required_value_missing.csv"] = missing_rows
+    row_errors["required_value_missing.csv"] = [
+        {
+            "source_row": int(row["source_row"]),
+            "field": field,
+            "code": "REQUIRED_VALUE_MISSING",
+        }
+        for row, field in zip(
+            missing_rows,
+            ("event_time", "site", "area", "tag", "description", "priority", "state", "source_system"),
+            strict=True,
+        )
+    ]
 
     time_rows = [valid_invalid_base(index, seed) for index in range(7)]
     time_mutations = (
-        ("event_time", "not-a-time"),
-        ("event_time", "2026-13-40T25:61:00+08:00"),
-        ("event_time", "2026/01/15 08:00"),
-        ("return_time", "yesterday"),
+        ("event_time", "NOT_A_TIMESTAMP"),
+        ("event_time", "2026-02-30T08:00:00+08:00"),
+        ("event_time", "2026-01-15T08:00:00+25:00"),
+        ("return_time", "NOT_A_TIMESTAMP"),
         ("return_time", "2026-02-30T08:00:00+08:00"),
-        ("ack_time", "08:00:00"),
-        ("ack_time", "2026-01-15T08:00:00+99:00"),
+        ("ack_time", "NOT_A_TIMESTAMP"),
+        ("ack_time", "2026-01-15T08:00:00+25:00"),
     )
     for row, (field, value) in zip(time_rows, time_mutations, strict=True):
         row[field] = value
     files["invalid_time.csv"] = time_rows
+    row_errors["invalid_time.csv"] = [
+        {"source_row": int(row["source_row"]), "field": field, "code": "INVALID_TIME"}
+        for row, (field, _) in zip(time_rows, time_mutations, strict=True)
+    ]
 
     enum_rows = [valid_invalid_base(index, seed) for index in range(7)]
     enum_mutations = (
+        ("priority", "INVALID_PRIORITY"),
         ("priority", "P0"),
         ("priority", "P5"),
-        ("priority", "HIGH"),
-        ("priority", "p1"),
+        ("priority", "PRIORITY_1"),
+        ("state", "INVALID_STATE"),
         ("state", "OPEN"),
-        ("state", "active"),
-        ("state", "CLEARED"),
+        ("state", "RETURNED_WRONG"),
     )
     for row, (field, value) in zip(enum_rows, enum_mutations, strict=True):
         row[field] = value
     files["invalid_enum.csv"] = enum_rows
+    row_errors["invalid_enum.csv"] = [
+        {"source_row": int(row["source_row"]), "field": field, "code": "INVALID_ENUM"}
+        for row, (field, _) in zip(enum_rows, enum_mutations, strict=True)
+    ]
 
     number_rows = [valid_invalid_base(index, seed) for index in range(7)]
     number_mutations = (
-        ("value", "NaN"),
-        ("value", "Infinity"),
-        ("value", "12,34"),
-        ("value", "十"),
-        ("threshold", "75%"),
-        ("threshold", "--1"),
+        ("value", "NOT_A_NUMBER"),
+        ("value", "--1"),
+        ("value", "1.2.3"),
+        ("value", "12x"),
+        ("threshold", "NOT_A_NUMBER"),
+        ("threshold", "++2"),
         ("threshold", "1e+"),
     )
     for row, (field, value) in zip(number_rows, number_mutations, strict=True):
         row[field] = value
     files["invalid_number.csv"] = number_rows
+    row_errors["invalid_number.csv"] = [
+        {"source_row": int(row["source_row"]), "field": field, "code": "INVALID_NUMBER"}
+        for row, (field, _) in zip(number_rows, number_mutations, strict=True)
+    ]
 
     order_rows = [valid_invalid_base(index, seed) for index in range(7)]
     for index, row in enumerate(order_rows):
@@ -383,6 +409,14 @@ def generate_invalid(seed: int) -> None:
         else:
             row["ack_time"] = iso(event_time - timedelta(seconds=index + 1))
     files["time_order_invalid.csv"] = order_rows
+    row_errors["time_order_invalid.csv"] = [
+        {
+            "source_row": int(row["source_row"]),
+            "field": "return_time" if index % 2 == 0 else "ack_time",
+            "code": "TIME_ORDER_INVALID",
+        }
+        for index, row in enumerate(order_rows)
+    ]
 
     for name, rows in files.items():
         if name == "missing_header.csv":
@@ -397,17 +431,43 @@ def generate_invalid(seed: int) -> None:
         "invalid_number.csv": "INVALID_NUMBER",
         "time_order_invalid.csv": "TIME_ORDER_INVALID",
     }
+    file_expectations = {}
+    for name, code in expected_codes.items():
+        path = invalid_dir / name
+        file_expectations[name] = {
+            "data_rows": len(files[name]),
+            "total_rows": len(files[name]),
+            "valid_rows": 0,
+            "expected_error_code": code,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "file_errors": (
+                [
+                    {
+                        "source_row": 1,
+                        "field": "description",
+                        "code": "MISSING_HEADER",
+                    }
+                ]
+                if name == "missing_header.csv"
+                else []
+            ),
+            "row_errors": row_errors[name],
+        }
+
     write_json(
         ROOT / "samples" / "expected" / "invalid-summary.json",
         {
+            "schema_version": 1,
             "synthetic": True,
             "generator_version": GENERATOR_VERSION,
             "seed": seed,
+            "valid_rows_definition": "通过文件级与逐行校验、可进入 READY 的数据行数；文件级阻断时为 0",
+            "row_validation_skipped_on_file_error": True,
             "total_data_rows": sum(len(rows) for rows in files.values()),
-            "files": {
-                name: {"data_rows": len(files[name]), "expected_error_code": code}
-                for name, code in expected_codes.items()
-            },
+            "total_valid_rows": 0,
+            "total_file_errors": 1,
+            "total_row_errors": sum(len(errors) for errors in row_errors.values()),
+            "files": file_expectations,
         },
     )
 
