@@ -146,9 +146,10 @@ def tracked_files(errors: list[str]) -> list[Path]:
 
 def validate_tracked_files(errors: list[str]) -> None:
     for relative_path in tracked_files(errors):
-        if relative_path.parts[:3] == NATIVE_RELEASE_TEMPLATE_PARTS:
-            continue
-        if any(part in GENERATED_PARTS for part in relative_path.parts):
+        parts_to_check = relative_path.parts
+        if parts_to_check[:3] == NATIVE_RELEASE_TEMPLATE_PARTS:
+            parts_to_check = parts_to_check[3:]
+        if any(part in GENERATED_PARTS for part in parts_to_check):
             errors.append(f"已跟踪文件位于生成或依赖目录：{relative_path.as_posix()}")
 
 

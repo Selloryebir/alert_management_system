@@ -173,7 +173,8 @@ function Assert-PathUnderRoot {
 }
 
 function Get-CurrentSourceCommit {
-    $result = Invoke-NativeProcess "git.exe" @("-C", $repositoryRoot, "rev-parse", "HEAD")
+    $result = Invoke-NativeProcess "git.exe" @(
+        "-c", "safe.directory=$repositoryRoot", "-C", $repositoryRoot, "rev-parse", "HEAD")
     $commit = (($result.Output -join "`n").Trim())
     Assert-True ($result.ExitCode -eq 0 -and $commit -match '^[0-9a-f]{40}$') "无法读取当前 Git 提交。"
     return $commit
@@ -181,17 +182,20 @@ function Get-CurrentSourceCommit {
 
 function Resolve-Archive {
     param([string]$RequestedArchive)
+
+    $sourceCommit = Get-CurrentSourceCommit
+    $statusResult = Invoke-NativeProcess "git.exe" @(
+        "-c", "safe.directory=$repositoryRoot", "-C", $repositoryRoot,
+        "status", "--porcelain", "--untracked-files=all")
+    Assert-True ($statusResult.ExitCode -eq 0) "无法检查 Git 工作区状态。"
+    if ($statusResult.Output.Count -gt 0 -and -not $AllowDirty) {
+        throw "正式原生发布拒绝脏工作区；请提交改动后重试。"
+    }
+
     if (-not [string]::IsNullOrWhiteSpace($RequestedArchive)) {
         $resolved = [IO.Path]::GetFullPath($RequestedArchive)
         Assert-True (Test-Path -LiteralPath $resolved -PathType Leaf) "指定 ZIP 不存在：$resolved"
         return $resolved
-    }
-
-    $sourceCommit = Get-CurrentSourceCommit
-    $statusResult = Invoke-NativeProcess "git.exe" @("-C", $repositoryRoot, "status", "--porcelain", "--untracked-files=all")
-    Assert-True ($statusResult.ExitCode -eq 0) "无法检查 Git 工作区状态。"
-    if ($statusResult.Output.Count -gt 0 -and -not $AllowDirty) {
-        throw "正式原生发布拒绝脏工作区；请提交改动后重试。"
     }
 
     $commitArtifactRoot = Join-Path $artifactRoot $sourceCommit
@@ -252,6 +256,8 @@ function Assert-ReleaseManifest {
     $manifestPath = Join-Path $ReleaseRoot "release-manifest.json"
     $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ($manifest.source_commit -eq $ExpectedCommit) "发布 manifest 源提交与当前提交不一致。"
+    Assert-True ($manifest.PSObject.Properties.Name -contains "source_dirty") "发布 manifest 缺少 source_dirty。"
+    Assert-True (-not [bool]$manifest.source_dirty -or $AllowDirty) "正式验收拒绝 source_dirty=true 的发布包。"
     $entries = @($manifest.files)
     Assert-True ($entries.Count -gt 0) "发布 manifest 没有文件清单。"
     $seen = @{}

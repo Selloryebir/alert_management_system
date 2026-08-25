@@ -46,9 +46,24 @@ jobs:
             .runtime/native/tools
           key: m6-native-v1-${{ runner.os }}-${{ hashFiles('scripts/native/build-release.ps1', 'packaging/native/runtime-lock.json', 'packaging/native/pyinstaller.lock', 'packaging/native/algorithm-service.spec', 'src/algorithm/requirements.lock', 'src/frontend/package-lock.json', 'tests/e2e/package-lock.json') }}
 
-      - name: 构建并执行双目录正式验收
+      - name: 构建正式原生发布包
+        id: build
         shell: powershell
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native/verify-release.ps1
+        run: |
+          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native/build-release.ps1
+          $output | ForEach-Object { Write-Host $_ }
+          $markers = @($output | Where-Object { [string]$_ -like "NATIVE_RELEASE_ZIP=*" })
+          if ($markers.Count -ne 1) {
+            throw "构建脚本未输出唯一的 NATIVE_RELEASE_ZIP。"
+          }
+          $archive = ([string]$markers[0]).Substring("NATIVE_RELEASE_ZIP=".Length).Trim()
+          [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "archive=$archive`n", (New-Object Text.UTF8Encoding($false)))
+
+      - name: 使用标准用户执行双目录正式验收
+        shell: powershell
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native/verify-release-as-standard-user.ps1 `
+            -ArchivePath "${{ steps.build.outputs.archive }}"
 
       - name: 保存原生发布包
         if: success()
@@ -72,5 +87,6 @@ jobs:
             .runtime/native/verification/**/round-*-summary.json
             .runtime/native/verification/**/logs/*.log
             .runtime/native/verification/**/test-results/**
+            .runtime/native/standard-user-verification/*.log
           if-no-files-found: warn
           retention-days: 14
