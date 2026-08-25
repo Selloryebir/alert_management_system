@@ -241,7 +241,6 @@ def test_chatter_finds_an_interior_qualifying_window_with_a_quiet_tail() -> None
         "ACTIVE",
         "RETURNED",
         "ACTIVE",
-        "ACTIVE",
     )
     records = [
         record(
@@ -257,11 +256,43 @@ def test_chatter_finds_an_interior_qualifying_window_with_a_quiet_tail() -> None
 
     indexed = by_id(analyze(records, run="interior-chatter"))
 
-    assert indexed[identity("interior-7")]["noise_type"] == "CHATTER"
+    assert indexed[identity("interior-0")]["noise_type"] == "NORMAL"
+    assert {
+        indexed[identity(f"interior-{index}")]["noise_type"]
+        for index in range(1, 7)
+    } == {"CHATTER"}
+    assert indexed[identity("interior-6")]["score"] == 0.8
     assert any(
         "A=T/(N-1)=0.800000" in line
-        for line in indexed[identity("interior-7")]["evidence"]
+        for line in indexed[identity("interior-6")]["evidence"]
     )
+
+
+def test_chatter_evidence_size_is_linear_for_a_large_same_time_group() -> None:
+    records = [
+        record(
+            f"dense-{index}",
+            0,
+            tag="DENSE",
+            state="ACTIVE" if index % 2 == 0 else "RETURNED",
+            return_after=20 if index % 2 else None,
+            value=str(index),
+            source_row=index + 2,
+        )
+        for index in range(500)
+    ]
+
+    result = analyze(records, run="dense-chatter")
+    chatter_evidence = [
+        line
+        for item in result["record_results"]
+        for line in item["evidence"]
+        if line.startswith("EXPERT_CHATTER_V2")
+    ]
+
+    assert len(chatter_evidence) == 500
+    assert max(map(len, chatter_evidence)) < 400
+    assert sum(map(len, chatter_evidence)) < 200_000
 
 
 @pytest.mark.parametrize(

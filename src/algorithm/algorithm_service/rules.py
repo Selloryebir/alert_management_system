@@ -391,7 +391,6 @@ def _mark_chatter(
                 continue
             negative_ratio, end, start, transitions, count = active[0]
             ratio = -negative_ratio
-            state_sequence = "->".join(str(_binary_state(item)) for item in ordered[start : end + 1])
             _set_match(
                 strengths,
                 evidence,
@@ -400,7 +399,8 @@ def _mark_chatter(
                 ratio,
                 "EXPERT_CHATTER_V2：同关系范围和位号的滑动窗口命中；"
                 f"窗口 {ordered[start].event_time.isoformat()} 至 {ordered[end].event_time.isoformat()}，"
-                f"N={count}，二值状态={state_sequence}，T={transitions}，"
+                f"N={count}，首尾二值状态={_binary_state(ordered[start])}->"
+                f"{_binary_state(ordered[end])}，T={transitions}，"
                 f"A=T/(N-1)={ratio:.6f}，门槛 N>={minimum}、A>={minimum_ratio:.6f}。",
             )
 
