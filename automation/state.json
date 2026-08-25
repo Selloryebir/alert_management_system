@@ -1,50 +1,8 @@
 {
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
-  "current_stage": "M5",
-  "active_run": {
-    "stage": "M5",
-    "base_commit": "fcdf0ef652a99c285f616fc6e59aa4d869083d05",
-    "requirements": [
-      "PRD-001",
-      "PRD-014",
-      "PRD-016",
-      "PRD-018"
-    ],
-    "allowed_paths": [
-      "src/backend/",
-      "src/frontend/",
-      "tests/e2e/",
-      "scripts/dev/",
-      ".github/workflows/",
-      "README.md",
-      "automation/workflow.json",
-      "automation/state.json",
-      "docs/planning/M5-implementation.md",
-      "docs/verification/evidence/M5.md"
-    ],
-    "checks": [
-      "scripts/dev/test.sh：后端 34、算法 28、合成数据 5、跨组件契约 4、前端 12 项通过",
-      "M5 两轮 300 行真实 Chromium 报告、审计、分类修订、处置和复位闭环通过，规范化摘要一致，耗时 13899 ms",
-      "20000 行页面分析与两类报告通过，整轮 18332 ms；PDF 1152 ms/21340 bytes，XLSX 1843 ms/2346969 bytes",
-      "PDF 控制字符和缺字边界回归通过：中文保真，内嵌换行转空格，emoji 缺字转问号，PDF 可打开和提取",
-      "PostgreSQL 自定义格式备份可读；复位后业务表为零，非业务 SQL 哨兵保留",
-      "成功和失败退出均停止 PostgreSQL/Java/Python，PID 文件为零且 8080 不可达",
-      "Shell 语法、git diff --check 和 M5 变更路径白名单通过"
-    ],
-    "failures": [
-      "首次分类白名单遗漏 ACTIONABLE；按 Python v1 契约补齐 Java、V5 CHECK 和成功/非法零写入测试",
-      "首次浏览器测试因页面存在两个 demo-reviewer 文本导致选择器歧义；限定首个身份标识后业务流程继续",
-      "第二次浏览器测试把复位成功文案错误限定为含成功二字；改为断言稳定语义已复位",
-      "DrvFS 上第二个 Vitest worker 偶发启动超时；将同范围 M5 用例并入既有单文件后 12 项稳定通过",
-      "首个固定候选的 CI 测试夹具把 jsdom Blob 直接传给 Node Response，触发 object.stream 不兼容；改用原始响应字节后保持浏览器生产路径不变",
-      "第二个固定候选未提交 M5 和备份脚本的 Unix 可执行位，CI 以 126 拒绝执行；已在 Git 索引固定为 100755",
-      "第三个固定候选的独立审查发现合法内嵌换行可使 PDFBox 因 U+000A 无字形而返回 500；在 PDF 输出边界规范化控制字符和字体不支持字符并补集成测试"
-    ],
-    "decision": "M5 只实现整次分析 PDF/XLSX、统一业务审计、最小人工分类修订和限定业务表的演示复位；原始算法结果不可变，不建设报告任务、文件仓库、消息队列、权限系统或通用工作流。实现及作者验收完成，进入固定候选独立审查。",
-    "next_action": "固定候选并推送，由未参与 M5 实现的智能体复跑全量测试、真实 G5、报告内容对账和复位范围审计。",
-    "resume_status": null
-  },
+  "current_stage": "M6",
+  "active_run": null,
   "stages": {
     "M0": {
       "status": "passed",
@@ -102,22 +60,24 @@
       "note": "看板、详情、事件链和人工处置已通过作者检查、独立审查及 dev 远端真实浏览器回归。"
     },
     "M5": {
-      "status": "review",
+      "status": "passed",
       "attempt": 4,
-      "evidence_files": [],
-      "checkpoint_commit": null,
-      "remote_verified": false,
-      "next_action": "固定并推送第四个候选，由未参与 M5 实现的智能体复跑全量测试、真实 G5 和 PDF 边界回归。",
-      "note": "第三个候选的 PDF 控制字符缺陷已修复；83 项测试、真实 Chromium 300/20000 行门槛和针对性回归通过。"
+      "evidence_files": [
+        "docs/verification/evidence/M5.md"
+      ],
+      "checkpoint_commit": "de98a05eed9052383a30881ef85760440cf93667",
+      "remote_verified": true,
+      "next_action": "无；M5 已通过并解锁 M6。",
+      "note": "报告、统一业务审计、人工分类修订、项目备份和演示复位已通过作者检查、第四候选独立审查及 dev 远端回归。"
     },
     "M6": {
-      "status": "blocked",
-      "attempt": 0,
+      "status": "ready",
+      "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "等待 M5 通过。",
-      "note": "等待 M5 通过。"
+      "next_action": "从远端核验的 M5 检查点建立 feat/m6-windows-native 并冻结原生运行时、PowerShell 运维和双目录验收契约。",
+      "note": "M5 已通过；M6 范围由 PRD-002/004/005/006/015/018 和 G6 固定。"
     },
     "M7": {
       "status": "blocked",
