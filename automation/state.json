@@ -1,50 +1,8 @@
 {
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
-  "current_stage": "M3",
-  "active_run": {
-    "stage": "M3",
-    "base_commit": "3959ebe6495db604b6bb981ce38778e59b944075",
-    "requirements": [
-      "PRD-004",
-      "PRD-009",
-      "PRD-010",
-      "PRD-011",
-      "PRD-015"
-    ],
-    "allowed_paths": [
-      "src/algorithm/",
-      "src/backend/",
-      "samples/expected/",
-      "samples/generate_samples.py",
-      "samples/smoke/",
-      "tests/contract/",
-      "tests/data/",
-      "scripts/dev/",
-      ".github/workflows/",
-      "README.md",
-      "automation/workflow.json",
-      "automation/state.json",
-      "docs/verification/evidence/M3.md"
-    ],
-    "checks": [
-      "scripts/dev/test.sh：后端 29、算法 28、合成数据 5、跨组件契约 4、前端 5 项通过",
-      "scripts/dev/m3-analysis-smoke.sh：实际 Java、Python、PostgreSQL 17.6 两次逐行结果及 12 条关联链与独立黄金预期一致",
-      "算法服务中断时任务为 FAILED 且结果零写入；恢复后同批次 attempt=2 成功",
-      "固定种子 20,000 行在实际组件闭环中 4,547 ms 完成分析",
-      "嵌入式 PostgreSQL 集成测试覆盖超时、503、非法契约、超窗/跨关系链、强制完成失败回滚和 HTTP 边界"
-    ],
-    "failures": [
-      "初版 Java 参数提议与已冻结黄金规则冲突；已删除兼容分支并统一为 rules-v1.0.0",
-      "首次冒烟因空 failure 字段被 JSON 省略而失败；断言按契约允许缺省空值后通过",
-      "首次跨批次比较受时区文本、随机记录 UUID 和链排序影响；改为瞬时时间、源行证据和稳定排序后通过",
-      "首次固定候选独立审查为 FAIL：算法会把不同 site/area/unit 的步骤误连，且 Java 会接受超时间窗的非法链；已按关系键分组并在 Java 端校验关系键和时间窗",
-      "首次修复候选的允许路径漏列 automation/workflow.json；已补齐白名单并由审查者核验"
-    ],
-    "decision": "独立审查阻断已用最小改动修复并完成作者回归；第二次固定候选后不扩展 M4 功能。",
-    "next_action": "提交第二次固定候选并推送，等待远端 CI 与独立复核；两者通过后非快进合入 dev。",
-    "resume_status": null
-  },
+  "current_stage": "M4",
+  "active_run": null,
   "stages": {
     "M0": {
       "status": "passed",
@@ -80,22 +38,24 @@
       "note": "合成样例、精确校验、原子导入、原始行追溯和最小导入向导已通过本机、独立审查及 dev 远端 CI。"
     },
     "M3": {
-      "status": "review",
-      "attempt": 1,
-      "evidence_files": [],
-      "checkpoint_commit": null,
-      "remote_verified": false,
-      "next_action": "对固定候选执行独立审查和远端 CI，确认 G3 后合入 dev。",
-      "note": "首次独立审查发现跨关系误连和 Java 未拒绝超窗链；修复后规则、Java 契约、黄金样例和真实组件冒烟均已通过作者检查。"
+      "status": "passed",
+      "attempt": 2,
+      "evidence_files": [
+        "docs/verification/evidence/M3.md"
+      ],
+      "checkpoint_commit": "dacfdf28d9b79a7f9ccd6b24dae339846f65e6fe",
+      "remote_verified": true,
+      "next_action": "无；M3 已通过并解锁 M4。",
+      "note": "可解释规则、关系/时间窗事件链、Java 契约与原子保存已通过本机、第二次独立审查及 dev 远端 CI。"
     },
     "M4": {
-      "status": "blocked",
+      "status": "ready",
       "attempt": 0,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "等待 M3 通过。",
-      "note": "等待 M3 通过。"
+      "next_action": "从远端核验的 M3 状态转换提交创建 M4 功能分支，并锁定浏览器主流程与 G4 验收。",
+      "note": "M3 已通过；等待建立 M4 活动运行。"
     },
     "M5": {
       "status": "blocked",
