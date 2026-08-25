@@ -52,7 +52,9 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: src/frontend/package-lock.json
+          cache-dependency-path: |
+            src/frontend/package-lock.json
+            tests/e2e/package-lock.json
       - name: 运行组件测试
         run: scripts/dev/test.sh
       - name: 运行两轮集成冒烟
@@ -61,6 +63,15 @@ jobs:
         run: scripts/dev/m2-import-smoke.sh
       - name: 运行 M3 分析冒烟
         run: scripts/dev/m3-analysis-smoke.sh
+      - name: 准备 Chromium 浏览器
+        run: |
+          npm ci --prefix tests/e2e
+          npm --prefix tests/e2e run install:chromium -- --with-deps
+      - name: 运行 M4 浏览器业务闭环
+        env:
+          E2E_DEPS_READY: "1"
+          E2E_BROWSER_READY: "1"
+        run: scripts/dev/m4-browser-smoke.sh
       - name: 停止测试进程
         if: always()
         run: scripts/dev/stop.sh
