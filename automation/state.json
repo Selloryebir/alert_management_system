@@ -2,7 +2,32 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M4",
-  "active_run": null,
+  "active_run": {
+    "stage": "M4",
+    "base_commit": "f3660b00867e5f4a466dd73c99ddf2dc320b654e",
+    "requirements": [
+      "PRD-006",
+      "PRD-012",
+      "PRD-013",
+      "PRD-018"
+    ],
+    "allowed_paths": [
+      "src/backend/",
+      "src/frontend/",
+      "tests/e2e/",
+      "scripts/dev/",
+      ".github/workflows/",
+      "README.md",
+      "automation/workflow.json",
+      "automation/state.json",
+      "docs/verification/evidence/M4.md"
+    ],
+    "checks": [],
+    "failures": [],
+    "decision": "M4 保持单页 Vue 与 Java 单体边界；统计和处置状态只来自 PostgreSQL，不在前端复制业务规则。",
+    "next_action": "先冻结看板、详情、处置 API 与固定抽样，再并行实现 Java 业务读写、Vue 主流程和浏览器验收。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -49,13 +74,13 @@
       "note": "可解释规则、关系/时间窗事件链、Java 契约与原子保存已通过本机、第二次独立审查及 dev 远端 CI。"
     },
     "M4": {
-      "status": "ready",
-      "attempt": 0,
+      "status": "in_progress",
+      "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "从远端核验的 M3 状态转换提交创建 M4 功能分支，并锁定浏览器主流程与 G4 验收。",
-      "note": "M3 已通过；等待建立 M4 活动运行。"
+      "next_action": "冻结业务 API、固定抽样和 E2E 主路径，完成看板、详情、关联链与人工处置。",
+      "note": "活动分支 feat/m4-business-workflow 已从远端核验的 M3 状态转换提交建立。"
     },
     "M5": {
       "status": "blocked",
