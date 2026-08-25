@@ -2,7 +2,33 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M3",
-  "active_run": null,
+  "active_run": {
+    "stage": "M3",
+    "base_commit": "3959ebe6495db604b6bb981ce38778e59b944075",
+    "requirements": [
+      "PRD-004",
+      "PRD-009",
+      "PRD-010",
+      "PRD-011",
+      "PRD-015"
+    ],
+    "allowed_paths": [
+      "src/algorithm/",
+      "src/backend/",
+      "samples/expected/",
+      "tests/contract/",
+      "scripts/dev/",
+      ".github/workflows/",
+      "README.md",
+      "automation/state.json",
+      "docs/verification/evidence/M3.md"
+    ],
+    "checks": [],
+    "failures": [],
+    "decision": "M2 远端状态转换已核验；M3 采用 Python 纯计算规则、Java 同步编排与 PostgreSQL 原子保存的最小闭环。",
+    "next_action": "先建立独立黄金预期和 v1 请求/响应契约，再并行实现 Python 规则与 Java 编排，最后执行 G3 故障和确定性门槛。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -38,13 +64,13 @@
       "note": "合成样例、精确校验、原子导入、原始行追溯和最小导入向导已通过本机、独立审查及 dev 远端 CI。"
     },
     "M3": {
-      "status": "ready",
-      "attempt": 0,
+      "status": "in_progress",
+      "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "从 dev 的 M2 状态转换提交建立 M3 功能分支，按 G3 实现规则分析闭环。",
-      "note": "M2 已通过；尚未开始 M3 活动运行。"
+      "next_action": "实现固定规则、关联事件链、Java 调用/契约校验/原子保存和 G3 自动测试。",
+      "note": "活动分支 feat/m3-analysis-pipeline 已从远端核验的 M2 状态转换提交建立。"
     },
     "M4": {
       "status": "blocked",
