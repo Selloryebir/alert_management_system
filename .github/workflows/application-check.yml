@@ -57,6 +57,8 @@ jobs:
         run: scripts/dev/test.sh
       - name: 运行两轮集成冒烟
         run: scripts/dev/restart-smoke.sh
+      - name: 运行 M2 导入冒烟
+        run: scripts/dev/m2-import-smoke.sh
       - name: 停止测试进程
         if: always()
         run: scripts/dev/stop.sh
