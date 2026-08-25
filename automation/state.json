@@ -1,8 +1,46 @@
 {
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
-  "current_stage": "M7",
-  "active_run": null,
+  "current_stage": "M8",
+  "active_run": {
+    "stage": "M8",
+    "base_commit": "21e69f097f88fa75fa8442694dafbdd09ffcd402",
+    "requirements": [
+      "PRD-028",
+      "PRD-029",
+      "PRD-030"
+    ],
+    "allowed_paths": [
+      "README.md",
+      "automation/",
+      "docs/algorithm/",
+      "docs/architecture/",
+      "docs/decisions/",
+      "docs/planning/",
+      "docs/product/",
+      "docs/releases/",
+      "docs/security/",
+      "packaging/native/",
+      "scripts/validate_formal_baseline.py",
+      "scripts/dev/",
+      "src/README.md",
+      "src/algorithm/README.md",
+      "src/backend/README.md",
+      "src/backend/pom.xml",
+      "src/backend/src/main/resources/application.yml",
+      "src/frontend/",
+      "tests/",
+      "compose.yaml",
+      ".github/workflows/"
+    ],
+    "checks": [
+      "PR #1 以 merge commit 合入 main；main 的仓库、应用、Windows 原生和 Docker G7 均成功；v0.1.0 指向已验证合并提交。"
+    ],
+    "failures": [],
+    "decision": "M8 只冻结正式身份、来源能力处置、产品化阶段和研究/安全基线，并同步必要的用户可见身份；不提前实现 M9-M14 业务能力。",
+    "next_action": "建立 M8 实施契约和来源闭环矩阵，并替换正式运行路径中的灾后重建身份。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -89,8 +127,71 @@
       ],
       "checkpoint_commit": "a0526c0bf1c040dee2d017405e051cf92ef8cf29",
       "remote_verified": true,
-      "next_action": "等待人工审核，并由人工决定是否将 dev 合并到 main。",
-      "note": "第五固定候选已通过本机 Windows 11 Docker Desktop、远端 Ubuntu G7、独立审查及 dev 合并检查点三条远端流水线；自动开发阶段全部完成。"
+      "next_action": "无；已通过 PR #1 合入 main 并标记 v0.1.0。",
+      "note": "第五固定候选已通过本机 Windows 11 Docker Desktop、远端 Ubuntu G7、独立审查及 dev 合并检查点三条远端流水线；PR #1 的四条发布检查与 main 合并后四条检查均成功。"
+    },
+    "M8": {
+      "status": "in_progress",
+      "attempt": 1,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "建立 M8 实施契约和来源闭环矩阵，并替换正式运行路径中的灾后重建身份。",
+      "note": "以 main/dev 同步且已标记 v0.1.0 的提交为基线。"
+    },
+    "M9": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M8 通过后实现 hybrid-v2 可泛化算法。",
+      "note": "依赖 M8 的正式产品和模型契约。"
+    },
+    "M10": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M9 通过后实现项目化业务与全中文 UX。",
+      "note": "依赖 M9 的稳定算法契约。"
+    },
+    "M11": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M10 通过后实现身份权限与安全部署边界。",
+      "note": "依赖项目数据作用域和完整业务路径。"
+    },
+    "M12": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M11 通过后实现恢复、质量和运行可靠性门槛。",
+      "note": "依赖安全部署配置和最终业务结构。"
+    },
+    "M13": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M12 通过后生成正式说明书和项目过程文件。",
+      "note": "文档必须从最终事实源生成，避免提前编写后漂移。"
+    },
+    "M14": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M13 通过后执行 Windows 11 业务用户终验。",
+      "note": "最终阶段通过后停在人工正式发布门禁。"
     }
   }
 }

@@ -1,11 +1,11 @@
 # 自动化阶段控制
 
-本目录把 `docs/planning/README.md` 中的 M0–M7 计划转换为可机器读取、可逐阶段推进的控制面。它不执行后台守护进程，也不绕过 Git、测试或人工裁决边界。
+本目录把 `docs/planning/README.md` 中的 M0–M14 计划转换为可机器读取、可逐阶段推进的控制面。M0–M7 形成 `v0.1.0` 可运行基线，M8–M14 推进正式产品化。控制面不执行后台守护进程，也不绕过 Git、测试或人工裁决边界。
 
 ## 文件
 
 - `workflow.json`：稳定的阶段顺序、依赖、引用、提示链和验收门槛。
-- `state.json`：唯一当前状态；初始为 M0 `passed`、M1 `ready`、M2–M7 `blocked`。
+- `state.json`：唯一当前状态；保存各阶段检查点、证据、失败和当前可恢复增量。
 - `prompts/start-goal.md`：发起持续目标时的入口提示。
 - `prompts/controller.md`：主智能体的循环、状态推进和提交规则。
 - `prompts/stage-worker.md`：实现型智能体的最小职责。
