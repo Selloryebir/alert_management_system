@@ -157,12 +157,12 @@ def _mark_duplicates(
             original = candidates[-1]
             matches[record.record_id].add("DUPLICATE")
             evidence[record.record_id].append(
-                f"同位号且核心值相同，在 {window} 秒窗口内重复；前序记录 {original.record_id}。"
+                f"同位号且核心值相同，在 {window} 秒窗口内重复；前序源行 {original.source_row}。"
             )
             for candidate in candidates:
                 matches[candidate.record_id].add("DUPLICATE")
                 evidence[candidate.record_id].append(
-                    f"同位号且核心值相同，在 {window} 秒窗口内重复；后序记录 {record.record_id}。"
+                    f"同位号且核心值相同，在 {window} 秒窗口内重复；后序源行 {record.source_row}。"
                 )
         candidates.append(record)
 

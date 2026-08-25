@@ -195,7 +195,7 @@ class AnalysisPersistenceService {
                 SELECT chain_id, start_record_id, start_time, end_time, association_rule, explanation
                   FROM event_chain
                  WHERE run_id = ?
-                 ORDER BY chain_id
+                 ORDER BY start_time, chain_id
                 """, (resultSet, rowNumber) -> new AnalysisView.EventChain(
                 resultSet.getString("chain_id"), resultSet.getObject("start_record_id", UUID.class),
                 resultSet.getObject("start_time", OffsetDateTime.class),
