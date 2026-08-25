@@ -242,7 +242,7 @@ test("报告、审计、人工修订和明确复位结果一致", async ({ page 
 
   for (let cycle = 1; cycle <= cycles; cycle += 1) {
     await page.goto("/");
-    await expect(page.getByText("2026 年灾后重建 Demo", { exact: false }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "报警管理系统" })).toBeVisible();
     await expect(page.getByText("本地演示身份 demo-reviewer", { exact: false }).first()).toBeVisible();
     const runId = await importAndAnalyze(page);
     await openSyntheticChainAlarm(page);

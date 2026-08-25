@@ -120,7 +120,7 @@ async function handleReset() {
     <div class="operations-grid">
       <section class="operation-card" aria-labelledby="report-title">
         <h4 id="report-title">整次分析报告</h4>
-        <p class="empty-copy">导出完整已完成分析；报告持续标明重建 Demo 与合成数据。</p>
+        <p class="empty-copy">导出完整已完成分析；使用示例数据时，报告会明确标注合成数据声明。</p>
         <label>
           报告操作者（必填）
           <input v-model="reportOperator" data-testid="report-operator" :disabled="reportBusy" />

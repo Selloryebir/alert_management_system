@@ -1,5 +1,5 @@
 {
-  "identity": "2026 年灾后重建 Demo",
+  "identity": "报警管理系统",
   "ports": {
     "postgres": 55432,
     "algorithm": 8001,

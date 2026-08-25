@@ -17,7 +17,7 @@ $nativeRuntime = Join-Path $repositoryRoot ".runtime\native"
 $cacheRoot = Join-Path $nativeRuntime "cache"
 $toolsRoot = Join-Path $nativeRuntime "tools"
 $stagingRoot = Join-Path $nativeRuntime ("staging\" + [Guid]::NewGuid().ToString("N"))
-$releaseRoot = Join-Path $stagingRoot "alert-management-demo-windows-x64"
+$releaseRoot = Join-Path $stagingRoot "alert-management-system-windows-x64"
 $lockPath = Join-Path $repositoryRoot "packaging\native\runtime-lock.json"
 $templateRoot = Join-Path $repositoryRoot "packaging\native\release"
 $algorithmSpec = Join-Path $repositoryRoot "packaging\native\algorithm-service.spec"
@@ -275,7 +275,7 @@ if (-not $AllowDirty -and $sourceDirty) {
 
 $shortCommit = $sourceCommit.Substring(0, 12)
 $artifactDirectory = Join-Path $OutputRoot $sourceCommit
-$zipName = "alert-management-demo-windows-x64-$shortCommit.zip"
+$zipName = "alert-management-system-windows-x64-$shortCommit.zip"
 $zipPath = Join-Path $artifactDirectory $zipName
 $checksumPath = "$zipPath.sha256"
 if (Test-Path -LiteralPath $artifactDirectory) {
@@ -437,7 +437,7 @@ try {
     )
     $manifest = [ordered]@{
         schema_version = 1
-        product = "alert-management-demo"
+        product = "alert-management-system"
         release_version = $ReleaseVersion
         target = "windows-x64"
         source_commit = $sourceCommit

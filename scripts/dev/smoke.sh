@@ -10,7 +10,7 @@ import os
 
 payload = json.loads(os.environ["HEALTH_JSON"])
 assert payload["status"] == "UP", payload
-assert payload["identity"] == "2026 年灾后重建 Demo", payload
+assert payload["identity"] == "报警管理系统", payload
 assert payload["components"] == {
     "system": {"status": "UP"},
     "database": {"status": "UP"},
@@ -27,7 +27,7 @@ if [[ -z "$asset_path" ]]; then
 fi
 bundle=$(curl --noproxy '*' --fail --silent --show-error \
   "http://127.0.0.1:8080$asset_path")
-grep -Fq "2026 年灾后重建 Demo" <<<"$bundle"
+grep -Fq "报警管理系统" <<<"$bundle"
 grep -Fq "仅使用合成数据" <<<"$bundle"
 
 migration_table=$(docker_run exec "$POSTGRES_CONTAINER" psql \

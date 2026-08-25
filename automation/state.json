@@ -1,8 +1,54 @@
 {
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
-  "current_stage": "M7",
-  "active_run": null,
+  "current_stage": "M8",
+  "active_run": {
+    "stage": "M8",
+    "base_commit": "21e69f097f88fa75fa8442694dafbdd09ffcd402",
+    "requirements": [
+      "PRD-028",
+      "PRD-029",
+      "PRD-030"
+    ],
+    "allowed_paths": [
+      "README.md",
+      "automation/",
+      "docs/algorithm/",
+      "docs/architecture/",
+      "docs/automation/",
+      "docs/decisions/",
+      "docs/planning/",
+      "docs/product/",
+      "docs/releases/",
+      "docs/security/",
+      "packaging/native/",
+      "scripts/validate_formal_baseline.py",
+      "scripts/dev/",
+      "scripts/native/",
+      "src/README.md",
+      "src/algorithm/README.md",
+      "src/backend/",
+      "src/frontend/",
+      "tests/",
+      "compose.yaml",
+      ".github/workflows/"
+    ],
+    "checks": [
+      "PR #1 以 merge commit 合入 main；main 的仓库、应用、Windows 原生和 Docker G7 均成功；v0.1.0 指向已验证合并提交。",
+      "正式身份、来源闭环、自动化契约、仓库结构和 37 个来源提取文件校验成功。",
+      "组件测试顺序执行成功：Java 34、Python 算法 28、数据 5、契约 4、前端 12。",
+      "Windows 11 本机两轮停止、启动、聚合健康、静态页面和 Flyway 迁移幂等检查成功。"
+    ],
+    "failures": [
+      "首次把组件测试与来源提取并行调度时 scripts/dev/test.sh 以 141 退出且无组件失败输出；改为符合验收定义的顺序执行后全部通过，不把并发调度结果计为验收。",
+      "首次 restart-smoke 在应用启动前中止，容器退出码为 0 且无新应用日志；随后用 bash -x 完整启动成功，并再次顺序执行两轮 restart-smoke 成功。现有证据只支持瞬时环境启动失败，不引入无依据代码修复。",
+      "Windows 测试工具初始化 PostgreSQL 时控制台第三方输出受宿主代码页影响显示问号；发布服务日志未复现，列入 M12 中文编码与日志可靠性审计。",
+      "独立审查发现第二候选 968e5c4 的 Windows 目录、ZIP、manifest 与 CI artifact 仍使用旧 demo 构件名，版本标签门槛也未明确限定 main；候选未判通过，已按正式构件和 main 发布边界修正并扩展自动校验。"
+    ],
+    "decision": "M8 只冻结正式身份、来源能力处置、产品化阶段和研究/安全基线，并同步必要的用户可见身份；不提前实现 M9-M14 业务能力。",
+    "next_action": "保存 M8 候选证据并合入 dev，随后核验远端检查点。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -89,8 +135,73 @@
       ],
       "checkpoint_commit": "a0526c0bf1c040dee2d017405e051cf92ef8cf29",
       "remote_verified": true,
-      "next_action": "等待人工审核，并由人工决定是否将 dev 合并到 main。",
-      "note": "第五固定候选已通过本机 Windows 11 Docker Desktop、远端 Ubuntu G7、独立审查及 dev 合并检查点三条远端流水线；自动开发阶段全部完成。"
+      "next_action": "无；已通过 PR #1 合入 main 并标记 v0.1.0。",
+      "note": "第五固定候选已通过本机 Windows 11 Docker Desktop、远端 Ubuntu G7、独立审查及 dev 合并检查点三条远端流水线；PR #1 的四条发布检查与 main 合并后四条检查均成功。"
+    },
+    "M8": {
+      "status": "review",
+      "attempt": 3,
+      "evidence_files": [
+        "docs/verification/evidence/M8.md"
+      ],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "把独立审查通过的固定候选 b1f3c16 合入 dev 并核验远端检查点。",
+      "note": "第三固定候选已通过全部 G8 命令、独立复审、远端仓库/应用检查和 Windows 标准用户双目录验收。"
+    },
+    "M9": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M8 通过后实现 hybrid-v2 可泛化算法。",
+      "note": "依赖 M8 的正式产品和模型契约。"
+    },
+    "M10": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M9 通过后实现项目化业务与全中文 UX。",
+      "note": "依赖 M9 的稳定算法契约。"
+    },
+    "M11": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M10 通过后实现身份权限与安全部署边界。",
+      "note": "依赖项目数据作用域和完整业务路径。"
+    },
+    "M12": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M11 通过后实现恢复、质量和运行可靠性门槛。",
+      "note": "依赖安全部署配置和最终业务结构。"
+    },
+    "M13": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M12 通过后生成正式说明书和项目过程文件。",
+      "note": "文档必须从最终事实源生成，避免提前编写后漂移。"
+    },
+    "M14": {
+      "status": "blocked",
+      "attempt": 0,
+      "evidence_files": [],
+      "checkpoint_commit": null,
+      "remote_verified": false,
+      "next_action": "等待 M13 通过后执行 Windows 11 业务用户终验。",
+      "note": "最终阶段通过后停在人工正式发布门禁。"
     }
   }
 }

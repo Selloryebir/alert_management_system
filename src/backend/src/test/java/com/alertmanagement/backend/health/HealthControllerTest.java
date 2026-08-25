@@ -16,7 +16,7 @@ class HealthControllerTest {
     private static final AppProperties PROPERTIES = new AppProperties(
             "alert-management-backend",
             "0.1.0",
-            "2026 年灾后重建 Demo",
+            "报警管理系统",
             new AppProperties.Algorithm(
                     URI.create("http://127.0.0.1:8001/health"),
                     URI.create("http://127.0.0.1:8001/api/v1/analyze"),
@@ -36,7 +36,7 @@ class HealthControllerTest {
                 .andExpect(jsonPath("$.status").value("UP"))
                 .andExpect(jsonPath("$.service").value("alert-management-backend"))
                 .andExpect(jsonPath("$.version").value("0.1.0"))
-                .andExpect(jsonPath("$.identity").value("2026 年灾后重建 Demo"))
+                .andExpect(jsonPath("$.identity").value("报警管理系统"))
                 .andExpect(jsonPath("$.components.system.status").value("UP"))
                 .andExpect(jsonPath("$.components.database.status").value("UP"))
                 .andExpect(jsonPath("$.components.algorithm.status").value("UP"));

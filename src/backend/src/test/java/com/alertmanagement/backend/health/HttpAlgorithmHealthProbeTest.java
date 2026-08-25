@@ -19,7 +19,7 @@ class HttpAlgorithmHealthProbeTest {
     private static final AppProperties PROPERTIES = new AppProperties(
             "alert-management-backend",
             "0.1.0",
-            "2026 年灾后重建 Demo",
+            "报警管理系统",
             new AppProperties.Algorithm(
                     URI.create("http://127.0.0.1:8001/health"),
                     URI.create("http://127.0.0.1:8001/api/v1/analyze"),

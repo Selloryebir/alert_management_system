@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 class ReportService {
 
-    private static final String IDENTITY = "2026 年灾后重建 Demo";
+    private static final String IDENTITY = "报警管理系统";
     private static final String SYNTHETIC_NOTICE = "仅使用合成数据，不代表真实工业准确率";
     private static final String FONT_RESOURCE = "/fonts/NotoSansSC-VF.ttf";
     private static final int UNSUPPORTED_GLYPH_PLACEHOLDER = '?';
