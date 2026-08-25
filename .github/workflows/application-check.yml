@@ -1,6 +1,7 @@
 name: M1 应用骨架检查
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - ".github/workflows/application-check.yml"
