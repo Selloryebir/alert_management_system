@@ -81,6 +81,7 @@ class ReportAuditResetIntegrationTest {
     void overrideReportsAndAuditUseEffectivePostgresFacts() throws Exception {
         Seed seed = seedCompletedRun();
         UUID recordId = seed.recordIds().getFirst();
+        jdbcTemplate.update("UPDATE alarm_record SET area = ? WHERE record_id = ?", "北区\n二线🚀", recordId);
 
         String invalidAlarmClass = """
                 {"noise_type":"CHATTER","alarm_class":"CUSTOM",
@@ -134,7 +135,9 @@ class ReportAuditResetIntegrationTest {
                 .andReturn().getResponse().getContentAsByteArray();
         try (PDDocument document = Loader.loadPDF(pdf)) {
             String text = new PDFTextStripper().getText(document);
-            assertThat(text).contains("2026 年灾后重建 Demo", "仅使用合成数据", "报警总数：5", "CHATTER=1");
+            assertThat(text).contains("2026 年灾后重建 Demo", "仅使用合成数据", "报警总数：5", "CHATTER=1",
+                    "北区 二线?=1");
+            assertThat(text).doesNotContain("北区\n二线");
         }
 
         byte[] xlsx = mockMvc.perform(post("/api/v1/analyses/{runId}/reports/xlsx", seed.runId())

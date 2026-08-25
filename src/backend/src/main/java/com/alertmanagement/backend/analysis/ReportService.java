@@ -32,6 +32,7 @@ class ReportService {
     private static final String IDENTITY = "2026 年灾后重建 Demo";
     private static final String SYNTHETIC_NOTICE = "仅使用合成数据，不代表真实工业准确率";
     private static final String FONT_RESOURCE = "/fonts/NotoSansSC-VF.ttf";
+    private static final int UNSUPPORTED_GLYPH_PLACEHOLDER = '?';
 
     private final JdbcTemplate jdbcTemplate;
     private final AnalysisWorkflowService workflowService;
@@ -112,7 +113,7 @@ class ReportService {
                         content.newLineAtOffset(45, 800);
                         lineOnPage = 0;
                     }
-                    content.showText(line);
+                    content.showText(pdfText(line, font));
                     content.newLine();
                     lineOnPage++;
                 }
@@ -126,6 +127,31 @@ class ReportService {
             return output.toByteArray();
         } catch (IOException exception) {
             throw new IllegalStateException("PDF 报告生成失败", exception);
+        }
+    }
+
+    private String pdfText(String value, PDType0Font font) {
+        StringBuilder normalized = new StringBuilder(value.length());
+        for (int offset = 0; offset < value.length();) {
+            int codePoint = value.codePointAt(offset);
+            offset += Character.charCount(codePoint);
+            if (Character.isISOControl(codePoint)) {
+                normalized.append(' ');
+            } else if (canEncode(font, codePoint)) {
+                normalized.appendCodePoint(codePoint);
+            } else {
+                normalized.appendCodePoint(UNSUPPORTED_GLYPH_PLACEHOLDER);
+            }
+        }
+        return normalized.toString();
+    }
+
+    private boolean canEncode(PDType0Font font, int codePoint) {
+        try {
+            font.encode(new String(Character.toChars(codePoint)));
+            return true;
+        } catch (IOException | IllegalArgumentException exception) {
+            return false;
         }
     }
 
