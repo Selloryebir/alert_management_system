@@ -31,7 +31,8 @@
       "首个试构件在中文空格目录触发 PostgreSQL UTF-8 路径失败；改用目标精确受控的临时 ASCII Junction 后专项通过",
       "第二个试构件的验收器未接受工作目录等于发布根；只修复根等值归属判断后双目录通过",
       "首个远端候选误把 packaging/native/release 源码模板判作生成目录，且预创建空 PgData 在 runner ACL 下失败；收窄模板例外并改由 initdb 自建目录",
-      "第四个固定候选被独立审查拒绝：GitHub Windows runner 高权限账户不能运行 PostgreSQL，且显式 ZIP 验收未拒绝脏工作树/source_dirty；改为管理员只构建、临时标准用户验收并收紧固定候选检查"
+      "第四个固定候选被独立审查拒绝：GitHub Windows runner 高权限账户不能运行 PostgreSQL，且显式 ZIP 验收未拒绝脏工作树/source_dirty；改为管理员只构建、临时标准用户验收并收紧固定候选检查",
+      "第五个固定候选在 GitHub Actions 生成的无 BOM 内联 PowerShell 中解析中文异常文本失败，尚未进入构建；只将该内联异常文本改为 ASCII"
     ],
     "decision": "M6 只组装 Windows 11 x64 自包含 ZIP 和发布运维/验收路径；复用同一 JAR、算法、Flyway、样例及浏览器测试，不修改业务实现，不建设安装器、Windows 服务或第二套运行逻辑。",
     "next_action": "验证标准用户远端运行路径和固定候选完整性修复，重新固定候选并独立审查。",
@@ -106,12 +107,12 @@
     },
     "M6": {
       "status": "in_progress",
-      "attempt": 5,
+      "attempt": 6,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "修复第四候选的标准用户远端运行和固定候选审计缺口后重新验收。",
-      "note": "第四个固定候选被独立审查判为 FAIL；本机正式双目录通过，但远端高权限账户运行和验收器完整性仍不满足 G6。"
+      "next_action": "验证第六候选的标准用户远端运行、固定候选完整性和独立审查结论。",
+      "note": "第五个固定候选尚未进入构建即因 CI 内联 PowerShell 中文异常文本编码失败；已改为 ASCII，标准用户运行路径仍待远端实证。"
     },
     "M7": {
       "status": "blocked",
