@@ -169,4 +169,3 @@ def test_golden_file_is_byte_rebuildable(tmp_path: Path) -> None:
     rebuilt = tmp_path / "analysis-smoke-expected.json"
     builder.write_expected(rebuilt, SMOKE_PATH)
     assert rebuilt.read_bytes() == EXPECTED_PATH.read_bytes()
-
