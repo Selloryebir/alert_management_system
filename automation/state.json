@@ -2,7 +2,34 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M2",
-  "active_run": null,
+  "active_run": {
+    "stage": "M2",
+    "base_commit": "db7227c6b368da17b04dc47d6b28d6f0b959143e",
+    "requirements": [
+      "PRD-003",
+      "PRD-005",
+      "PRD-007",
+      "PRD-008",
+      "PRD-015",
+      "PRD-019"
+    ],
+    "allowed_paths": [
+      "src/backend/",
+      "src/frontend/",
+      "samples/",
+      "tests/data/",
+      "scripts/dev/",
+      ".github/workflows/",
+      "README.md",
+      "automation/state.json",
+      "docs/verification/evidence/M2.md"
+    ],
+    "checks": [],
+    "failures": [],
+    "decision": "按 G2 建立可审计的两阶段导入；Java 负责格式解析、全量校验和 PostgreSQL 原子落库，样例生成与业务实现目录分离。",
+    "next_action": "并行实现固定种子多格式样例和 Java 导入闭环，随后集成数据库与格式等价验收。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -27,13 +54,13 @@
       "note": "四组件骨架、健康契约、迁移、状态页和启停闭环已通过本机、独立审查及 dev 远端 CI。"
     },
     "M2": {
-      "status": "ready",
-      "attempt": 0,
+      "status": "in_progress",
+      "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "从最新 origin/dev 创建 M2 短期分支，实施合成样例与 CSV/TXT/XLSX 原子导入闭环。",
-      "note": "M1 已通过；按数据契约选择 M2 最小增量。"
+      "next_action": "并行实现固定种子多格式样例和 Java 两阶段原子导入闭环。",
+      "note": "已从远端核验的 dev 检查点建立 feat/m2-import-pipeline，范围限定于 PRD-007/008/015 主闭环。"
     },
     "M3": {
       "status": "blocked",
