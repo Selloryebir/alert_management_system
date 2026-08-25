@@ -1,53 +1,8 @@
 {
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
-  "current_stage": "M6",
-  "active_run": {
-    "stage": "M6",
-    "base_commit": "4ef81468af18ddb90d7c9f64a0264088c43ee2d2",
-    "requirements": [
-      "PRD-002",
-      "PRD-004",
-      "PRD-005",
-      "PRD-006",
-      "PRD-015",
-      "PRD-016",
-      "PRD-019"
-    ],
-    "allowed_paths": [
-      "packaging/native/",
-      "scripts/native/",
-      "scripts/validate_repository.py",
-      "tests/e2e/",
-      ".github/workflows/",
-      "README.md",
-      "automation/workflow.json",
-      "automation/state.json",
-      "docs/planning/M6-implementation.md",
-      "docs/verification/evidence/M6.md"
-    ],
-    "checks": [
-      "本机 Windows 11 固定 ZIP 双目录正式验收通过，耗时 169.255 秒",
-      "远端临时标准用户 Windows 双目录正式验收通过，run 32873354137",
-      "远端应用全链回归通过，run 32873354180",
-      "远端仓库基础检查通过，run 32873354435",
-      "独立审查核对远端 artifact、两轮摘要和日志后判定 PASS"
-    ],
-    "failures": [
-      "首个试构件在中文空格目录触发 PostgreSQL UTF-8 路径失败；改用目标精确受控的临时 ASCII Junction 后专项通过",
-      "第二个试构件的验收器未接受工作目录等于发布根；只修复根等值归属判断后双目录通过",
-      "首个远端候选误把 packaging/native/release 源码模板判作生成目录，且预创建空 PgData 在 runner ACL 下失败；收窄模板例外并改由 initdb 自建目录",
-      "第四个固定候选被独立审查拒绝：GitHub Windows runner 高权限账户不能运行 PostgreSQL，且显式 ZIP 验收未拒绝脏工作树/source_dirty；改为管理员只构建、临时标准用户验收并收紧固定候选检查",
-      "第五个固定候选在 GitHub Actions 生成的无 BOM 内联 PowerShell 中解析中文异常文本失败，尚未进入构建；只将该内联异常文本改为 ASCII",
-      "第六个固定候选已由标准用户完成第一轮业务闭环，但 start/backup 的 pg_isready 在设置 PGPASSWORD 前留下两条认证 FATAL；收紧两次探测的口令作用域，不放宽日志门禁",
-      "第七个固定候选的远端标准用户首轮 ASCII 目录完整验收通过，但第二轮中文目录下 jlink Java 无法加载 java.dll；复用同一精确 ASCII Junction 承载 Java 与 PostgreSQL 路径",
-      "第八个固定候选的远端标准用户已通过中文目录启动和业务链，但验收器二次调用 pg_restore 时绕过 Junction 使用真实中文路径；只让该二次校验复用已验证 Junction",
-      "第九个固定候选的中文轮 PostgreSQL 单次 pg_isready 恰逢 rejecting connections；将误当等待窗口的 -t 参数改为有界显式重试"
-    ],
-    "decision": "M6 只组装 Windows 11 x64 自包含 ZIP 和发布运维/验收路径；复用同一 JAR、算法、Flyway、样例及浏览器测试，不修改业务实现，不建设安装器、Windows 服务或第二套运行逻辑。",
-    "next_action": "提交 M6 review 证据并复核功能分支 CI，然后非快进合并到 dev。",
-    "resume_status": null
-  },
+  "current_stage": "M7",
+  "active_run": null,
   "stages": {
     "M0": {
       "status": "passed",
@@ -116,24 +71,24 @@
       "note": "报告、统一业务审计、人工分类修订、项目备份和演示复位已通过作者检查、第四候选独立审查及 dev 远端回归。"
     },
     "M6": {
-      "status": "review",
+      "status": "passed",
       "attempt": 10,
       "evidence_files": [
         "docs/verification/evidence/M6.md"
       ],
-      "checkpoint_commit": null,
-      "remote_verified": false,
-      "next_action": "提交 review 证据、复核功能分支 CI，并以非快进合并进入 dev。",
-      "note": "第十固定候选已通过本机 Windows 11、远端临时标准用户双目录 G6 和独立审查；等待证据提交与 dev 集成。"
+      "checkpoint_commit": "fae9c0b28623784f65b35d7f907b3e439770421b",
+      "remote_verified": true,
+      "next_action": "无；M6 已通过并解锁 M7。",
+      "note": "第十固定候选已通过本机 Windows 11、远端临时标准用户双目录 G6、独立审查及 dev 合并检查点三条远端流水线。"
     },
     "M7": {
-      "status": "blocked",
+      "status": "ready",
       "attempt": 0,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "等待 M6 通过。",
-      "note": "等待 M6 通过。"
+      "next_action": "冻结 M7 实施契约并在 feat/m7-docker-compose 开始 Docker Compose 次级交付。",
+      "note": "M6 已通过；M7 可开始，且不得复制或分叉业务实现。"
     }
   }
 }
