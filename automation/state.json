@@ -2,7 +2,35 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M1",
-  "active_run": null,
+  "active_run": {
+    "stage": "M1",
+    "base_commit": "188e6a554f00123b214e87fb449a1c2cc129c2f5",
+    "requirements": [
+      "PRD-001",
+      "PRD-002",
+      "PRD-003",
+      "PRD-004",
+      "PRD-005",
+      "PRD-006",
+      "PRD-019"
+    ],
+    "allowed_paths": [
+      "src/backend/",
+      "src/algorithm/",
+      "src/frontend/",
+      "scripts/dev/",
+      "tests/",
+      "README.md",
+      ".gitignore",
+      "automation/state.json",
+      "docs/verification/evidence/M1.md"
+    ],
+    "checks": [],
+    "failures": [],
+    "decision": "G0 已通过；按 G1 只建立四组件健康、迁移、静态资源和统一启停闭环。",
+    "next_action": "并行实现后端、算法和前端骨架，主智能体建立 PostgreSQL 与统一启动链。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -16,8 +44,8 @@
       "note": "来源隔离、产品事实、架构、计划和验收基线已落盘，检查点已在 origin/dev 核验。"
     },
     "M1": {
-      "status": "ready",
-      "attempt": 0,
+      "status": "in_progress",
+      "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
