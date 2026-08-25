@@ -98,3 +98,21 @@ PATCH /api/v1/analyses/{runId}/alarms/{recordId}/disposition
 看板、列表、详情和处置仅接受 `COMPLETED` 分析运行，统计与筛选直接查询 PostgreSQL。报警列表可按 `priority`、`area`、`unit`、`noise_type`、`cause_category` 和 `disposition_status` 筛选，`unit=未指定单元` 用于筛选空单元。详情包含原始行、算法证据、相关事件链及完整处置历史。
 
 处置请求为 `{"status":"IN_PROGRESS","operator":"值班员","note":"开始核查"}`。合法流转为 `OPEN → IN_PROGRESS`、`IN_PROGRESS → OPEN/CLOSED`、`CLOSED → IN_PROGRESS`；每次变更在同一事务中更新当前态并追加历史。关闭保存 `closed_at`，重新打开时清空。
+
+## 报告、审计、分类修订与演示复位
+
+```text
+PATCH /api/v1/analyses/{runId}/alarms/{recordId}/classification
+POST  /api/v1/analyses/{runId}/reports/pdf
+POST  /api/v1/analyses/{runId}/reports/xlsx
+GET   /api/v1/audit-events?page=0&size=50
+POST  /api/v1/demo/reset
+```
+
+人工分类修订同时提交完整的 `noise_type`、`alarm_class`、`cause_category`、`operator` 和 `reason`；原始算法结果保持不变，看板、报警列表、详情和报告使用当前有效分类。详情顶层分类字段为有效值，`algorithm_classification` 保留算法原值，`classification_override` 显示修订者、理由和时间。
+
+报告请求为 `{"operator":"审核员A"}`，仅导出整次 `COMPLETED` 分析。PDF 是带“2026 年灾后重建 Demo”和合成数据声明的汇总报告；XLSX 包含概要、报警明细、关联事件链和处置历史。审计 API 支持按事件类型、目标类型和目标 UUID 分页筛选。
+
+复位请求为 `{"operator":"demo-reviewer","confirmation":"RESET_DEMO"}`。复位只清空 Flyway 明确管理的演示业务表，保留 `app_metadata`、`flyway_schema_history`、项目文件和其他数据库表；存在 `ANALYZING` 运行时拒绝复位。
+
+PDF 使用 Apache PDFBox 3.0.8，并随包携带 Noto Sans SC TrueType 字体。字体遵循 SIL Open Font License 1.1，许可证位于 `src/main/resources/fonts/OFL.txt`。

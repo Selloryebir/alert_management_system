@@ -74,6 +74,8 @@ record AlarmDetail(
         String operator,
         @JsonProperty("raw_payload") Map<String, String> rawPayload,
         List<String> evidence,
+        @JsonProperty("algorithm_classification") ClassificationValues algorithmClassification,
+        @JsonProperty("classification_override") ClassificationOverrideView classificationOverride,
         DispositionView disposition,
         @JsonProperty("disposition_history") List<DispositionHistoryView> dispositionHistory,
         @JsonProperty("event_chains") List<AnalysisView.EventChain> eventChains) {
@@ -96,6 +98,26 @@ record DispositionHistoryView(
 }
 
 record DispositionRequest(String status, String operator, String note) {
+}
+
+record ClassificationValues(
+        @JsonProperty("noise_type") String noiseType,
+        @JsonProperty("alarm_class") String alarmClass,
+        @JsonProperty("cause_category") String causeCategory) {
+}
+
+record ClassificationOverrideView(
+        String operator,
+        String reason,
+        @JsonProperty("updated_at") OffsetDateTime updatedAt) {
+}
+
+record ClassificationRequest(
+        @JsonProperty("noise_type") String noiseType,
+        @JsonProperty("alarm_class") String alarmClass,
+        @JsonProperty("cause_category") String causeCategory,
+        String operator,
+        String reason) {
 }
 final class WorkflowViews {
     private WorkflowViews() {

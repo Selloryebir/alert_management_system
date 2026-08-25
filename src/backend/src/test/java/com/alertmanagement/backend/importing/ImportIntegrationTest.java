@@ -75,7 +75,7 @@ class ImportIntegrationTest {
     void cleanDatabase() {
         jdbcTemplate.execute("DROP TRIGGER IF EXISTS reject_import_status ON import_batch");
         jdbcTemplate.execute("DROP FUNCTION IF EXISTS reject_import_status()");
-        jdbcTemplate.execute("TRUNCATE alarm_record, import_staging, import_batch CASCADE");
+        jdbcTemplate.execute("TRUNCATE alarm_record, import_staging, import_batch, audit_event CASCADE");
     }
 
     @AfterAll
@@ -100,6 +100,12 @@ class ImportIntegrationTest {
         importService.confirm(xlsx.batchId());
         assertThat(List.of(countAlarms(csv.batchId()), countAlarms(txt.batchId()), countAlarms(xlsx.batchId())))
                 .containsOnly(300);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM audit_event WHERE event_type = 'IMPORT_CREATED'", Integer.class))
+                .isEqualTo(3);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM audit_event WHERE event_type = 'IMPORT_CONFIRMED'", Integer.class))
+                .isEqualTo(3);
     }
 
     @Test
@@ -134,6 +140,10 @@ class ImportIntegrationTest {
         Set<String> codes = summary.errors().stream().map(ImportError::code).collect(Collectors.toSet());
 
         assertThat(summary.status()).isEqualTo(ImportBatchStatus.REJECTED);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM audit_event
+                 WHERE target_id = ? AND event_type IN ('IMPORT_CREATED', 'IMPORT_REJECTED')
+                """, Integer.class, summary.batchId())).isEqualTo(2);
         assertThat(codes).contains("INVALID_TIME", "INVALID_ENUM", "INVALID_NUMBER",
                 "TIME_ORDER_INVALID", "REQUIRED_VALUE_MISSING");
         assertThat(summary.errors()).allSatisfy(error -> {

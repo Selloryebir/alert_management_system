@@ -73,7 +73,7 @@ class AnalysisIntegrationTest {
         jdbcTemplate.execute("DROP TRIGGER IF EXISTS reject_analysis_completion ON import_batch");
         jdbcTemplate.execute("DROP FUNCTION IF EXISTS reject_analysis_completion()");
         jdbcTemplate.execute("TRUNCATE event_chain_member, event_chain, analysis_result, analysis_run, "
-                + "alarm_record, import_staging, import_batch CASCADE");
+                + "alarm_record, import_staging, import_batch, audit_event CASCADE");
         RESPONDER.set(AnalysisIntegrationTest::successResponse);
         LAST_REQUEST.set(null);
     }
@@ -114,6 +114,9 @@ class AnalysisIntegrationTest {
                 "SELECT COUNT(*) FROM analysis_result WHERE run_id = ?", Integer.class, runId)).isEqualTo(5);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT status FROM import_batch WHERE batch_id = ?", String.class, batchId)).isEqualTo("COMPLETED");
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT event_type FROM audit_event WHERE target_id = ? ORDER BY occurred_at",
+                String.class, runId)).containsExactly("ANALYSIS_STARTED", "ANALYSIS_COMPLETED");
 
         mockMvc.perform(get("/api/v1/analyses/{runId}", runId))
                 .andExpect(status().isOk())
@@ -137,6 +140,10 @@ class AnalysisIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         UUID failedRunId = UUID.fromString(objectMapper.readTree(failedBody).get("run_id").asText());
         assertZeroResults(failedRunId);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT details ->> 'failure_code' FROM audit_event
+                 WHERE target_id = ? AND event_type = 'ANALYSIS_FAILED'
+                """, String.class, failedRunId)).isEqualTo("ALGORITHM_HTTP_ERROR");
 
         RESPONDER.set(AnalysisIntegrationTest::successResponse);
         mockMvc.perform(post("/api/v1/imports/{batchId}/analyses", batchId))

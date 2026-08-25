@@ -1,5 +1,6 @@
 package com.alertmanagement.backend.importing;
 
+import com.alertmanagement.backend.audit.AuditService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -29,10 +31,12 @@ class ImportPersistenceService {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final AuditService auditService;
 
-    ImportPersistenceService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    ImportPersistenceService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, AuditService auditService) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -57,6 +61,14 @@ class ImportPersistenceService {
 
         if (validated.status() == ImportBatchStatus.READY) {
             insertStaging(batchId, validated.records());
+        }
+        auditService.record("IMPORT_CREATED", AuditService.DEMO_OPERATOR, "IMPORT_BATCH", batchId, "SUCCESS",
+                Map.of("file_name", fileName, "format", validated.format().name(),
+                        "record_count", validated.totalRows()));
+        if (validated.status() == ImportBatchStatus.REJECTED) {
+            auditService.record("IMPORT_REJECTED", AuditService.DEMO_OPERATOR, "IMPORT_BATCH", batchId, "FAILURE",
+                    Map.of("error_count", validated.errors().size(), "error_codes",
+                            new LinkedHashSet<>(validated.errors().stream().map(ImportError::code).toList())));
         }
         return find(batchId);
     }
@@ -95,6 +107,8 @@ class ImportPersistenceService {
         if (updated != 1) {
             throw new IllegalStateException("批次状态更新失败");
         }
+        auditService.record("IMPORT_CONFIRMED", AuditService.DEMO_OPERATOR, "IMPORT_BATCH", batchId, "SUCCESS",
+                Map.of("success_count", inserted, "warning_count", 0));
         return find(batchId);
     }
 

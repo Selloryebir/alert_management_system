@@ -1,5 +1,6 @@
 package com.alertmanagement.backend.analysis;
 
+import com.alertmanagement.backend.audit.AuditService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,10 +28,12 @@ class AnalysisPersistenceService {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final AuditService auditService;
 
-    AnalysisPersistenceService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    AnalysisPersistenceService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, AuditService auditService) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -87,6 +90,9 @@ class AnalysisPersistenceService {
         if (records.isEmpty()) {
             throw new IllegalStateException("导入批次没有可分析记录");
         }
+        auditService.record("ANALYSIS_STARTED", AuditService.DEMO_OPERATOR, "ANALYSIS_RUN", runId, "SUCCESS",
+                Map.of("batch_id", batchId, "run_id", runId, "algorithm_version", algorithmVersion,
+                        "contract_version", contractVersion, "input_count", records.size()));
         return new StartedAnalysis(new AnalysisRequest(
                 runId, contractVersion, algorithmVersion, Map.copyOf(parameters), List.copyOf(records)), attempt);
     }
@@ -135,6 +141,10 @@ class AnalysisPersistenceService {
         if (runUpdated != 1 || batchUpdated != 1) {
             throw new IllegalStateException("分析完成状态更新失败");
         }
+        auditService.record("ANALYSIS_COMPLETED", AuditService.DEMO_OPERATOR,
+                "ANALYSIS_RUN", runId, "SUCCESS",
+                Map.of("run_id", runId, "input_count", started.request().records().size(),
+                        "output_count", analysis.results().size(), "summary", analysis.summary()));
     }
 
     @Transactional
@@ -152,6 +162,9 @@ class AnalysisPersistenceService {
         if (runUpdated != 1 || batchUpdated != 1) {
             throw new IllegalStateException("分析失败状态更新失败");
         }
+        auditService.record("ANALYSIS_FAILED", AuditService.DEMO_OPERATOR, "ANALYSIS_RUN", runId, "FAILURE",
+                Map.of("run_id", runId, "failure_code", failureCode(reason),
+                        "retryable", true, "reason", reason));
     }
 
     public AnalysisView find(UUID runId) {
@@ -246,6 +259,28 @@ class AnalysisPersistenceService {
 
     private String abbreviate(String value) {
         return value.length() <= 500 ? value : value.substring(0, 500);
+    }
+
+    private String failureCode(String reason) {
+        if (reason.contains("HTTP")) {
+            return "ALGORITHM_HTTP_ERROR";
+        }
+        if (reason.contains("JSON")) {
+            return "ALGORITHM_INVALID_JSON";
+        }
+        if (reason.contains("超时")) {
+            return "ALGORITHM_TIMEOUT";
+        }
+        if (reason.contains("不可用")) {
+            return "ALGORITHM_UNAVAILABLE";
+        }
+        if (reason.contains("中断")) {
+            return "ALGORITHM_INTERRUPTED";
+        }
+        if (reason.contains("数据库")) {
+            return "ANALYSIS_PERSISTENCE_FAILED";
+        }
+        return "ALGORITHM_CONTRACT_INVALID";
     }
 
     private String writeJson(Object value) {
