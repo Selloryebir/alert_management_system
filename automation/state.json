@@ -35,7 +35,8 @@
       "首次分类白名单遗漏 ACTIONABLE；按 Python v1 契约补齐 Java、V5 CHECK 和成功/非法零写入测试",
       "首次浏览器测试因页面存在两个 demo-reviewer 文本导致选择器歧义；限定首个身份标识后业务流程继续",
       "第二次浏览器测试把复位成功文案错误限定为含成功二字；改为断言稳定语义已复位",
-      "DrvFS 上第二个 Vitest worker 偶发启动超时；将同范围 M5 用例并入既有单文件后 12 项稳定通过"
+      "DrvFS 上第二个 Vitest worker 偶发启动超时；将同范围 M5 用例并入既有单文件后 12 项稳定通过",
+      "首个固定候选的 CI 测试夹具把 jsdom Blob 直接传给 Node Response，触发 object.stream 不兼容；改用原始响应字节后保持浏览器生产路径不变"
     ],
     "decision": "M5 只实现整次分析 PDF/XLSX、统一业务审计、最小人工分类修订和限定业务表的演示复位；原始算法结果不可变，不建设报告任务、文件仓库、消息队列、权限系统或通用工作流。实现及作者验收完成，进入固定候选独立审查。",
     "next_action": "固定候选并推送，由未参与 M5 实现的智能体复跑全量测试、真实 G5、报告内容对账和复位范围审计。",
@@ -99,7 +100,7 @@
     },
     "M5": {
       "status": "review",
-      "attempt": 1,
+      "attempt": 2,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,

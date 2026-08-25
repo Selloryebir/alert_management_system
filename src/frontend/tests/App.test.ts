@@ -561,7 +561,7 @@ describe("M5 报告、审计与演示复位", () => {
         });
       }
       const format = String(input).endsWith("/pdf") ? "pdf" : "xlsx";
-      return new Response(new Blob([format === "pdf" ? "PDF-DATA" : "XLSX-DATA"]), {
+      return new Response(format === "pdf" ? "PDF-DATA" : "XLSX-DATA", {
         status: 200,
         headers: { "Content-Disposition": `attachment; filename="analysis.${format}"` },
       });
