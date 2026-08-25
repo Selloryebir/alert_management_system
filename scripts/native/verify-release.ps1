@@ -415,7 +415,7 @@ function Invoke-E2e {
 }
 
 function Invoke-BackupCheck {
-    param([string]$ReleaseRoot)
+    param([string]$ReleaseRoot, [string]$ReleaseAlias)
     $before = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "backups") -Filter "*.dump" -File -ErrorAction SilentlyContinue)
     $beforeNames = @($before | ForEach-Object { $_.FullName })
     Invoke-ReleaseScript $ReleaseRoot "backup.ps1" | Out-Null
@@ -423,8 +423,16 @@ function Invoke-BackupCheck {
     Assert-True ($after.Count -eq ($before.Count + 1)) "backup.ps1 未生成唯一的新备份。"
     $newBackup = @($after | Where-Object { $beforeNames -notcontains $_.FullName })
     Assert-True ($newBackup.Count -eq 1 -and $newBackup[0].Length -gt 0) "新备份不存在或为空。"
-    $pgRestore = Join-Path $ReleaseRoot "runtime\postgresql\bin\pg_restore.exe"
-    Invoke-CheckedCommand $pgRestore @("--list", $newBackup[0].FullName) "包内 pg_restore 无法读取备份"
+    $workingRoot = $ReleaseRoot
+    if (-not [string]::IsNullOrWhiteSpace($ReleaseAlias)) {
+        Assert-JunctionTargetsRelease $ReleaseAlias $ReleaseRoot
+        $workingRoot = $ReleaseAlias
+    }
+    $pgRestore = Join-Path $workingRoot "runtime\postgresql\bin\pg_restore.exe"
+    $backupArgument = Join-Path $workingRoot ("backups\" + $newBackup[0].Name)
+    Assert-True (Test-Path -LiteralPath $backupArgument -PathType Leaf) "受控路径下看不到新备份。"
+    Assert-True ((Get-Item -LiteralPath $backupArgument).Length -eq $newBackup[0].Length) "受控路径下的新备份大小不一致。"
+    Invoke-CheckedCommand $pgRestore @("--list", $backupArgument) "包内 pg_restore 无法读取备份"
     return $newBackup[0].FullName
 }
 
@@ -649,7 +657,7 @@ try {
         Assert-True (Test-Path -LiteralPath $demoDataset -PathType Leaf) "发布包缺少 20k 样例。"
 
         Invoke-E2e $e2eRoot $npm $releaseRoot "smoke" $smokeDataset 300 "test:smoke" $roundResultRoot
-        $backupPath = Invoke-BackupCheck $releaseRoot
+        $backupPath = Invoke-BackupCheck $releaseRoot $postgresAlias
         Invoke-ResetCheck $releaseRoot
         Assert-True (Test-Path -LiteralPath $backupPath -PathType Leaf) "演示复位越界删除了备份。"
 
