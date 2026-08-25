@@ -2,7 +2,33 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M5",
-  "active_run": null,
+  "active_run": {
+    "stage": "M5",
+    "base_commit": "fcdf0ef652a99c285f616fc6e59aa4d869083d05",
+    "requirements": [
+      "PRD-001",
+      "PRD-014",
+      "PRD-016",
+      "PRD-018"
+    ],
+    "allowed_paths": [
+      "src/backend/",
+      "src/frontend/",
+      "tests/e2e/",
+      "scripts/dev/",
+      ".github/workflows/",
+      "README.md",
+      "automation/workflow.json",
+      "automation/state.json",
+      "docs/planning/M5-implementation.md",
+      "docs/verification/evidence/M5.md"
+    ],
+    "checks": [],
+    "failures": [],
+    "decision": "M5 只实现整次分析 PDF/XLSX、统一业务审计、最小人工分类修订和限定业务表的演示复位；原始算法结果不可变，不建设报告任务、文件仓库、消息队列、权限系统或通用工作流。",
+    "next_action": "按已冻结的 V5、HTTP 契约和 G5 验收并行实现后端、前端与真实浏览器门槛。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -60,13 +86,13 @@
       "note": "看板、详情、事件链和人工处置已通过作者检查、独立审查及 dev 远端真实浏览器回归。"
     },
     "M5": {
-      "status": "ready",
+      "status": "in_progress",
       "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "从远端核验的 M4 检查点建立 feat/m5-report-audit-reset 并冻结 V5/API/验收。",
-      "note": "M4 已通过；M5 范围由 PRD-001/014/016/018 和 G5 固定。"
+      "next_action": "按目录所有权实现报告、统一审计、人工分类修订、备份和演示复位。",
+      "note": "活动分支 feat/m5-report-audit-reset 已从远端核验的 M4 状态转换提交建立；接口、事务边界和验收已冻结。"
     },
     "M6": {
       "status": "blocked",
