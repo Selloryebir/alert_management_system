@@ -1,4 +1,10 @@
-export type ImportStatus = "READY" | "REJECTED" | "IMPORTED";
+export type ImportStatus =
+  | "READY"
+  | "REJECTED"
+  | "IMPORTED"
+  | "ANALYZING"
+  | "COMPLETED"
+  | "FAILED";
 
 export interface ImportErrorItem {
   source_row: number;

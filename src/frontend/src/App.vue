@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 
+import BusinessWorkflow from "./BusinessWorkflow.vue";
 import {
   createUnknownHealth,
   fetchHealth,
@@ -160,7 +161,7 @@ onMounted(loadHealth);
       <h1 id="page-title">2026 年灾后重建 Demo</h1>
       <p class="synthetic-notice">仅使用合成数据</p>
       <p class="identity-copy">
-        本页面仅检查演示环境的基础服务连接，不代表历史系统功能已经恢复或通过验收。
+        从合成文件导入、规则分析、统计查看到人工处置均在本页面完成；规则输出仅供审核演示，不代表已确认工业根因。
       </p>
     </section>
 
@@ -210,7 +211,7 @@ onMounted(loadHealth);
       <div class="import-form">
         <label>
           <span>报警文件</span>
-          <input type="file" accept=".csv,.txt,.xlsx" :disabled="importBusy" @change="selectFile" />
+          <input data-testid="file-input" type="file" accept=".csv,.txt,.xlsx" :disabled="importBusy" @change="selectFile" />
         </label>
         <label>
           <span>可选字段映射（目标字段到源表头的 JSON）</span>
@@ -221,14 +222,14 @@ onMounted(loadHealth);
             placeholder='例如 {"event_time":"发生时间","tag":"位号"}'
           />
         </label>
-        <button type="button" :disabled="importBusy || !selectedFile" @click="previewSelectedFile">
+        <button data-testid="preview-button" type="button" :disabled="importBusy || !selectedFile" @click="previewSelectedFile">
           {{ importBusy ? "处理中…" : "校验并预览" }}
         </button>
       </div>
 
       <p v-if="importMessage" class="import-message" role="status">{{ importMessage }}</p>
 
-      <article v-if="currentBatch" class="batch-detail" aria-labelledby="batch-title">
+      <article v-if="currentBatch" class="batch-detail" aria-labelledby="batch-title" data-testid="preview-summary">
         <div class="status-line">
           <h3 id="batch-title">{{ currentBatch.file_name }}</h3>
           <span class="status-badge" :class="`batch-${currentBatch.status.toLowerCase()}`">
@@ -242,6 +243,7 @@ onMounted(loadHealth);
         <button
           v-if="currentBatch.status === 'READY'"
           type="button"
+          data-testid="confirm-import"
           :disabled="importBusy"
           @click="confirmCurrentBatch"
         >
@@ -291,5 +293,7 @@ onMounted(loadHealth);
         </table>
       </div>
     </section>
+
+    <BusinessWorkflow :current-batch="currentBatch" :batches="recentBatches" />
   </main>
 </template>
