@@ -1,8 +1,8 @@
-# 报警管理系统（灾后重建）
+# 报警管理系统
 
-本仓库用于重建报警管理系统的可演示版本。M1 至 M6 已完成可运行骨架、合成数据导入、可解释分析、浏览器业务闭环、报告审计和 Windows 11 x64 原生发布；当前实现 Docker Compose 次级交付。
+本仓库提供报警文件导入、规范化、可解释分析、统计看板、人工处置、审计和报告的一体化应用。当前 `v0.1.0` 已具备 Windows 11 x64 自包含运行包和 Docker Compose 启动方式；`dev` 正按 M8–M14 产品化路线增强算法、项目化业务、安全部署、恢复能力和正式文档。
 
-阶段目标是交付一个可重复演示的最小闭环：导入报警样例文件，完成校验、分析和展示，并能导出处置结果。实现与验收以稳定、可解释、可复现为优先，不把历史材料中未经验证的指标直接作为承诺。
+产品北极星是让业务人员仅按中文说明即可部署并完成“导入校验 → 分析 → 查看 → 处置 → 报告 → 备份恢复”。实现与验收以稳定、可解释、可复现为优先，不把历史材料中未经验证的指标直接作为承诺。仓库内置数据均为合成示例数据。
 
 ## 仓库入口
 
@@ -38,7 +38,7 @@ python3 scripts/validate_repository.py
 python3 scripts/validate_automation.py
 ```
 
-这些命令只验证仓库基础结构、文档链接和自动化状态定义；它们不代表业务功能已经实现或通过验收。
+这些命令只验证仓库基础结构、文档链接和自动化状态定义；业务能力以对应阶段验收和证据为准。
 
 ## 开发启动与阶段验证
 
@@ -53,7 +53,7 @@ scripts/dev/stop.sh
 
 启动成功后访问 `http://127.0.0.1:8080`。`status.sh` 在任一进程、数据库或健康状态异常时返回非零。`scripts/dev/restart-smoke.sh` 会连续执行两轮启停，验证三项聚合健康、Vue 静态资源和 Flyway 重复迁移。
 
-M2 的合成导入样例位于 `samples/`。以下命令会在 PostgreSQL 17.6 上验证 CSV/TXT/XLSX 等价导入、GB18030、非法批次零落库、重复确认冲突，并生成和导入固定种子的 20,000 行 Demo：
+合成导入样例位于 `samples/`。以下命令会在 PostgreSQL 17.6 上验证 CSV/TXT/XLSX 等价导入、GB18030、非法批次零落库、重复确认冲突，并生成和导入固定种子的 20,000 行示例数据：
 
 ```bash
 scripts/dev/m2-import-smoke.sh
@@ -117,6 +117,6 @@ python3 tests/smoke/run.py --target docker --fresh-volume
 
 Compose 只向本机发布 Java 的 8080 端口；PostgreSQL 与算法服务仅在项目网络内可达。不要使用全局容器或卷清理命令。
 
-## 当前状态
+## 版本与当前状态
 
-M0 至 M6 已通过；M7 Docker Compose 次级交付正在实现。状态以 `automation/state.json` 及对应阶段的当前提交证据为准。
+`v0.1.0` 已通过 PR、Windows 原生包、应用全链、Docker Compose 和仓库检查并发布为可运行功能基线。M0 至 M7 全部通过；当前为 M8 正式产品基线与来源闭环。后续标签和发布门槛见 [`docs/releases/versioning.md`](docs/releases/versioning.md)，实时状态以 `automation/state.json` 和提交绑定的验收证据为准。

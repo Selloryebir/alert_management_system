@@ -25,20 +25,25 @@
       "scripts/dev/",
       "src/README.md",
       "src/algorithm/README.md",
-      "src/backend/README.md",
-      "src/backend/pom.xml",
-      "src/backend/src/main/resources/application.yml",
+      "src/backend/",
       "src/frontend/",
       "tests/",
       "compose.yaml",
       ".github/workflows/"
     ],
     "checks": [
-      "PR #1 以 merge commit 合入 main；main 的仓库、应用、Windows 原生和 Docker G7 均成功；v0.1.0 指向已验证合并提交。"
+      "PR #1 以 merge commit 合入 main；main 的仓库、应用、Windows 原生和 Docker G7 均成功；v0.1.0 指向已验证合并提交。",
+      "正式身份、来源闭环、自动化契约、仓库结构和 37 个来源提取文件校验成功。",
+      "组件测试顺序执行成功：Java 34、Python 算法 28、数据 5、契约 4、前端 12。",
+      "Windows 11 本机两轮停止、启动、聚合健康、静态页面和 Flyway 迁移幂等检查成功。"
     ],
-    "failures": [],
+    "failures": [
+      "首次把组件测试与来源提取并行调度时 scripts/dev/test.sh 以 141 退出且无组件失败输出；改为符合验收定义的顺序执行后全部通过，不把并发调度结果计为验收。",
+      "首次 restart-smoke 在应用启动前中止，容器退出码为 0 且无新应用日志；随后用 bash -x 完整启动成功，并再次顺序执行两轮 restart-smoke 成功。现有证据只支持瞬时环境启动失败，不引入无依据代码修复。",
+      "Windows 测试工具初始化 PostgreSQL 时控制台第三方输出受宿主代码页影响显示问号；发布服务日志未复现，列入 M12 中文编码与日志可靠性审计。"
+    ],
     "decision": "M8 只冻结正式身份、来源能力处置、产品化阶段和研究/安全基线，并同步必要的用户可见身份；不提前实现 M9-M14 业务能力。",
-    "next_action": "建立 M8 实施契约和来源闭环矩阵，并替换正式运行路径中的灾后重建身份。",
+    "next_action": "固定 M8 候选，执行完整验收、独立审查和远端检查。",
     "resume_status": null
   },
   "stages": {
@@ -136,8 +141,8 @@
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "建立 M8 实施契约和来源闭环矩阵，并替换正式运行路径中的灾后重建身份。",
-      "note": "以 main/dev 同步且已标记 v0.1.0 的提交为基线。"
+      "next_action": "固定 M8 候选，执行完整验收、独立审查和远端检查。",
+      "note": "以 main/dev 同步且已标记 v0.1.0 的提交为基线；正式身份、来源闭环和本机运行验收已完成，尚待固定候选与独立审查。"
     },
     "M9": {
       "status": "blocked",

@@ -49,7 +49,7 @@ function Initialize-ReleaseDirectories {
 function Assert-FixedRuntimeConfig {
     param([Parameter(Mandatory = $true)]$Context)
     $config = $Context.Config
-    if ($config.identity -ne "2026 年灾后重建 Demo") {
+    if ($config.identity -ne "报警管理系统") {
         throw "config/runtime.json 的 identity 与发布契约不一致。"
     }
     if ([int]$config.ports.postgres -ne 55432 -or [int]$config.ports.algorithm -ne 8001 -or

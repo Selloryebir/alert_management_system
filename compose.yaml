@@ -45,7 +45,7 @@ services:
       DB_PASSWORD: alert_management
       ALGORITHM_HEALTH_URL: http://algorithm:8001/health
       ALGORITHM_ANALYSIS_URL: http://algorithm:8001/api/v1/analyze
-      APP_IDENTITY: 2026 年灾后重建 Demo
+      APP_IDENTITY: 报警管理系统
     depends_on:
       postgres:
         condition: service_healthy

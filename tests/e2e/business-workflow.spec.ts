@@ -56,7 +56,7 @@ async function importAndAnalyze(page: Page): Promise<{ batchId: string; runId: s
 
 test("浏览器完成导入、分析、详情、事件链和人工处置闭环", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("2026 年灾后重建 Demo", { exact: false }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "报警管理系统" })).toBeVisible();
 
   const { runId } = await importAndAnalyze(page);
   const dashboardResponse = await page.request.get(`/api/v1/analyses/${runId}/dashboard`);

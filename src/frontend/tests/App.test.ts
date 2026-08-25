@@ -24,7 +24,7 @@ describe("M1 状态页", () => {
         status: "UP",
         service: "alert-management-backend",
         version: "0.1.0",
-        identity: "2026 年灾后重建 Demo",
+        identity: "报警管理系统",
         components: {
           system: { status: "UP" },
           database: { status: "UP" },
@@ -37,7 +37,7 @@ describe("M1 状态页", () => {
     render(App);
 
     expect(
-      screen.getByRole("heading", { name: "2026 年灾后重建 Demo" }),
+      screen.getByRole("heading", { name: "报警管理系统" }),
     ).toBeInTheDocument();
     expect(screen.getByText("仅使用合成数据")).toBeInTheDocument();
 

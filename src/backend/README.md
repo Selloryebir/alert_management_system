@@ -1,6 +1,6 @@
 # Java 后端
 
-本模块是报警管理系统灾后重建 Demo 的 Java 主系统，使用 Java 21、Spring Boot 3.5.16、PostgreSQL JDBC 和 Flyway。当前提供聚合健康、两阶段报警文件导入，以及调用 Python 服务的同步分析编排。
+本模块是报警管理系统的 Java 主系统，使用 Java 21、Spring Boot 3.5.16、PostgreSQL JDBC 和 Flyway。当前提供聚合健康、两阶段报警文件导入，以及调用 Python 服务的同步分析编排。
 
 ## 构建与测试
 
@@ -50,7 +50,7 @@ GET http://127.0.0.1:8080/api/v1/health
 | `ALGORITHM_CONTRACT_VERSION` | `v1` | 预期算法健康契约版本 |
 | `APP_SERVICE_NAME` | `alert-management-backend` | 健康响应服务名 |
 | `APP_VERSION` | `0.1.0` | 健康响应版本 |
-| `APP_IDENTITY` | `2026 年灾后重建 Demo` | 审核身份标识 |
+| `APP_IDENTITY` | `报警管理系统` | 产品身份标识 |
 
 算法服务默认监听 `127.0.0.1:8001`。其 `/health` 必须返回 2xx，且 `status`、`service`、`version`、`contract_version` 与配置完全匹配，否则算法组件状态为 `DOWN`。
 
@@ -111,7 +111,7 @@ POST  /api/v1/demo/reset
 
 人工分类修订同时提交完整的 `noise_type`、`alarm_class`、`cause_category`、`operator` 和 `reason`；原始算法结果保持不变，看板、报警列表、详情和报告使用当前有效分类。详情顶层分类字段为有效值，`algorithm_classification` 保留算法原值，`classification_override` 显示修订者、理由和时间。
 
-报告请求为 `{"operator":"审核员A"}`，仅导出整次 `COMPLETED` 分析。PDF 是带“2026 年灾后重建 Demo”和合成数据声明的汇总报告；XLSX 包含概要、报警明细、关联事件链和处置历史。审计 API 支持按事件类型、目标类型和目标 UUID 分页筛选。
+报告请求为 `{"operator":"审核员A"}`，仅导出整次 `COMPLETED` 分析。PDF 带“报警管理系统”和合成数据声明；XLSX 包含概要、报警明细、关联事件链和处置历史。审计 API 支持按事件类型、目标类型和目标 UUID 分页筛选。
 
 复位请求为 `{"operator":"demo-reviewer","confirmation":"RESET_DEMO"}`。复位只清空 Flyway 明确管理的演示业务表，保留 `app_metadata`、`flyway_schema_history`、项目文件和其他数据库表；存在 `ANALYZING` 运行时拒绝复位。
 

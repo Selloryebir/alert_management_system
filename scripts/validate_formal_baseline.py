@@ -110,8 +110,10 @@ def validate_workflow(errors: list[str]) -> None:
     stage_ids = [stage.get("id") for stage in workflow.get("stages", [])]
     if stage_ids != [f"M{number}" for number in range(15)]:
         errors.append("产品化工作流必须完整定义 M0..M14。")
-    if state.get("current_stage") != "M8":
-        errors.append("M8 正式基线验收时 current_stage 必须为 M8。")
+    current_stage = state.get("current_stage")
+    productization_stages = {f"M{number}" for number in range(8, 15)}
+    if current_stage not in productization_stages:
+        errors.append("正式产品基线校验仅适用于 M8..M14 产品化阶段。")
     for number in range(8, 15):
         stage_id = f"M{number}"
         if stage_id not in state.get("stages", {}):
