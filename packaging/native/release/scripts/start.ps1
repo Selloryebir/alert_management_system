@@ -61,8 +61,7 @@ function Initialize-PostgresData {
         if (@(Get-ChildItem -LiteralPath $context.PgData -Force).Count -ne 0) {
             throw "PostgreSQL 数据目录非空但缺少 PG_VERSION，拒绝覆盖：$($context.PgData)"
         }
-    } else {
-        New-Item -ItemType Directory -Path $context.PgData | Out-Null
+        Remove-Item -LiteralPath $context.PgData -Force
     }
     $passwordName = ".pg-password-" + [Guid]::NewGuid().ToString("N")
     $passwordFile = Join-Path (Split-Path $context.PgData -Parent) $passwordName
