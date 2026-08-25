@@ -109,8 +109,8 @@ try {
     }
     if ($manifest.components.java.version -ne "21.0.12.1" -or
             $manifest.components.postgresql.version -ne "17.11" -or
-            $manifest.components.algorithm.version -ne "0.1.0" -or
-            $manifest.components.algorithm.contract_version -ne "v1" -or
+            $manifest.components.algorithm.version -ne "0.2.0" -or
+            $manifest.components.algorithm.contract_version -ne "v2" -or
             $manifest.components.algorithm.packager -ne "PyInstaller 6.22.2") {
         throw "release-manifest.json 的运行时版本与 M6 锁定版本不一致。"
     }
@@ -142,7 +142,7 @@ try {
     Write-Host "预检通过：Windows x64、发布清单、包内运行时、目录、磁盘和固定端口均符合要求。"
     Write-Host "Java：$javaVersion"
     Write-Host "PostgreSQL：$postgresVersion"
-    Write-Host "算法：清单版本 0.1.0；启动后将通过 /health 核对真实版本和契约。"
+    Write-Host "算法：清单版本 0.2.0；启动后将通过 /health 核对真实版本和契约。"
     exit 0
 } catch {
     Write-Error ("预检失败：" + $_.Exception.Message)

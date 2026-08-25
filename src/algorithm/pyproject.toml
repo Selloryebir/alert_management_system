@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alert-management-algorithm-service"
-version = "0.1.0"
+version = "0.2.0"
 description = "报警管理系统纯计算算法服务"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

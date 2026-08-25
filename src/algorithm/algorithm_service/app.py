@@ -35,8 +35,8 @@ def health() -> HealthResponse:
     )
 
 
-@app.post("/api/v1/analyze", response_model=AnalysisResponse)
+@app.post("/api/v2/analyze", response_model=AnalysisResponse)
 def analyze_records(request: AnalysisRequest) -> AnalysisResponse:
-    """按显式 v1 参数运行纯计算规则，不访问业务数据库。"""
+    """按显式 v2 参数运行纯计算模型，不访问业务数据库。"""
 
     return analyze(request)

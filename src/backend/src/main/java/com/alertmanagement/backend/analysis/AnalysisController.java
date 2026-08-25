@@ -1,10 +1,12 @@
 package com.alertmanagement.backend.analysis;
 
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -18,8 +20,14 @@ class AnalysisController {
     }
 
     @PostMapping("/imports/{batchId}/analyses")
-    AnalysisView analyze(@PathVariable UUID batchId) {
-        return analysisService.analyze(batchId);
+    AnalysisView analyze(@PathVariable UUID batchId,
+            @RequestBody(required = false) AnalysisParameters parameters) {
+        return analysisService.analyze(batchId, parameters);
+    }
+
+    @GetMapping("/analysis-parameters/defaults")
+    Map<String, Object> defaultParameters() {
+        return analysisService.defaultParameters();
     }
 
     @GetMapping("/analyses/{runId}")

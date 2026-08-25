@@ -13,6 +13,6 @@ def test_health_returns_contract_identity() -> None:
     assert response.json() == {
         "status": "UP",
         "service": "algorithm-service",
-        "version": "0.1.0",
-        "contract_version": "v1",
+        "version": "0.2.0",
+        "contract_version": "v2",
     }

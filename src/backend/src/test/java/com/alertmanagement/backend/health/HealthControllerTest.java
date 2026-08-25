@@ -19,13 +19,13 @@ class HealthControllerTest {
             "报警管理系统",
             new AppProperties.Algorithm(
                     URI.create("http://127.0.0.1:8001/health"),
-                    URI.create("http://127.0.0.1:8001/api/v1/analyze"),
+                    URI.create("http://127.0.0.1:8001/api/v2/analyze"),
                     Duration.ofMillis(500),
                     Duration.ofSeconds(1),
                     Duration.ofSeconds(60),
                     "algorithm-service",
-                    "0.1.0",
-                    "v1"));
+                    "0.2.0",
+                    "v2"));
 
     @Test
     void returnsUpWhenAllComponentsAreUp() throws Exception {

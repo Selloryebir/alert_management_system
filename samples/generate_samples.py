@@ -15,7 +15,8 @@ from xml.etree import ElementTree as ET
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 
-GENERATOR_VERSION = "1.0.0"
+GENERATOR_VERSION = "2.0.0"
+RANDOM_STREAM_VERSION = "1.0.0"
 DEFAULT_SEED = 20260825
 SMOKE_ROWS = 300
 DEMO_ROWS = 20_000
@@ -59,7 +60,7 @@ SCENARIO_CYCLE = tuple(
 
 
 def stable_number(seed: int, index: int, salt: str, modulo: int) -> int:
-    payload = f"{GENERATOR_VERSION}:{seed}:{index}:{salt}".encode("ascii")
+    payload = f"{RANDOM_STREAM_VERSION}:{seed}:{index}:{salt}".encode("ascii")
     return int.from_bytes(hashlib.sha256(payload).digest()[:8], "big") % modulo
 
 
@@ -73,9 +74,22 @@ def scenario_time(scenario: str, occurrence: int, index: int) -> datetime:
     if scenario == "ALARM_FLOOD":
         return start + timedelta(seconds=occurrence * 2)
     if scenario == "DUPLICATE":
-        return start + timedelta(minutes=20, seconds=(occurrence // 2) * 20)
+        return start + timedelta(
+            minutes=20,
+            seconds=(occurrence // 2) * 20 + (occurrence % 2) * 5,
+        )
     if scenario == "CHATTER":
         return start + timedelta(minutes=40, seconds=occurrence * 3)
+    if scenario == "EQUIPMENT_TRIP":
+        return start + timedelta(
+            hours=2,
+            seconds=(occurrence // 5) * 120 + (occurrence % 5) * 11,
+        )
+    if scenario == "PROCESS_CASCADE":
+        return start + timedelta(
+            hours=4,
+            seconds=(occurrence // 5) * 120 + (occurrence % 5) * 11,
+        )
     return start + timedelta(hours=1, seconds=index * 11)
 
 
@@ -116,7 +130,11 @@ def make_record(index: int, scenario: str, occurrence: int, seed: int) -> dict[s
         record["unit"] = f"SYNTHETIC_UNIT_{1 + stable_number(seed, pair, 'duplicate-unit', 6):02d}"
         record["operator"] = f"SYNTHETIC_OPERATOR_{1 + pair % 5:02d}"
     elif scenario == "CHATTER":
-        record["tag"] = f"SYNTHETIC-CHATTER-{occurrence // 10 + 1:03d}"
+        group = occurrence // 10
+        record["site"] = "SYNTHETIC_SITE_01"
+        record["area"] = "SYNTHETIC_AREA_02"
+        record["unit"] = f"SYNTHETIC_UNIT_{group + 1:02d}"
+        record["tag"] = f"SYNTHETIC-CHATTER-{group + 1:03d}"
         if occurrence % 2:
             record["state"] = "RETURNED"
             record["return_time"] = iso(event_time + timedelta(seconds=2))
@@ -133,19 +151,17 @@ def make_record(index: int, scenario: str, occurrence: int, seed: int) -> dict[s
         record["description"] = "[SYNTHETIC] 仪表漂移合成场景"
     elif scenario == "EQUIPMENT_TRIP":
         step = occurrence % 5
-        chain_index = occurrence // 5
-        record["site"] = f"SYNTHETIC_SITE_{chain_index % 2 + 1:02d}"
-        record["area"] = f"SYNTHETIC_AREA_{chain_index % 4 + 1:02d}"
-        record["unit"] = f"SYNTHETIC_UNIT_{chain_index % 6 + 1:02d}"
+        record["site"] = "SYNTHETIC_SITE_01"
+        record["area"] = "SYNTHETIC_AREA_03"
+        record["unit"] = "SYNTHETIC_UNIT_05"
         record["tag"] = f"SYNTHETIC-EQUIPMENT_TRIP-{step + 1:03d}"
         record["description"] = f"[SYNTHETIC] 设备跳停序列步骤 {step + 1}"
         record["priority"] = "P1" if step >= 3 else "P2"
     elif scenario == "PROCESS_CASCADE":
         step = occurrence % 5
-        chain_index = occurrence // 5
-        record["site"] = f"SYNTHETIC_SITE_{chain_index % 2 + 1:02d}"
-        record["area"] = f"SYNTHETIC_AREA_{chain_index % 4 + 1:02d}"
-        record["unit"] = f"SYNTHETIC_UNIT_{chain_index % 6 + 1:02d}"
+        record["site"] = "SYNTHETIC_SITE_02"
+        record["area"] = "SYNTHETIC_AREA_04"
+        record["unit"] = "SYNTHETIC_UNIT_06"
         record["tag"] = f"SYNTHETIC-PROCESS_CASCADE-{step + 1:03d}"
         record["description"] = f"[SYNTHETIC] 工艺扰动级联步骤 {step + 1}"
     elif scenario == "MAINTENANCE_TEST":

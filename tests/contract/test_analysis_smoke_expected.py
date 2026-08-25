@@ -13,15 +13,22 @@ ROOT = Path(__file__).resolve().parents[2]
 SMOKE_PATH = ROOT / "samples" / "smoke" / "synthetic_smoke_utf8.csv"
 EXPECTED_PATH = ROOT / "samples" / "expected" / "analysis-smoke-expected.json"
 BUILDER_PATH = ROOT / "samples" / "expected" / "build_analysis_smoke_expected.py"
-SMOKE_SHA256 = "329e260e7330bd5897600bae41ca61bc2f29aca137f9b6fdffa29c4c40199e68"
+SMOKE_SHA256 = "f8a2b4dcb5a6629839330689681867ee37d82fdc752266ca610bf6ddbf43b8a2"
 PARAMETERS = {
     "duplicate_window_seconds": 30,
     "chatter_window_seconds": 60,
     "chatter_min_count": 4,
+    "chatter_min_transition_ratio": 0.8,
     "short_lived_seconds": 10,
     "persistent_requires_ack": True,
+    "episode_gap_seconds": 60,
     "chain_window_seconds": 60,
     "chain_min_steps": 5,
+    "min_episode_support": 3,
+    "min_transition_probability": 0.6,
+    "min_lift": 2.0,
+    "expert_min_score": 0.35,
+    "expert_min_margin": 0.1,
 }
 SCENARIOS = (
     ("ALARM_FLOOD", 2, 61),
@@ -68,10 +75,10 @@ def test_smoke_satisfies_frozen_rule_preconditions() -> None:
 
     duplicates = scenario_rows(rows, 62, 91)
     for first, second in zip(duplicates[::2], duplicates[1::2], strict=True):
-        assert {key: value for key, value in first.items() if key != "source_row"} == {
-            key: value for key, value in second.items() if key != "source_row"
+        assert {key: value for key, value in first.items() if key not in {"source_row", "event_time"}} == {
+            key: value for key, value in second.items() if key not in {"source_row", "event_time"}
         }
-        assert seconds_between(first["event_time"], second["event_time"]) <= PARAMETERS[
+        assert 0 < seconds_between(first["event_time"], second["event_time"]) <= PARAMETERS[
             "duplicate_window_seconds"
         ]
 
@@ -86,6 +93,7 @@ def test_smoke_satisfies_frozen_rule_preconditions() -> None:
             "chatter_window_seconds"
         ]
         assert [row["state"] for row in chatter_rows] == ["ACTIVE", "RETURNED"] * 5
+        assert len({(row["site"], row["area"], row["unit"]) for row in chatter_rows}) == 1
 
     for row in scenario_rows(rows, 132, 161):
         assert row["state"] == "RETURNED"
@@ -113,7 +121,7 @@ def test_golden_records_cover_all_rows_with_exact_counts() -> None:
     assert expected["synthetic"] is True
     assert expected["oracle"] == "independent-smoke-scenario-contract"
     assert expected["input"]["sha256"] == SMOKE_SHA256
-    assert expected["rule_version"] == "rules-v1.0.0"
+    assert expected["rule_version"] == "hybrid-v2.0.0"
     assert expected["parameters"] == PARAMETERS
 
     records = expected["records"]
@@ -132,11 +140,11 @@ def test_golden_records_cover_all_rows_with_exact_counts() -> None:
         "ACTIONABLE": 30,
     }
     assert Counter(record["cause_category"] for record in records) == {
-        "PROCESS_DISTURBANCE": 90,
+        "PROCESS_DISTURBANCE": 30,
         "EQUIPMENT_FAULT": 30,
         "INSTRUMENT_ISSUE": 30,
         "MAINTENANCE_TEST": 20,
-        "UNKNOWN": 130,
+        "UNKNOWN": 190,
     }
     assert expected["summary"]["input_count"] == 300
 
@@ -147,8 +155,7 @@ def test_event_chains_are_exact_and_non_overlapping() -> None:
     chains = expected["event_chains"]
     assert len(chains) == 12
     assert Counter(chain["association_rule_category"] for chain in chains) == {
-        "EQUIPMENT_TRIP_SEQUENCE": 6,
-        "PROCESS_CASCADE_SEQUENCE": 6,
+        "MARKOV_TRANSITION_HYBRID_V2": 12,
     }
 
     all_members = [source_row for chain in chains for source_row in chain["member_source_rows"]]

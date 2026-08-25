@@ -22,13 +22,13 @@ class HttpAlgorithmHealthProbeTest {
             "报警管理系统",
             new AppProperties.Algorithm(
                     URI.create("http://127.0.0.1:8001/health"),
-                    URI.create("http://127.0.0.1:8001/api/v1/analyze"),
+                    URI.create("http://127.0.0.1:8001/api/v2/analyze"),
                     Duration.ofMillis(500),
                     Duration.ofSeconds(1),
                     Duration.ofSeconds(60),
                     "algorithm-service",
-                    "0.1.0",
-                    "v1"));
+                    "0.2.0",
+                    "v2"));
 
     @Test
     void returnsUpForValidAlgorithmHealthResponse() throws Exception {
@@ -37,7 +37,7 @@ class HttpAlgorithmHealthProbeTest {
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(200);
         when(response.body()).thenReturn("""
-                {"status":"UP","service":"algorithm-service","version":"0.1.0","contract_version":"v1"}
+                {"status":"UP","service":"algorithm-service","version":"0.2.0","contract_version":"v2"}
                 """);
         when(httpClient.send(any(), anyResponseHandler())).thenReturn(response);
 
@@ -49,7 +49,7 @@ class HttpAlgorithmHealthProbeTest {
     @Test
     void returnsDownForWrongAlgorithmIdentity() throws Exception {
         ComponentHealth result = checkResponse("""
-                {"status":"UP","service":"another-service","version":"0.1.0","contract_version":"v1"}
+                {"status":"UP","service":"another-service","version":"0.2.0","contract_version":"v2"}
                 """);
 
         assertThat(result.status()).isEqualTo(ComponentStatus.DOWN);
@@ -59,7 +59,7 @@ class HttpAlgorithmHealthProbeTest {
     @Test
     void returnsDownForWrongContractVersion() throws Exception {
         ComponentHealth result = checkResponse("""
-                {"status":"UP","service":"algorithm-service","version":"0.1.0","contract_version":"v2"}
+                {"status":"UP","service":"algorithm-service","version":"0.2.0","contract_version":"v1"}
                 """);
 
         assertThat(result.status()).isEqualTo(ComponentStatus.DOWN);
@@ -69,7 +69,7 @@ class HttpAlgorithmHealthProbeTest {
     @Test
     void returnsDownForWrongAlgorithmVersion() throws Exception {
         ComponentHealth result = checkResponse("""
-                {"status":"UP","service":"algorithm-service","version":"0.2.0","contract_version":"v1"}
+                {"status":"UP","service":"algorithm-service","version":"0.1.0","contract_version":"v2"}
                 """);
 
         assertThat(result.status()).isEqualTo(ComponentStatus.DOWN);

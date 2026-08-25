@@ -1,7 +1,7 @@
 {
   "synthetic": true,
   "generated_file_committed": false,
-  "generator_version": "1.0.0",
+  "generator_version": "2.0.0",
   "seed": 20260825,
   "row_count": 20000,
   "scenario_counts": {
@@ -15,5 +15,5 @@
     "PROCESS_CASCADE": 1980,
     "SHORT_LIVED": 2010
   },
-  "utf8_csv_sha256": "bfe646c5a060f9cfef0db7045bb73dc3320176fb76fc4cf0a6f191fbcd1f1221"
+  "utf8_csv_sha256": "3eacea1a612f829fa559142ba431832316766bd720a9750efcfb624a1da65cd9"
 }

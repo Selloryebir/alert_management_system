@@ -15,18 +15,34 @@
     "allowed_paths": [
       "src/algorithm/",
       "src/backend/",
+      "src/frontend/",
       "tests/",
+      "samples/",
       "scripts/dev/",
+      "scripts/native/",
+      "packaging/",
+      "compose.yaml",
       "docs/algorithm/",
       "docs/product/",
       "docs/planning/",
       "docs/verification/",
       "automation/state.json"
     ],
-    "checks": [],
-    "failures": [],
+    "checks": [
+      "scripts/dev/test.sh：PASS（Java 35、算法 34、数据 5、契约 4、前端 13）",
+      "scripts/dev/m9-algorithm-v2-smoke.sh：PASS（静态隔离及 12 组泛化/负控）",
+      "scripts/dev/m3-analysis-smoke.sh：PASS（300 行双轮、失败重试、20000 行完整分析 6572ms）"
+    ],
+    "failures": [
+      "已修复：Markov 解释缺少明确 P(v|u)/P(v) 标签。",
+      "已修复：Markov 支持度曾跨 site/area/unit 借用，现按关系独立统计。",
+      "已修复：旧固定样例不满足 v2 正时间差、同关系抖动和跨 episode 支持前提，现由 2.0.0 生成器重建独立金样。",
+      "已修复：事件链长解释超过旧 VARCHAR(500) 导致事务回滚，Flyway V6 扩展为 TEXT 并以长解释集成测试覆盖。",
+      "已修复：逐记录证据包含随导入变化的链 UUID，现改为稳定成员源行，使两次导入语义一致。",
+      "已修复：抖动滑动窗口只检查两种起点会漏掉内部合法窗口，现用前缀变换和区间最小值查询完整判定。"
+    ],
     "decision": "依照已冻结 model-v2 契约，以显式数学规则、一阶 Markov 统计和可弃权专家分类替换 v1 固定分数及场景命名耦合。",
-    "next_action": "完成 Python 核心、Java 契约和独立泛化验收后固定候选提交。",
+    "next_action": "建立固定候选提交并执行独立审查；审查通过后按同一提交重跑 G9。",
     "resume_status": null
   },
   "stages": {
@@ -130,13 +146,13 @@
       "note": "第三固定候选经 PR #2 合入 dev；合并树与候选一致，dev 的仓库、应用、Windows 原生和 Docker 四条远端检查全部成功。"
     },
     "M9": {
-      "status": "in_progress",
+      "status": "review",
       "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "在 feat/m9-hybrid-v2 实现并验证可泛化 hybrid-v2 算法与跨组件契约。",
-      "note": "M8 正式产品和模型契约已通过；M9 第一轮固定增量已启动。"
+      "next_action": "固定候选并完成独立审查、G9 验收及 dev 远端检查点。",
+      "note": "hybrid-v2、参数化页面、独立金样和跨组件 v2 契约已完成作者验收，等待固定候选独立审查。"
     },
     "M10": {
       "status": "blocked",

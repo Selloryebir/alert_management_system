@@ -4,6 +4,7 @@ import { computed, reactive, ref } from "vue";
 import ReviewOperations from "./ReviewOperations.vue";
 import {
   fetchAlarmDetail,
+  fetchAnalysisDefaults,
   fetchDashboard,
   latestAnalysis,
   listAlarms,
@@ -15,6 +16,7 @@ import {
   type AlarmFilters,
   type AlarmPage,
   type AnalysisRun,
+  type AnalysisParameters,
   type Dashboard,
   type DispositionStatus,
   type CauseCategory,
@@ -44,6 +46,8 @@ const classificationClass = ref<AlarmClass>("STANDARD");
 const classificationCause = ref<CauseCategory>("UNKNOWN");
 const classificationOperator = ref("");
 const classificationReason = ref("");
+const analysisParameters = ref<AnalysisParameters>();
+const parameterBusy = ref(false);
 const filters = reactive<AlarmFilters>({
   priority: "",
   area: "",
@@ -52,6 +56,34 @@ const filters = reactive<AlarmFilters>({
   cause_category: "",
   disposition_status: "",
 });
+
+type NumericParameter = Exclude<keyof AnalysisParameters, "persistent_requires_ack">;
+const parameterDefinitions: Array<{
+  key: NumericParameter;
+  label: string;
+  unit: string;
+  min: number;
+  max?: number;
+  step: number;
+}> = [
+  { key: "duplicate_window_seconds", label: "重复报警窗口", unit: "秒", min: 1, step: 1 },
+  { key: "chatter_window_seconds", label: "抖动检测窗口", unit: "秒", min: 1, step: 1 },
+  { key: "chatter_min_count", label: "抖动最少记录数", unit: "条", min: 2, step: 1 },
+  { key: "chatter_min_transition_ratio", label: "抖动最小转换比", unit: "0–1", min: 0, max: 1, step: 0.05 },
+  { key: "short_lived_seconds", label: "短时恢复阈值", unit: "秒", min: 1, step: 1 },
+  { key: "episode_gap_seconds", label: "事件片段间隔", unit: "秒", min: 1, step: 1 },
+  { key: "chain_window_seconds", label: "关联边延迟窗口", unit: "秒", min: 1, step: 1 },
+  { key: "chain_min_steps", label: "事件链最少成员数", unit: "2–5", min: 2, max: 5, step: 1 },
+  { key: "min_episode_support", label: "最少事件片段支持数", unit: "段", min: 2, step: 1 },
+  { key: "min_transition_probability", label: "最小转移概率", unit: "0–1", min: 0.01, max: 1, step: 0.05 },
+  { key: "min_lift", label: "最小提升度", unit: "倍", min: 1, step: 0.1 },
+  { key: "expert_min_score", label: "原因建议最小分数", unit: "0–1", min: 0, max: 1, step: 0.05 },
+  { key: "expert_min_margin", label: "原因建议最小差值", unit: "0–1", min: 0, max: 1, step: 0.05 },
+];
+const parameterLabels: Record<string, string> = Object.fromEntries([
+  ...parameterDefinitions.map((definition) => [definition.key, definition.label]),
+  ["persistent_requires_ack", "持续报警必须已确认"],
+]);
 
 const actionableBatches = computed(() => {
   const byId = new Map<string, ImportBatch>();
@@ -100,6 +132,23 @@ function clearBusinessState() {
   businessMessage.value = "";
 }
 
+async function loadAnalysisParameters() {
+  parameterBusy.value = true;
+  clearBusinessState();
+  try {
+    analysisParameters.value = await fetchAnalysisDefaults();
+    businessMessage.value = "已加载 hybrid-v2 推荐参数；修改值将在本次分析中保存并显示。";
+  } catch (error) {
+    businessError.value = `参数预设加载失败：${error instanceof Error ? error.message : "未知错误"}。`;
+  } finally {
+    parameterBusy.value = false;
+  }
+}
+
+function parameterLabel(key: string): string {
+  return parameterLabels[key] ?? key;
+}
+
 async function openCompletedAnalysis(run: AnalysisRun) {
   analysis.value = run;
   selectedAlarm.value = undefined;
@@ -120,7 +169,7 @@ async function handleBatchAction(batch: ImportBatch) {
       ? analysis.value.status
       : batch.status;
     const run = currentStatus === "IMPORTED" || currentStatus === "FAILED"
-      ? await startAnalysis(batch.batch_id)
+      ? await startAnalysis(batch.batch_id, analysisParameters.value)
       : await latestAnalysis(batch.batch_id);
     analysis.value = run;
     if (run.status === "COMPLETED") {
@@ -297,7 +346,36 @@ async function changeDisposition(status: DispositionStatus) {
       尚无可分析批次。请先在导入向导中确认一个合成数据文件。
     </p>
 
-    <div v-else class="batch-actions" aria-label="可分析批次">
+    <section v-else class="analysis-parameters" aria-labelledby="analysis-parameters-title">
+      <div class="panel-heading compact-heading">
+        <div>
+          <p class="eyebrow">hybrid-v2 推荐预设</p>
+          <h3 id="analysis-parameters-title">本次分析参数</h3>
+        </div>
+        <button type="button" class="secondary-button" :disabled="parameterBusy || analysisBusy" @click="loadAnalysisParameters">
+          {{ analysisParameters ? "恢复推荐预设" : "加载并调整参数" }}
+        </button>
+      </div>
+      <p class="empty-copy">不调整时使用系统推荐值；加载后可按本批数据修改，服务端会拒绝越界参数。</p>
+      <div v-if="analysisParameters" class="parameter-grid" data-testid="analysis-parameter-form">
+        <label v-for="definition in parameterDefinitions" :key="definition.key">
+          <span>{{ definition.label }}（{{ definition.unit }}）</span>
+          <input
+            v-model.number="analysisParameters[definition.key]"
+            type="number"
+            :min="definition.min"
+            :max="definition.max"
+            :step="definition.step"
+          />
+        </label>
+        <label class="parameter-checkbox">
+          <input v-model="analysisParameters.persistent_requires_ack" type="checkbox" />
+          <span>持续 P1 报警必须已有确认时间才命中</span>
+        </label>
+      </div>
+    </section>
+
+    <div v-if="actionableBatches.length > 0" class="batch-actions" aria-label="可分析批次">
       <article v-for="batch in actionableBatches" :key="batch.batch_id" class="batch-action-card">
         <div>
           <strong>{{ batch.file_name }}</strong>
@@ -336,6 +414,15 @@ async function changeDisposition(status: DispositionStatus) {
           <article><span>已关闭</span><strong>{{ dashboard.disposition_counts.CLOSED ?? 0 }}</strong></article>
           <article><span>关联事件链</span><strong data-testid="dashboard-chains">{{ analysis.summary?.event_chain_count ?? 0 }}</strong></article>
         </div>
+
+        <details class="analysis-parameter-summary">
+          <summary>查看本次分析采用的参数</summary>
+          <dl>
+            <div v-for="[key, value] in Object.entries(analysis.parameters)" :key="key">
+              <dt>{{ parameterLabel(key) }}</dt><dd>{{ value }}</dd>
+            </div>
+          </dl>
+        </details>
 
         <div class="dashboard-grid">
           <article class="metric-panel">

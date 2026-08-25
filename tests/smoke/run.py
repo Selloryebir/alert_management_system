@@ -377,8 +377,8 @@ def verify_analysis() -> tuple[str, dict[str, Any]]:
     )
     for key, value in (
         ("status", "COMPLETED"),
-        ("contract_version", "v1"),
-        ("algorithm_version", "0.1.0"),
+        ("contract_version", "v2"),
+        ("algorithm_version", "0.2.0"),
         ("rule_version", expected["rule_version"]),
     ):
         if actual.get(key) != value:

@@ -4,20 +4,27 @@
   "oracle": "independent-smoke-scenario-contract",
   "input": {
     "path": "samples/smoke/synthetic_smoke_utf8.csv",
-    "sha256": "329e260e7330bd5897600bae41ca61bc2f29aca137f9b6fdffa29c4c40199e68",
-    "generator_version": "1.0.0",
+    "sha256": "f8a2b4dcb5a6629839330689681867ee37d82fdc752266ca610bf6ddbf43b8a2",
+    "generator_version": "2.0.0",
     "seed": 20260825,
     "row_count": 300
   },
-  "rule_version": "rules-v1.0.0",
+  "rule_version": "hybrid-v2.0.0",
   "parameters": {
     "duplicate_window_seconds": 30,
     "chatter_window_seconds": 60,
     "chatter_min_count": 4,
+    "chatter_min_transition_ratio": 0.8,
     "short_lived_seconds": 10,
     "persistent_requires_ack": true,
+    "episode_gap_seconds": 60,
     "chain_window_seconds": 60,
-    "chain_min_steps": 5
+    "chain_min_steps": 5,
+    "min_episode_support": 3,
+    "min_transition_probability": 0.6,
+    "min_lift": 2.0,
+    "expert_min_score": 0.35,
+    "expert_min_margin": 0.1
   },
   "summary": {
     "input_count": 300,
@@ -34,15 +41,14 @@
       "ACTIONABLE": 30
     },
     "cause_category_counts": {
-      "PROCESS_DISTURBANCE": 90,
+      "PROCESS_DISTURBANCE": 30,
       "EQUIPMENT_FAULT": 30,
       "INSTRUMENT_ISSUE": 30,
       "MAINTENANCE_TEST": 20,
-      "UNKNOWN": 130
+      "UNKNOWN": 190
     },
     "event_chain_counts": {
-      "EQUIPMENT_TRIP_SEQUENCE": 6,
-      "PROCESS_CASCADE_SEQUENCE": 6,
+      "MARKOV_TRANSITION_HYBRID_V2": 12,
       "total": 12
     }
   },
@@ -51,361 +57,361 @@
       "source_row": 2,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 3,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 4,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 5,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 6,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 7,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 8,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 9,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 10,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 11,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 12,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 13,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 14,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 15,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 16,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 17,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 18,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 19,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 20,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 21,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 22,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 23,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 24,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 25,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 26,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 27,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 28,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 29,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 30,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 31,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 32,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 33,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 34,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 35,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 36,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 37,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 38,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 39,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 40,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 41,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 42,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 43,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 44,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 45,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 46,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 47,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 48,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 49,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 50,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 51,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 52,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 53,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 54,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 55,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 56,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 57,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 58,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 59,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 60,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 61,
       "noise_type": "NORMAL",
       "alarm_class": "STANDARD",
-      "cause_category": "PROCESS_DISTURBANCE"
+      "cause_category": "UNKNOWN"
     },
     {
       "source_row": 62,
@@ -1859,9 +1865,9 @@
         225,
         226
       ],
-      "start_time": "2026-01-15T09:40:20+08:00",
-      "end_time": "2026-01-15T09:41:04+08:00",
-      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+      "start_time": "2026-01-15T10:00:00+08:00",
+      "end_time": "2026-01-15T10:00:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     },
     {
       "chain_id": "SYNTHETIC_CHAIN_EQUIPMENT_TRIP_02",
@@ -1873,9 +1879,9 @@
         230,
         231
       ],
-      "start_time": "2026-01-15T09:41:15+08:00",
-      "end_time": "2026-01-15T09:41:59+08:00",
-      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+      "start_time": "2026-01-15T10:02:00+08:00",
+      "end_time": "2026-01-15T10:02:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     },
     {
       "chain_id": "SYNTHETIC_CHAIN_EQUIPMENT_TRIP_03",
@@ -1887,9 +1893,9 @@
         235,
         236
       ],
-      "start_time": "2026-01-15T09:42:10+08:00",
-      "end_time": "2026-01-15T09:42:54+08:00",
-      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+      "start_time": "2026-01-15T10:04:00+08:00",
+      "end_time": "2026-01-15T10:04:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     },
     {
       "chain_id": "SYNTHETIC_CHAIN_EQUIPMENT_TRIP_04",
@@ -1901,9 +1907,9 @@
         240,
         241
       ],
-      "start_time": "2026-01-15T09:43:05+08:00",
-      "end_time": "2026-01-15T09:43:49+08:00",
-      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+      "start_time": "2026-01-15T10:06:00+08:00",
+      "end_time": "2026-01-15T10:06:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     },
     {
       "chain_id": "SYNTHETIC_CHAIN_EQUIPMENT_TRIP_05",
@@ -1915,9 +1921,9 @@
         245,
         246
       ],
-      "start_time": "2026-01-15T09:44:00+08:00",
-      "end_time": "2026-01-15T09:44:44+08:00",
-      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+      "start_time": "2026-01-15T10:08:00+08:00",
+      "end_time": "2026-01-15T10:08:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     },
     {
       "chain_id": "SYNTHETIC_CHAIN_EQUIPMENT_TRIP_06",
@@ -1929,9 +1935,9 @@
         250,
         251
       ],
-      "start_time": "2026-01-15T09:44:55+08:00",
-      "end_time": "2026-01-15T09:45:39+08:00",
-      "association_rule_category": "EQUIPMENT_TRIP_SEQUENCE"
+      "start_time": "2026-01-15T10:10:00+08:00",
+      "end_time": "2026-01-15T10:10:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     },
     {
       "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_01",
@@ -1943,9 +1949,9 @@
         255,
         256
       ],
-      "start_time": "2026-01-15T09:45:50+08:00",
-      "end_time": "2026-01-15T09:46:34+08:00",
-      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+      "start_time": "2026-01-15T12:00:00+08:00",
+      "end_time": "2026-01-15T12:00:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     },
     {
       "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_02",
@@ -1957,9 +1963,9 @@
         260,
         261
       ],
-      "start_time": "2026-01-15T09:46:45+08:00",
-      "end_time": "2026-01-15T09:47:29+08:00",
-      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+      "start_time": "2026-01-15T12:02:00+08:00",
+      "end_time": "2026-01-15T12:02:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     },
     {
       "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_03",
@@ -1971,9 +1977,9 @@
         265,
         266
       ],
-      "start_time": "2026-01-15T09:47:40+08:00",
-      "end_time": "2026-01-15T09:48:24+08:00",
-      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+      "start_time": "2026-01-15T12:04:00+08:00",
+      "end_time": "2026-01-15T12:04:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     },
     {
       "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_04",
@@ -1985,9 +1991,9 @@
         270,
         271
       ],
-      "start_time": "2026-01-15T09:48:35+08:00",
-      "end_time": "2026-01-15T09:49:19+08:00",
-      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+      "start_time": "2026-01-15T12:06:00+08:00",
+      "end_time": "2026-01-15T12:06:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     },
     {
       "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_05",
@@ -1999,9 +2005,9 @@
         275,
         276
       ],
-      "start_time": "2026-01-15T09:49:30+08:00",
-      "end_time": "2026-01-15T09:50:14+08:00",
-      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+      "start_time": "2026-01-15T12:08:00+08:00",
+      "end_time": "2026-01-15T12:08:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     },
     {
       "chain_id": "SYNTHETIC_CHAIN_PROCESS_CASCADE_06",
@@ -2013,9 +2019,9 @@
         280,
         281
       ],
-      "start_time": "2026-01-15T09:50:25+08:00",
-      "end_time": "2026-01-15T09:51:09+08:00",
-      "association_rule_category": "PROCESS_CASCADE_SEQUENCE"
+      "start_time": "2026-01-15T12:10:00+08:00",
+      "end_time": "2026-01-15T12:10:44+08:00",
+      "association_rule_category": "MARKOV_TRANSITION_HYBRID_V2"
     }
   ]
 }
