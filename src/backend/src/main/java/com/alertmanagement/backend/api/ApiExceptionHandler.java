@@ -10,6 +10,12 @@ import org.springframework.web.server.ResponseStatusException;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
+    @ExceptionHandler(BusinessApiException.class)
+    ResponseEntity<ApiError> handleBusiness(BusinessApiException exception) {
+        return ResponseEntity.status(exception.getStatusCode())
+                .body(new ApiError(exception.code(), exception.getReason(), UUID.randomUUID().toString()));
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<ApiError> handleResponseStatus(ResponseStatusException exception) {
         HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());

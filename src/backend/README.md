@@ -84,3 +84,17 @@ GET  /api/v1/analyses/{runId}
 只有 `IMPORTED` 批次可首次分析；算法调用失败后批次为 `FAILED`，可通过同一 POST 明确重试。调用期间批次为 `ANALYZING`，成功后为 `COMPLETED`；其余状态返回 HTTP 409，已成功批次不会生成重复运行或结果。
 
 Java 按 `source_row` 向 Python 发送全部已导入记录、固定 v1 版本和显式规则参数。Python 的运行 ID、契约/算法/规则版本、规则参数、逐记录唯一全覆盖、摘要计数及事件链成员归属和时间顺序均须通过校验。HTTP 错误、超时、非法 JSON 或契约漂移会保存中文可重试原因，并保证逐记录结果和事件链为零；成功结果、事件链和完成状态在一个 PostgreSQL 事务中提交。查询响应中的逐记录结果带 `source_row`，事件链成员带 `record_id`、`source_row` 和从 0 开始的 `order`，便于审查追溯。
+
+## 看板、报警详情与处置
+
+```text
+GET   /api/v1/imports/{batchId}/analyses/latest
+GET   /api/v1/analyses/{runId}/dashboard
+GET   /api/v1/analyses/{runId}/alarms?page=0&size=50
+GET   /api/v1/analyses/{runId}/alarms/{recordId}
+PATCH /api/v1/analyses/{runId}/alarms/{recordId}/disposition
+```
+
+看板、列表、详情和处置仅接受 `COMPLETED` 分析运行，统计与筛选直接查询 PostgreSQL。报警列表可按 `priority`、`area`、`unit`、`noise_type`、`cause_category` 和 `disposition_status` 筛选，`unit=未指定单元` 用于筛选空单元。详情包含原始行、算法证据、相关事件链及完整处置历史。
+
+处置请求为 `{"status":"IN_PROGRESS","operator":"值班员","note":"开始核查"}`。合法流转为 `OPEN → IN_PROGRESS`、`IN_PROGRESS → OPEN/CLOSED`、`CLOSED → IN_PROGRESS`；每次变更在同一事务中更新当前态并追加历史。关闭保存 `closed_at`，重新打开时清空。

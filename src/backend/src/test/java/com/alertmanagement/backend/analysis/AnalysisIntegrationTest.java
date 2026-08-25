@@ -3,6 +3,7 @@ package com.alertmanagement.backend.analysis;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -18,6 +19,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
@@ -29,6 +31,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -154,7 +157,11 @@ class AnalysisIntegrationTest {
                 .andExpect(jsonPath("$.status").value("FAILED"))
                 .andExpect(jsonPath("$.failure").value("算法响应不是合法 JSON，可重试"))
                 .andReturn().getResponse().getContentAsString();
-        assertZeroResults(UUID.fromString(objectMapper.readTree(invalidJsonBody).get("run_id").asText()));
+        UUID invalidJsonRun = UUID.fromString(objectMapper.readTree(invalidJsonBody).get("run_id").asText());
+        assertZeroResults(invalidJsonRun);
+        mockMvc.perform(get("/api/v1/analyses/{runId}/dashboard", invalidJsonRun))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ANALYSIS_STATUS_CONFLICT"));
 
         UUID invalidContractBatch = importedBatch();
         RESPONDER.set(request -> {
@@ -275,8 +282,183 @@ class AnalysisIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void dashboardAlarmListDetailAndLatestAreBackedByPostgresFacts() throws Exception {
+        UUID batchId = importedBatch();
+        JsonNode analysis = completedAnalysis(batchId);
+        UUID runId = UUID.fromString(analysis.get("run_id").asText());
+        UUID firstRecordId = recordId(batchId, 2);
+        jdbcTemplate.update("UPDATE alarm_record SET priority = 'P2', area = '二区' "
+                + "WHERE batch_id = ? AND source_row = 3", batchId);
+        jdbcTemplate.update("UPDATE alarm_record SET unit_name = '反应单元' "
+                + "WHERE batch_id = ? AND source_row = 4", batchId);
+        jdbcTemplate.update("UPDATE alarm_record SET event_time = event_time + INTERVAL '1 hour' "
+                + "WHERE batch_id = ? AND source_row = 6", batchId);
+
+        mockMvc.perform(get("/api/v1/imports/{batchId}/analyses/latest", batchId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.run_id").value(runId.toString()))
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+        mockMvc.perform(get("/api/v1/imports/{batchId}/analyses/latest", UUID.randomUUID()))
+                .andExpect(status().isNotFound());
+
+        String dashboardBody = mockMvc.perform(get("/api/v1/analyses/{runId}/dashboard", runId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.run_id").value(runId.toString()))
+                .andExpect(jsonPath("$.batch_id").value(batchId.toString()))
+                .andExpect(jsonPath("$.total").value(5))
+                .andExpect(jsonPath("$.disposition_counts.OPEN").value(5))
+                .andExpect(jsonPath("$.disposition_counts.IN_PROGRESS").value(0))
+                .andExpect(jsonPath("$.disposition_counts.CLOSED").value(0))
+                .andExpect(jsonPath("$.trend.length()").value(2))
+                .andExpect(jsonPath("$.priority_counts.P1").value(4))
+                .andExpect(jsonPath("$.priority_counts.P2").value(1))
+                .andExpect(jsonPath("$.area_counts.一区").value(4))
+                .andExpect(jsonPath("$.area_counts.二区").value(1))
+                .andExpect(jsonPath("$.unit_counts.未指定单元").value(4))
+                .andExpect(jsonPath("$.unit_counts.反应单元").value(1))
+                .andExpect(jsonPath("$.noise_type_counts.NORMAL").value(5))
+                .andExpect(jsonPath("$.cause_category_counts.UNKNOWN").value(5))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(objectMapper.readTree(dashboardBody).get("total").asLong()).isEqualTo(
+                jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM analysis_result WHERE run_id = ?", Long.class, runId));
+
+        mockMvc.perform(get("/api/v1/analyses/{runId}/alarms", runId).param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(2))
+                .andExpect(jsonPath("$.total").value(5))
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].source_row").value(2))
+                .andExpect(jsonPath("$.items[0].disposition_status").value("OPEN"));
+        mockMvc.perform(get("/api/v1/analyses/{runId}/alarms", runId)
+                        .param("page", "2").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].source_row").value(6));
+        mockMvc.perform(get("/api/v1/analyses/{runId}/alarms", runId)
+                        .param("priority", "P2").param("area", "二区")
+                        .param("noise_type", "NORMAL").param("cause_category", "UNKNOWN")
+                        .param("disposition_status", "OPEN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].source_row").value(3));
+        mockMvc.perform(get("/api/v1/analyses/{runId}/alarms", runId)
+                        .param("unit", "未指定单元"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(4));
+        mockMvc.perform(get("/api/v1/analyses/{runId}/alarms", runId).param("priority", "p1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ANALYSIS_REQUEST_INVALID"));
+        mockMvc.perform(get("/api/v1/analyses/{runId}/alarms", runId).param("page", "-1"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/analyses/{runId}/alarms", runId).param("size", "201"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/v1/analyses/{runId}/alarms/{recordId}", runId, firstRecordId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.source_row").value(2))
+                .andExpect(jsonPath("$.raw_payload.event_time").isNotEmpty())
+                .andExpect(jsonPath("$.evidence[0]").value("规则校验通过"))
+                .andExpect(jsonPath("$.disposition.status").value("OPEN"))
+                .andExpect(jsonPath("$.disposition_history").isEmpty())
+                .andExpect(jsonPath("$.event_chains[0].members.length()").value(5))
+                .andExpect(jsonPath("$.event_chains[0].members[0].source_row").value(2));
+    }
+
+    @Test
+    void dispositionTransitionsAreAtomicAuditedAndIsolatedByRun() throws Exception {
+        UUID firstBatch = importedBatch();
+        UUID firstRun = UUID.fromString(completedAnalysis(firstBatch).get("run_id").asText());
+        UUID firstRecord = recordId(firstBatch, 2);
+        UUID secondBatch = importedBatch();
+        UUID secondRun = UUID.fromString(completedAnalysis(secondBatch).get("run_id").asText());
+        UUID secondRecord = recordId(secondBatch, 2);
+
+        mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/disposition", firstRun, firstRecord)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CLOSED\",\"operator\":\"审核员\",\"note\":\"直接关闭\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DISPOSITION_STATUS_CONFLICT"));
+        mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/disposition", firstRun, firstRecord)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"IN_PROGRESS\",\"operator\":\"\",\"note\":\"接单\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ANALYSIS_REQUEST_INVALID"));
+        mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/disposition", firstRun, firstRecord)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"PENDING\",\"operator\":\"审核员\",\"note\":\"非法状态\"}"))
+                .andExpect(status().isBadRequest());
+
+        patchDisposition(firstRun, firstRecord, "IN_PROGRESS", "值班员", "开始核查")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.closed_at").doesNotExist());
+        patchDisposition(firstRun, firstRecord, "CLOSED", "班长", "确认并关闭")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CLOSED"))
+                .andExpect(jsonPath("$.closed_at").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/analyses/{runId}/alarms/{recordId}", firstRun, firstRecord))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.disposition.status").value("CLOSED"))
+                .andExpect(jsonPath("$.disposition_history.length()").value(2))
+                .andExpect(jsonPath("$.disposition_history[0].from_status").value("OPEN"))
+                .andExpect(jsonPath("$.disposition_history[0].to_status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.disposition_history[1].from_status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.disposition_history[1].to_status").value("CLOSED"));
+        patchDisposition(firstRun, firstRecord, "IN_PROGRESS", "班长", "重新打开")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.closed_at").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/analyses/{runId}/dashboard", firstRun))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.disposition_counts.IN_PROGRESS").value(1))
+                .andExpect(jsonPath("$.disposition_counts.OPEN").value(4));
+        mockMvc.perform(get("/api/v1/analyses/{runId}/dashboard", secondRun))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.disposition_counts.OPEN").value(5))
+                .andExpect(jsonPath("$.disposition_counts.IN_PROGRESS").value(0));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM disposition_history WHERE run_id = ?", Integer.class, secondRun)).isZero();
+
+        mockMvc.perform(get("/api/v1/analyses/{runId}/alarms/{recordId}", firstRun, secondRecord))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ANALYSIS_RESOURCE_NOT_FOUND"));
+        mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/disposition", firstRun, secondRecord)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"IN_PROGRESS\",\"operator\":\"审核员\",\"note\":\"跨运行\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/analyses/{runId}/dashboard", UUID.randomUUID()))
+                .andExpect(status().isNotFound());
+    }
+
     private UUID importedBatch() throws Exception {
         return importedBatch(10);
+    }
+
+    private JsonNode completedAnalysis(UUID batchId) throws Exception {
+        String body = mockMvc.perform(post("/api/v1/imports/{batchId}/analyses", batchId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body);
+    }
+
+    private UUID recordId(UUID batchId, int sourceRow) {
+        return jdbcTemplate.queryForObject(
+                "SELECT record_id FROM alarm_record WHERE batch_id = ? AND source_row = ?",
+                UUID.class, batchId, sourceRow);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions patchDisposition(
+            UUID runId, UUID recordId, String statusValue, String operator, String note) throws Exception {
+        String content = objectMapper.writeValueAsString(Map.of(
+                "status", statusValue, "operator", operator, "note", note));
+        return mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/disposition", runId, recordId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(content));
     }
 
     private UUID importedBatch(int intervalSeconds) throws Exception {

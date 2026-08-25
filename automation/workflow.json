@@ -121,8 +121,8 @@
           "失败和空状态均有可行动的中文提示"
         ],
         "commands": [
-          "npm --prefix src/frontend test -- --run",
-          "npm --prefix tests/e2e test"
+          "scripts/dev/test.sh",
+          "scripts/dev/m4-browser-smoke.sh"
         ]
       }
     },
