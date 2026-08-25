@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -36,6 +37,7 @@ REQUIRED_PATHS = (
     "scripts/validate_automation.py",
 )
 GENERATED_PARTS = {
+    ".runtime",
     ".gradle",
     ".mypy_cache",
     ".pytest_cache",
@@ -53,6 +55,7 @@ GENERATED_PARTS = {
     "target",
     "venv",
 }
+NATIVE_RELEASE_TEMPLATE_PARTS = ("packaging", "native", "release")
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 MARKDOWN_FENCE = re.compile(r"^\s*(```|~~~)")
 
@@ -72,12 +75,21 @@ def extract_link_target(raw_target: str) -> str:
 
 
 def validate_markdown_links(errors: list[str]) -> None:
-    for markdown_path in sorted(REPOSITORY_ROOT.rglob("*.md")):
+    markdown_paths: list[Path] = []
+    for current_root, directories, files in os.walk(REPOSITORY_ROOT):
+        directories[:] = sorted(
+            directory
+            for directory in directories
+            if directory != ".git" and directory not in GENERATED_PARTS
+        )
+        markdown_paths.extend(
+            Path(current_root) / file_name
+            for file_name in files
+            if file_name.endswith(".md")
+        )
+
+    for markdown_path in sorted(markdown_paths):
         relative_path = markdown_path.relative_to(REPOSITORY_ROOT)
-        if ".git" in relative_path.parts or any(
-            part in GENERATED_PARTS for part in relative_path.parts
-        ):
-            continue
         content = markdown_path.read_text(encoding="utf-8")
         active_fence: str | None = None
         for line_number, line in enumerate(content.splitlines(), start=1):
@@ -134,6 +146,8 @@ def tracked_files(errors: list[str]) -> list[Path]:
 
 def validate_tracked_files(errors: list[str]) -> None:
     for relative_path in tracked_files(errors):
+        if relative_path.parts[:3] == NATIVE_RELEASE_TEMPLATE_PARTS:
+            continue
         if any(part in GENERATED_PARTS for part in relative_path.parts):
             errors.append(f"已跟踪文件位于生成或依赖目录：{relative_path.as_posix()}")
 
