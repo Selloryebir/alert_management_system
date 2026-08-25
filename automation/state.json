@@ -2,7 +2,34 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M10",
-  "active_run": null,
+  "active_run": {
+    "stage": "M10",
+    "base_commit": "25ae00913d8a70d130e99c6ba269a748da8358f1",
+    "requirements": [
+      "PRD-006",
+      "PRD-007",
+      "PRD-008",
+      "PRD-012",
+      "PRD-013",
+      "PRD-014",
+      "PRD-018",
+      "PRD-032"
+    ],
+    "allowed_paths": [
+      "src/backend/",
+      "src/frontend/",
+      "tests/",
+      "scripts/dev/",
+      "docs/product/",
+      "docs/verification/",
+      "automation/state.json"
+    ],
+    "checks": [],
+    "failures": [],
+    "decision": "以项目作为导入、分析、处置和报告的统一业务作用域；在现有单体架构内补齐最小项目生命周期、图形化字段映射、全中文界面和首次使用引导，不引入通用工作流或任意模板引擎。",
+    "next_action": "冻结项目数据/API 契约，分别实现后端项目隔离、前端业务路径和 M10 黑盒验收。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -115,13 +142,13 @@
       "note": "第四固定候选通过 G9、独立复审及远端发布检查；PR #3 合入 dev 后，检查点 40680eeb 的仓库、应用、Windows 原生和 Docker 四条流水线全部成功。"
     },
     "M10": {
-      "status": "ready",
-      "attempt": 0,
+      "status": "in_progress",
+      "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "从最新 dev 创建 feat/m10-business-ux，实施项目化业务与全中文 UX。",
-      "note": "M9 的 v2 算法契约已稳定，可开始项目作用域、图形化字段映射和首次使用引导。"
+      "next_action": "在 feat/m10-business-ux 冻结共享契约并完成项目化业务、图形化字段映射和首次使用引导。",
+      "note": "M10 第一次增量已从 v0.2.0 对应 dev 提交启动。"
     },
     "M11": {
       "status": "blocked",
