@@ -29,7 +29,7 @@
       "automation/state.json"
     ],
     "checks": [
-      "scripts/dev/test.sh：PASS（Java 35、算法 35、数据 5、契约 4、前端 13）",
+      "scripts/dev/test.sh：PASS（固定候选 11254a06；Java 35、算法 36、数据 5、契约 4、前端 13）",
       "scripts/dev/m9-algorithm-v2-smoke.sh：PASS（静态隔离及 12 组泛化/负控）",
       "scripts/dev/m3-analysis-smoke.sh：PASS（300 行双轮、失败重试、20000 行完整分析 6572ms）",
       "scripts/dev/m4-browser-smoke.sh：PASS（300 行双轮业务用例；20000 行上传、分析和看板首屏 19952ms）",
@@ -50,7 +50,7 @@
       "第三固定候选独立审查失败：远端 M5 的 20000 行流程证实报告 E2E 仍无条件读取大分析响应体；已改为只查状态并从页面提取运行 ID，报告二进制也仅在失败时读取短错误文本。"
     ],
     "decision": "实现显式数学规则、一阶 Markov 统计和可弃权专家分类；对 M8 抖动强度初始定义作显式更正：保持全部合法窗口的精确命中集合，但只在每个右端点的最早合格窗口中取强度，避免未经证明的最大密度算法或 O(n²) 枚举。",
-    "next_action": "建立第四固定候选，重新执行独立审查、G9 和远端发布检查。",
+    "next_action": "提交 M9 固定候选证据，通过 PR 合入 dev 并建立远端检查点。",
     "resume_status": null
   },
   "stages": {
@@ -156,11 +156,13 @@
     "M9": {
       "status": "review",
       "attempt": 3,
-      "evidence_files": [],
+      "evidence_files": [
+        "docs/verification/evidence/M9.md"
+      ],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "建立第四固定候选并重新独立审查、G9 验收和远端发布检查。",
-      "note": "前三个固定候选先后暴露抖动与 Markov 证据复杂度、模型披露及两处大响应 E2E 问题；均已完成针对性修复。"
+      "next_action": "通过 PR 合入 dev，在合并提交上重跑四条发布级流水线后再标记 passed。",
+      "note": "第四固定候选 11254a06 已通过 G9、本机受影响回归、独立复审及候选远端仓库/应用/Windows 检查；Docker 由未改变容器代码的父候选成功结果覆盖，dev 检查点仍需四线重跑。"
     },
     "M10": {
       "status": "blocked",
