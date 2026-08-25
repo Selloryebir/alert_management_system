@@ -133,11 +133,19 @@ def make_record(index: int, scenario: str, occurrence: int, seed: int) -> dict[s
         record["description"] = "[SYNTHETIC] 仪表漂移合成场景"
     elif scenario == "EQUIPMENT_TRIP":
         step = occurrence % 5
+        chain_index = occurrence // 5
+        record["site"] = f"SYNTHETIC_SITE_{chain_index % 2 + 1:02d}"
+        record["area"] = f"SYNTHETIC_AREA_{chain_index % 4 + 1:02d}"
+        record["unit"] = f"SYNTHETIC_UNIT_{chain_index % 6 + 1:02d}"
         record["tag"] = f"SYNTHETIC-EQUIPMENT_TRIP-{step + 1:03d}"
         record["description"] = f"[SYNTHETIC] 设备跳停序列步骤 {step + 1}"
         record["priority"] = "P1" if step >= 3 else "P2"
     elif scenario == "PROCESS_CASCADE":
         step = occurrence % 5
+        chain_index = occurrence // 5
+        record["site"] = f"SYNTHETIC_SITE_{chain_index % 2 + 1:02d}"
+        record["area"] = f"SYNTHETIC_AREA_{chain_index % 4 + 1:02d}"
+        record["unit"] = f"SYNTHETIC_UNIT_{chain_index % 6 + 1:02d}"
         record["tag"] = f"SYNTHETIC-PROCESS_CASCADE-{step + 1:03d}"
         record["description"] = f"[SYNTHETIC] 工艺扰动级联步骤 {step + 1}"
     elif scenario == "MAINTENANCE_TEST":

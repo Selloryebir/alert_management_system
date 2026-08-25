@@ -191,8 +191,27 @@ def test_equipment_and_process_sequences_form_deterministic_chains() -> None:
     for chain in first["event_chains"]:
         assert len(chain["member_record_ids"]) == 5
         assert chain["start_record_id"] == chain["member_record_ids"][0]
+        assert "关系键为 SYNTHETIC_SITE_01/SYNTHETIC_AREA_01/SYNTHETIC_UNIT_01" in chain["explanation"]
         assert "不代表已确认根因" in chain["explanation"]
         assert datetime.fromisoformat(chain["start_time"]) < datetime.fromisoformat(chain["end_time"])
+
+
+def test_sequence_steps_from_different_units_do_not_form_a_chain() -> None:
+    records = []
+    for step in range(1, 6):
+        item = record(
+            f"cross-unit-{step}",
+            (step - 1) * 10,
+            tag=f"SYNTHETIC-EQUIPMENT_TRIP-{step:03d}",
+            description=f"[SYNTHETIC] 设备跳停序列步骤 {step}",
+        )
+        item["unit"] = f"SYNTHETIC_UNIT_{step:02d}"
+        records.append(item)
+
+    result = analyze(records, run="cross-unit-chain")
+
+    assert result["event_chains"] == []
+    assert result["summary"]["event_chain_count"] == 0
 
 
 def test_response_echoes_versions_run_id_parameters_and_has_stable_counts() -> None:

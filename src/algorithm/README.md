@@ -72,7 +72,7 @@ M3 审核参数为：
 - 主噪声类型优先级为 `DUPLICATE > CHATTER > SHORT_LIVED > PERSISTENT > NORMAL`；同位号的重复核心值由描述、优先级、状态、当前值和阈值组成，窗口内匹配记录的两端都标为重复；抖动要求同位号在窗口内达到频次阈值且状态连续交替。
 - `DUPLICATE`、`CHATTER`、`SHORT_LIVED` 映射为 `NUISANCE`，`PERSISTENT` 映射为 `ACTIONABLE`，`NORMAL` 映射为 `STANDARD`。
 - 原因类别按维护、仪表、设备、工艺的可解释文本规则以及设备跳停/工艺级联序列建议；证据不足时保留 `UNKNOWN`。
-- 关联事件链只识别同类步骤 `1..5` 在时间窗内的连续序列。链 ID 由规则版本和有序成员 ID 计算，同一请求重复运行结果相同。
+- 关联事件链只识别同一 `site/area/unit` 关系键下、同类步骤 `1..5` 在时间窗内的连续序列；不同单元的步骤不会拼接成链。链 ID 由规则版本和有序成员 ID 计算，同一请求重复运行结果相同。
 
 响应回传运行 ID、契约/算法/规则版本及参数，并返回 `record_results`、`event_chains`、`summary` 和 `errors`。`summary` 同时给出输入、成功、失败数量和完整分类计数。
 

@@ -17,7 +17,7 @@ from pathlib import Path
 
 
 RULE_VERSION = "rules-v1.0.0"
-INPUT_SHA256 = "476f4c7cded5709cd1b6a4e91f0f24f9efdb1499715494a9f0ea34e2b9bf76c3"
+INPUT_SHA256 = "329e260e7330bd5897600bae41ca61bc2f29aca137f9b6fdffa29c4c40199e68"
 PARAMETERS = {
     "duplicate_window_seconds": 30,
     "chatter_window_seconds": 60,

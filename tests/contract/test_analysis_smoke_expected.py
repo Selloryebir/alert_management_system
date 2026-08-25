@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SMOKE_PATH = ROOT / "samples" / "smoke" / "synthetic_smoke_utf8.csv"
 EXPECTED_PATH = ROOT / "samples" / "expected" / "analysis-smoke-expected.json"
 BUILDER_PATH = ROOT / "samples" / "expected" / "build_analysis_smoke_expected.py"
-SMOKE_SHA256 = "476f4c7cded5709cd1b6a4e91f0f24f9efdb1499715494a9f0ea34e2b9bf76c3"
+SMOKE_SHA256 = "329e260e7330bd5897600bae41ca61bc2f29aca137f9b6fdffa29c4c40199e68"
 PARAMETERS = {
     "duplicate_window_seconds": 30,
     "chatter_window_seconds": 60,
@@ -101,6 +101,7 @@ def test_smoke_satisfies_frozen_rule_preconditions() -> None:
     for first in list(range(222, 252, 5)) + list(range(252, 282, 5)):
         chain_rows = scenario_rows(rows, first, first + 4)
         assert len(chain_rows) == PARAMETERS["chain_min_steps"]
+        assert len({(row["site"], row["area"], row["unit"]) for row in chain_rows}) == 1
         assert [int(row["tag"].rsplit("-", 1)[1]) for row in chain_rows] == [1, 2, 3, 4, 5]
         assert seconds_between(chain_rows[0]["event_time"], chain_rows[-1]["event_time"]) <= PARAMETERS[
             "chain_window_seconds"

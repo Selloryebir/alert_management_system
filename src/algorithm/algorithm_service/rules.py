@@ -247,18 +247,23 @@ def _event_chains(
     request: AnalysisRequest,
     evidence: dict[UUID, list[str]],
 ) -> tuple[list[EventChain], dict[UUID, CauseCategory]]:
-    grouped: dict[str, list[tuple[AlarmRecord, int, CauseCategory, str, str]]] = defaultdict(list)
+    grouped: dict[
+        tuple[str, str, str, str | None],
+        list[tuple[AlarmRecord, int, CauseCategory, str, str]],
+    ] = defaultdict(list)
     for record in request.records:
         parsed = _chain_step(record)
         if parsed is not None:
             kind, step, cause, rule, label = parsed
-            grouped[kind].append((record, step, cause, rule, label))
+            relation = (kind, record.site, record.area, record.unit)
+            grouped[relation].append((record, step, cause, rule, label))
 
     chains: list[EventChain] = []
     causes: dict[UUID, CauseCategory] = {}
     expected_steps = list(range(1, request.parameters.chain_min_steps + 1))
-    for kind in sorted(grouped):
-        candidates = sorted(grouped[kind], key=lambda item: (item[0].event_time, item[0].source_row))
+    for relation in sorted(grouped, key=lambda item: tuple(value or "" for value in item)):
+        kind, site, area, unit = relation
+        candidates = sorted(grouped[relation], key=lambda item: (item[0].event_time, item[0].source_row))
         index = 0
         while index < len(candidates):
             if candidates[index][1] != 1:
@@ -289,7 +294,8 @@ def _event_chains(
             )
             explanation = (
                 f"{label}步骤 1..{request.parameters.chain_min_steps} 在 "
-                f"{request.parameters.chain_window_seconds} 秒内按顺序出现；"
+                f"{request.parameters.chain_window_seconds} 秒内按顺序出现，"
+                f"关系键为 {site}/{area}/{unit or '未指定单元'}；"
                 "这是规则关联建议，不代表已确认根因。"
             )
             chains.append(
