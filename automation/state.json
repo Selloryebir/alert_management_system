@@ -26,7 +26,13 @@
       "docs/planning/M6-implementation.md",
       "docs/verification/evidence/M6.md"
     ],
-    "checks": [],
+    "checks": [
+      "本机 Windows 11 固定 ZIP 双目录正式验收通过，耗时 169.255 秒",
+      "远端临时标准用户 Windows 双目录正式验收通过，run 32873354137",
+      "远端应用全链回归通过，run 32873354180",
+      "远端仓库基础检查通过，run 32873354435",
+      "独立审查核对远端 artifact、两轮摘要和日志后判定 PASS"
+    ],
     "failures": [
       "首个试构件在中文空格目录触发 PostgreSQL UTF-8 路径失败；改用目标精确受控的临时 ASCII Junction 后专项通过",
       "第二个试构件的验收器未接受工作目录等于发布根；只修复根等值归属判断后双目录通过",
@@ -39,7 +45,7 @@
       "第九个固定候选的中文轮 PostgreSQL 单次 pg_isready 恰逢 rejecting connections；将误当等待窗口的 -t 参数改为有界显式重试"
     ],
     "decision": "M6 只组装 Windows 11 x64 自包含 ZIP 和发布运维/验收路径；复用同一 JAR、算法、Flyway、样例及浏览器测试，不修改业务实现，不建设安装器、Windows 服务或第二套运行逻辑。",
-    "next_action": "验证第十候选在标准用户双轮运行中的数据库就绪等待、备份复核和独立审查结论。",
+    "next_action": "提交 M6 review 证据并复核功能分支 CI，然后非快进合并到 dev。",
     "resume_status": null
   },
   "stages": {
@@ -110,13 +116,15 @@
       "note": "报告、统一业务审计、人工分类修订、项目备份和演示复位已通过作者检查、第四候选独立审查及 dev 远端回归。"
     },
     "M6": {
-      "status": "in_progress",
+      "status": "review",
       "attempt": 10,
-      "evidence_files": [],
+      "evidence_files": [
+        "docs/verification/evidence/M6.md"
+      ],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "验证第十候选在标准用户双轮运行中的数据库就绪等待、备份复核和独立审查结论。",
-      "note": "第九个固定候选在远端中文轮启动时单次 pg_isready 恰逢 rejecting connections；原 -t 只控制单次连接超时，未提供启动重试。"
+      "next_action": "提交 review 证据、复核功能分支 CI，并以非快进合并进入 dev。",
+      "note": "第十固定候选已通过本机 Windows 11、远端临时标准用户双目录 G6 和独立审查；等待证据提交与 dev 集成。"
     },
     "M7": {
       "status": "blocked",
