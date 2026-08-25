@@ -36,9 +36,11 @@
       "Windows 嵌入式 PostgreSQL 退出后，pytest 默认捕获文件在 DrvFS 消失；无捕获模式稳定 4/4，并固定到 test.sh。",
       "首次 20000 行耗时使用墙上时钟，WSL 时间跳变产生无效数字；已改用单调时钟并重新执行，旧数字不进入证据。",
       "重复确认最初只有 Spring 英文框架错误；已补 code/message/trace_id 中文错误契约并通过 API 测试。"
+      ,"独立审查发现非法样例清单与实际校验不一致：部分枚举和时间值被接受，缺表头文件仍报告有效行；需按 source_row、field、code 精确固化。"
+      ,"独立审查发现 M2 计划中的批次列表、分页原始行追溯 API 和前端最小导入向导尚未实现。"
     ],
-    "decision": "M2 作者门槛已在同一工作树通过，格式、编码、校验、原子落库和 20000 行闭环均有实际证据；进入固定候选与独立审查。",
-    "next_action": "提交并推送 M2 集成候选，等待固定 SHA 的独立审查和 CI。",
+    "decision": "固定候选 3099b9e 的独立审查结论为 FAIL；保留已通过的导入核心，在原分支做最小范围修复后重新冻结候选。",
+    "next_action": "精确修复非法样例契约与断言，补齐批次列表、分页原始行追溯 API 和前端最小导入向导，然后重跑 G2。",
     "resume_status": null
   },
   "stages": {
@@ -65,13 +67,13 @@
       "note": "四组件骨架、健康契约、迁移、状态页和启停闭环已通过本机、独立审查及 dev 远端 CI。"
     },
     "M2": {
-      "status": "review",
+      "status": "failed",
       "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "提交并推送 M2 集成候选，完成固定 SHA 独立审查和 CI。",
-      "note": "G2 作者检查已通过；尚未建立和远端核验最终检查点，不得解锁 M3。"
+      "next_action": "修复独立审查阻断项后重新执行作者检查、固定 SHA 审查和 CI。",
+      "note": "候选 3099b9e 独立审查失败；M2 保持锁定，不得解锁 M3。"
     },
     "M3": {
       "status": "blocked",
