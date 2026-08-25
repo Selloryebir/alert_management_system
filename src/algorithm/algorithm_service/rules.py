@@ -614,13 +614,15 @@ def _append_chain(
             explanation=explanation,
         )
     )
-    member_rows = ",".join(str(member.source_row) for member in members)
-    chain_note = (
-        f"{ASSOCIATION_RULE}：属于成员源行[{member_rows}]的关联链；"
-        "时间最早只表示候选起始报警，统计关联不代表已确认根因。"
-    )
-    for member in members:
-        evidence[member.record_id].append(chain_note)
+    first_row = members[0].source_row
+    last_row = members[-1].source_row
+    member_count = len(members)
+    for position, member in enumerate(members, start=1):
+        evidence[member.record_id].append(
+            f"{ASSOCIATION_RULE}：链首源行{first_row}、链尾源行{last_row}、"
+            f"共{member_count}条；本记录为第{position}个成员（源行{member.source_row}）；"
+            "时间最早只表示候选起始报警，统计关联不代表已确认根因。"
+        )
 
 
 def _term_present(term: str, text: str, english_tokens: set[str]) -> bool:

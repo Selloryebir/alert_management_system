@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from algorithm_service.app import app
 from algorithm_service.models import AnalysisRequest
-from algorithm_service.rules import analyze as analyze_rules
+from algorithm_service.rules import ASSOCIATION_RULE, analyze as analyze_rules
 
 
 client = TestClient(app)
@@ -348,10 +348,40 @@ def test_markov_discovers_unseen_repeated_sequences_without_text_steps() -> None
         assert "lift=4.000000" in chain["explanation"]
         assert "不代表已确认根因" in chain["explanation"]
     assert all(
-        any("成员源行[" in line for line in item["evidence"])
+        any("链首源行" in line and "本记录为第" in line for line in item["evidence"])
         for item in result["record_results"]
     )
     assert {item["cause_category"] for item in result["record_results"]} == {"UNKNOWN"}
+
+
+def test_markov_member_evidence_size_is_linear_for_long_chains() -> None:
+    width = 400
+    tags = tuple(f"LONG-{index}" for index in range(width))
+    records = [
+        record(
+            f"long-{episode}-{index}",
+            episode * 1_000 + index,
+            tag=tag,
+            description="中性运行信息",
+            source_row=episode * width + index + 2,
+        )
+        for episode in range(3)
+        for index, tag in enumerate(tags)
+    ]
+
+    result = analyze(records, run="long-markov-evidence")
+    chain_evidence = [
+        line
+        for item in result["record_results"]
+        for line in item["evidence"]
+        if line.startswith(ASSOCIATION_RULE)
+    ]
+
+    assert len(result["event_chains"]) == 3
+    assert all(len(chain["member_record_ids"]) == width for chain in result["event_chains"])
+    assert len(chain_evidence) == 3 * width
+    assert max(map(len, chain_evidence)) < 300
+    assert sum(map(len, chain_evidence)) < 360_000
 
 
 def test_markov_rejects_insufficient_support_random_order_and_cross_scope() -> None:
