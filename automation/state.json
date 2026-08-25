@@ -22,10 +22,19 @@
       "automation/state.json",
       "docs/verification/evidence/M4.md"
     ],
-    "checks": [],
-    "failures": [],
-    "decision": "M4 保持单页 Vue 与 Java 单体边界；统计和处置状态只来自 PostgreSQL，不在前端复制业务规则。",
-    "next_action": "先冻结看板、详情、处置 API 与固定抽样，再并行实现 Java 业务读写、Vue 主流程和浏览器验收。",
+    "checks": [
+      "scripts/dev/test.sh：后端 31、算法 28、合成数据 5、跨组件契约 4、前端 8 项通过",
+      "scripts/dev/m4-browser-smoke.sh：300 行真实浏览器主流程通过，耗时 9715 ms",
+      "scripts/dev/m4-browser-smoke.sh：20000 行页面上传、分析和看板首屏通过，耗时 14461 ms",
+      "固定抽样精确核对噪声类型、原因类别、12 条事件链成员、原始行证据、处置状态和历史",
+      "git diff --check 与 M4 路径白名单检查通过"
+    ],
+    "failures": [
+      "WSL 初次运行缺少 Chromium 动态库；已改为仅在 .runtime 解压所需运行库，未修改系统环境",
+      "DrvFS 上 Vitest threads worker 曾启动超时；改用单 worker forks 后单测及全量测试稳定通过"
+    ],
+    "decision": "M4 保持单页 Vue 与 Java 单体边界；统计和处置状态只来自 PostgreSQL，不在前端复制业务规则。实现与作者验收完成，进入固定候选独立审查。",
+    "next_action": "固定候选提交并推送，等待全新智能体独立复跑全量测试、真实浏览器验收和范围审计。",
     "resume_status": null
   },
   "stages": {
@@ -74,13 +83,13 @@
       "note": "可解释规则、关系/时间窗事件链、Java 契约与原子保存已通过本机、第二次独立审查及 dev 远端 CI。"
     },
     "M4": {
-      "status": "in_progress",
+      "status": "review",
       "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "冻结业务 API、固定抽样和 E2E 主路径，完成看板、详情、关联链与人工处置。",
-      "note": "活动分支 feat/m4-business-workflow 已从远端核验的 M3 状态转换提交建立。"
+      "next_action": "固定并推送候选，完成独立复核及远端 CI 后非快进合并至 dev。",
+      "note": "业务实现及作者验收完成；真实 Chromium 已覆盖 300 行完整闭环和 20000 行演示流程。"
     },
     "M5": {
       "status": "blocked",
