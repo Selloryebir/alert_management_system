@@ -106,6 +106,33 @@ function Ensure-DemoDatabase {
     }
 }
 
+function Wait-PostgresReady {
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds(30)
+    $lastExitCode = $null
+    $lastOutput = "尚未收到 PostgreSQL 就绪响应"
+    $oldPassword = [Environment]::GetEnvironmentVariable("PGPASSWORD", "Process")
+    [Environment]::SetEnvironmentVariable("PGPASSWORD", [string]$context.Config.database.password, "Process")
+    try {
+        while ([DateTimeOffset]::UtcNow -lt $deadline) {
+            $result = Invoke-BundledCommandResult (Get-PostgresExecutable $context "pg_isready" $workingRoot) @(
+                "-h", "127.0.0.1", "-p", [string]$context.Config.ports.postgres,
+                "-U", [string]$context.Config.database.user, "-d", "postgres", "-t", "2") $workingRoot
+            if ($result.ExitCode -eq 0) {
+                return
+            }
+            if ($result.ExitCode -eq 3) {
+                throw "pg_isready 参数无效：$($result.Output)"
+            }
+            $lastExitCode = $result.ExitCode
+            $lastOutput = $result.Output
+            Start-Sleep -Milliseconds 500
+        }
+    } finally {
+        [Environment]::SetEnvironmentVariable("PGPASSWORD", $oldPassword, "Process")
+    }
+    throw "PostgreSQL 就绪等待超时（最后退出码 $lastExitCode）：$lastOutput"
+}
+
 try {
     Initialize-ReleaseDirectories $context
     foreach ($name in @("postgresql", "algorithm", "backend")) {
@@ -137,15 +164,7 @@ try {
         (Get-PostgresExpectedExecutables $context $workingRoot "postgres") $workingRoot @(
             $postgresOut, $postgresError)
 
-    $readinessOldPassword = [Environment]::GetEnvironmentVariable("PGPASSWORD", "Process")
-    [Environment]::SetEnvironmentVariable("PGPASSWORD", [string]$context.Config.database.password, "Process")
-    try {
-        Invoke-BundledCommand (Get-PostgresExecutable $context "pg_isready" $workingRoot) @(
-            "-h", "127.0.0.1", "-p", [string]$context.Config.ports.postgres,
-            "-U", [string]$context.Config.database.user, "-d", "postgres", "-t", "30") $workingRoot | Out-Null
-    } finally {
-        [Environment]::SetEnvironmentVariable("PGPASSWORD", $readinessOldPassword, "Process")
-    }
+    Wait-PostgresReady
     Ensure-DemoDatabase
 
     $algorithmOut = Join-Path $context.Logs ("algorithm-" + $stamp + ".out.log")

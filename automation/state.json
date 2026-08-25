@@ -35,10 +35,11 @@
       "第五个固定候选在 GitHub Actions 生成的无 BOM 内联 PowerShell 中解析中文异常文本失败，尚未进入构建；只将该内联异常文本改为 ASCII",
       "第六个固定候选已由标准用户完成第一轮业务闭环，但 start/backup 的 pg_isready 在设置 PGPASSWORD 前留下两条认证 FATAL；收紧两次探测的口令作用域，不放宽日志门禁",
       "第七个固定候选的远端标准用户首轮 ASCII 目录完整验收通过，但第二轮中文目录下 jlink Java 无法加载 java.dll；复用同一精确 ASCII Junction 承载 Java 与 PostgreSQL 路径",
-      "第八个固定候选的远端标准用户已通过中文目录启动和业务链，但验收器二次调用 pg_restore 时绕过 Junction 使用真实中文路径；只让该二次校验复用已验证 Junction"
+      "第八个固定候选的远端标准用户已通过中文目录启动和业务链，但验收器二次调用 pg_restore 时绕过 Junction 使用真实中文路径；只让该二次校验复用已验证 Junction",
+      "第九个固定候选的中文轮 PostgreSQL 单次 pg_isready 恰逢 rejecting connections；将误当等待窗口的 -t 参数改为有界显式重试"
     ],
     "decision": "M6 只组装 Windows 11 x64 自包含 ZIP 和发布运维/验收路径；复用同一 JAR、算法、Flyway、样例及浏览器测试，不修改业务实现，不建设安装器、Windows 服务或第二套运行逻辑。",
-    "next_action": "验证第九候选在标准用户 ASCII 与中文目录下的双轮运行、备份二次校验和独立审查结论。",
+    "next_action": "验证第十候选在标准用户双轮运行中的数据库就绪等待、备份复核和独立审查结论。",
     "resume_status": null
   },
   "stages": {
@@ -110,12 +111,12 @@
     },
     "M6": {
       "status": "in_progress",
-      "attempt": 9,
+      "attempt": 10,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "验证第九候选在标准用户 ASCII 与中文目录下的双轮运行、备份二次校验和独立审查结论。",
-      "note": "第八个固定候选已在远端标准用户中文目录完成启动和首段业务链，但验收器绕过 Junction 二次调用 pg_restore 失败；发布包 backup.ps1 本身已成功。"
+      "next_action": "验证第十候选在标准用户双轮运行中的数据库就绪等待、备份复核和独立审查结论。",
+      "note": "第九个固定候选在远端中文轮启动时单次 pg_isready 恰逢 rejecting connections；原 -t 只控制单次连接超时，未提供启动重试。"
     },
     "M7": {
       "status": "blocked",
