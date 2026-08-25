@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -52,6 +53,23 @@ class ImportService {
 
     ImportBatchSummary get(UUID batchId) {
         return persistence.find(batchId);
+    }
+
+    List<ImportBatchSummary> list(int limit) {
+        if (limit < 1 || limit > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit 必须在 1 到 100 之间");
+        }
+        return persistence.list(limit);
+    }
+
+    ImportRecordPage records(UUID batchId, int page, int size) {
+        if (page < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page 不能小于 0");
+        }
+        if (size < 1 || size > 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "size 必须在 1 到 200 之间");
+        }
+        return persistence.records(batchId, page, size);
     }
 
     private Map<String, String> parseMapping(String mappingJson) {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.time.OffsetDateTime;
@@ -104,26 +105,33 @@ class ImportPersistenceService {
                            headers::text, field_mapping::text, errors::text, created_at, imported_at
                       FROM import_batch
                      WHERE batch_id = ?
-                    """, (resultSet, rowNumber) -> new BatchRow(
-                    resultSet.getObject("batch_id", UUID.class),
-                    resultSet.getString("file_name"),
-                    ImportFormat.valueOf(resultSet.getString("file_format")),
-                    ImportBatchStatus.valueOf(resultSet.getString("status")),
-                    resultSet.getInt("total_rows"),
-                    resultSet.getInt("valid_rows"),
-                    resultSet.getInt("error_count"),
-                    readJson(resultSet.getString("headers"), STRING_LIST),
-                    readJson(resultSet.getString("field_mapping"), STRING_MAP),
-                    readJson(resultSet.getString("errors"), ERROR_LIST),
-                    resultSet.getObject("created_at", OffsetDateTime.class),
-                    resultSet.getObject("imported_at", OffsetDateTime.class)), batchId);
-            return new ImportBatchSummary(
-                    row.batchId(), row.fileName(), row.format(), row.status(), row.totalRows(), row.validRows(),
-                    row.errorCount(), row.headers(), row.mapping(), row.errors(), previewRows(batchId),
-                    row.createdAt(), row.importedAt());
+                    """, (resultSet, rowNumber) -> batchRow(resultSet), batchId);
+            return summary(row, previewRows(batchId));
         } catch (EmptyResultDataAccessException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "导入批次不存在");
         }
+    }
+
+    public List<ImportBatchSummary> list(int limit) {
+        return jdbcTemplate.query("""
+                SELECT batch_id, file_name, file_format, status, total_rows, valid_rows, error_count,
+                       headers::text, field_mapping::text, errors::text, created_at, imported_at
+                  FROM import_batch
+                 ORDER BY created_at DESC, batch_id DESC
+                 LIMIT ?
+                """, (resultSet, rowNumber) -> summary(batchRow(resultSet), List.of()), limit);
+    }
+
+    public ImportRecordPage records(UUID batchId, int page, int size) {
+        Boolean exists = jdbcTemplate.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM import_batch WHERE batch_id = ?)", Boolean.class, batchId);
+        if (!Boolean.TRUE.equals(exists)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "导入批次不存在");
+        }
+        long total = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM import_staging WHERE batch_id = ?", Long.class, batchId);
+        long offset = (long) page * size;
+        return new ImportRecordPage(recordRows(batchId, size, offset), total, page, size);
     }
 
     private LockedBatch lockBatch(UUID batchId) {
@@ -181,14 +189,19 @@ class ImportPersistenceService {
     }
 
     private List<AlarmPreview> previewRows(UUID batchId) {
+        return recordRows(batchId, PREVIEW_LIMIT, 0);
+    }
+
+    private List<AlarmPreview> recordRows(UUID batchId, int limit, long offset) {
         return jdbcTemplate.query("""
                 SELECT source_row, event_time, return_time, ack_time, site, area, unit_name, tag,
                        description, priority, alarm_state, alarm_value, threshold, engineering_unit,
                        source_system, operator_name, raw_payload::text
-                  FROM import_staging
+                 FROM import_staging
                  WHERE batch_id = ?
                  ORDER BY source_row
                  LIMIT ?
+                OFFSET ?
                 """, (resultSet, rowNumber) -> new AlarmPreview(
                 resultSet.getInt("source_row"),
                 resultSet.getObject("event_time", OffsetDateTime.class),
@@ -206,7 +219,30 @@ class ImportPersistenceService {
                 resultSet.getString("engineering_unit"),
                 resultSet.getString("source_system"),
                 resultSet.getString("operator_name"),
-                readJson(resultSet.getString("raw_payload"), STRING_MAP)), batchId, PREVIEW_LIMIT);
+                readJson(resultSet.getString("raw_payload"), STRING_MAP)), batchId, limit, offset);
+    }
+
+    private BatchRow batchRow(ResultSet resultSet) throws SQLException {
+        return new BatchRow(
+                resultSet.getObject("batch_id", UUID.class),
+                resultSet.getString("file_name"),
+                ImportFormat.valueOf(resultSet.getString("file_format")),
+                ImportBatchStatus.valueOf(resultSet.getString("status")),
+                resultSet.getInt("total_rows"),
+                resultSet.getInt("valid_rows"),
+                resultSet.getInt("error_count"),
+                readJson(resultSet.getString("headers"), STRING_LIST),
+                readJson(resultSet.getString("field_mapping"), STRING_MAP),
+                readJson(resultSet.getString("errors"), ERROR_LIST),
+                resultSet.getObject("created_at", OffsetDateTime.class),
+                resultSet.getObject("imported_at", OffsetDateTime.class));
+    }
+
+    private ImportBatchSummary summary(BatchRow row, List<AlarmPreview> previewRows) {
+        return new ImportBatchSummary(
+                row.batchId(), row.fileName(), row.format(), row.status(), row.totalRows(), row.validRows(),
+                row.errorCount(), row.headers(), row.mapping(), row.errors(), previewRows,
+                row.createdAt(), row.importedAt());
     }
 
     private void setNullable(PreparedStatement statement, int index, Object value, int sqlType) throws SQLException {

@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -79,6 +78,11 @@ class AlarmNormalizer {
                         site, area, unit, tag, description, priority, state, value, threshold,
                         engineeringUnit, sourceSystem, operator, Map.copyOf(row.values())));
             }
+        }
+
+        if (hasGlobalError(errors)) {
+            validRows = 0;
+            normalized.clear();
         }
 
         return new ValidatedImport(
@@ -229,12 +233,11 @@ class AlarmNormalizer {
             }
             return null;
         }
-        String normalized = value.toUpperCase(Locale.ROOT);
-        if (!accepted.contains(normalized)) {
+        if (!accepted.contains(value)) {
             errors.add(new ImportError(row.sourceRow(), field, "INVALID_ENUM", "枚举值无效：" + value));
             return null;
         }
-        return normalized;
+        return value;
     }
 
     private BigDecimal number(
@@ -264,6 +267,11 @@ class AlarmNormalizer {
             errors.add(new ImportError(sourceRow, field, "TIME_ORDER_INVALID",
                     field + " 不得早于 event_time"));
         }
+    }
+
+    private boolean hasGlobalError(List<ImportError> errors) {
+        return errors.stream().anyMatch(error -> error.sourceRow() == 1
+                && Set.of("MISSING_HEADER", "DUPLICATE_HEADER", "INVALID_MAPPING").contains(error.code()));
     }
 
     private static Map<String, List<String>> aliases() {

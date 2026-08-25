@@ -1,5 +1,6 @@
 package com.alertmanagement.backend.importing;
 
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,8 +33,21 @@ class ImportController {
         return importService.confirm(batchId);
     }
 
+    @GetMapping
+    List<ImportBatchSummary> list(
+            @RequestParam(value = "limit", defaultValue = "20") int limit) {
+        return importService.list(limit);
+    }
+
     @GetMapping("/{batchId}")
     ImportBatchSummary get(@PathVariable UUID batchId) {
         return importService.get(batchId);
+    }
+    @GetMapping("/{batchId}/records")
+    ImportRecordPage records(
+            @PathVariable UUID batchId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        return importService.records(batchId, page, size);
     }
 }

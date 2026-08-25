@@ -15,6 +15,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,7 +48,7 @@ class ImportIntegrationTest {
         {"2026-08-25 08:00:00", "2026-08-25 08:05:00", "2026-08-25 08:01:00", "合成厂区", "一号区",
             "反应单元", "TAG-001", "压力高", "P1", "RETURNED", "12.5", "10", "MPa", "SYNTHETIC_DCS", "演示员"},
         {"2026-08-25T09:00:00+08:00", "", "", "合成厂区", "二号区", "", "Tag-002", "温度高",
-            "p2", "active", "88.2", "80", "℃", "SYNTHETIC_DCS", ""}
+            "P2", "ACTIVE", "88.2", "80", "℃", "SYNTHETIC_DCS", ""}
     };
     private static final EmbeddedPostgres POSTGRES = startPostgres();
 
@@ -149,6 +150,38 @@ class ImportIntegrationTest {
     }
 
     @Test
+    void missingHeaderOrGlobalMappingFailureMakesEveryRowInvalid() throws Exception {
+        String missingSite = String.join(",", Arrays.stream(HEADERS)
+                .filter(header -> !header.equals("site"))
+                .toList()) + "\n"
+                + "2026-08-25 10:00:00,,,区域,单元,TAG-004,描述,P1,ACTIVE,1,1,MPa,SYNTHETIC_DCS,演示员\n";
+        ImportBatchSummary missingHeader = importService.preview(
+                file("missing-header.csv", missingSite.getBytes(StandardCharsets.UTF_8)), null);
+        ImportBatchSummary badMapping = importService.preview(
+                file("bad-mapping.csv", delimited(',').getBytes(StandardCharsets.UTF_8)),
+                objectMapper.writeValueAsString(Map.of("site", "不存在的表头")));
+
+        assertGlobalFailure(missingHeader, "MISSING_HEADER");
+        assertGlobalFailure(badMapping, "MISSING_HEADER");
+    }
+
+    @Test
+    void lowercaseEnumValuesAreRejectedInsteadOfSilentlyNormalized() {
+        String lowercase = String.join(",", HEADERS) + "\n"
+                + "2026-08-25 10:00:00,,,厂区,区域,单元,TAG-005,描述,p1,active,1,1,MPa,SYNTHETIC_DCS,\n";
+
+        ImportBatchSummary summary = importService.preview(
+                file("lowercase-enum.csv", lowercase.getBytes(StandardCharsets.UTF_8)), null);
+
+        assertThat(summary.status()).isEqualTo(ImportBatchStatus.REJECTED);
+        assertThat(summary.validRows()).isZero();
+        assertThat(summary.errors()).filteredOn(error -> error.code().equals("INVALID_ENUM"))
+                .extracting(ImportError::field)
+                .containsExactlyInAnyOrder("priority", "state");
+        assertThat(summary.previewRows()).isEmpty();
+    }
+
+    @Test
     void apiSupportsPreviewSummaryAndRejectsRepeatedConfirmation() throws Exception {
         MockMultipartFile file = file("api.csv", delimited(',').getBytes(StandardCharsets.UTF_8));
         String response = mockMvc.perform(multipart("/api/v1/imports/preview").file(file))
@@ -170,6 +203,64 @@ class ImportIntegrationTest {
                 .andExpect(jsonPath("$.message").value("批次已经确认导入，不能重复确认"))
                 .andExpect(jsonPath("$.trace_id").isNotEmpty());
         assertThat(countAlarms(batchId)).isEqualTo(2);
+    }
+
+    @Test
+    void batchListAndRecordPagesExposeAllRowsWithStableBounds() throws Exception {
+        ImportBatchSummary ready = importService.preview(sample("synthetic_smoke_utf8.csv"), null);
+        importService.confirm(ready.batchId());
+        importService.preview(file("second.csv", delimited(',').getBytes(StandardCharsets.UTF_8)), null);
+
+        mockMvc.perform(get("/api/v1/imports"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+        mockMvc.perform(get("/api/v1/imports").param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        mockMvc.perform(get("/api/v1/imports/{batchId}/records", ready.batchId())
+                        .param("page", "0").param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(300))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.items.length()").value(20))
+                .andExpect(jsonPath("$.items[0].source_row").value(2))
+                .andExpect(jsonPath("$.items[0].raw_payload.source_row").value("2"));
+        mockMvc.perform(get("/api/v1/imports/{batchId}/records", ready.batchId())
+                        .param("page", "14").param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(300))
+                .andExpect(jsonPath("$.items.length()").value(20))
+                .andExpect(jsonPath("$.items[19].source_row").value(301));
+        mockMvc.perform(get("/api/v1/imports/{batchId}/records", ready.batchId())
+                        .param("page", "15").param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(300))
+                .andExpect(jsonPath("$.items").isEmpty());
+    }
+
+    @Test
+    void listDetailAndRecordParametersRejectInvalidRequests() throws Exception {
+        UUID missing = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/v1/imports").param("limit", "0"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/imports").param("limit", "101"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/imports/{batchId}", missing))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/imports/{batchId}/records", missing))
+                .andExpect(status().isNotFound());
+
+        ImportBatchSummary summary = importService.preview(
+                file("bounds.csv", delimited(',').getBytes(StandardCharsets.UTF_8)), null);
+        mockMvc.perform(get("/api/v1/imports/{batchId}/records", summary.batchId()).param("page", "-1"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/imports/{batchId}/records", summary.batchId()).param("size", "0"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/imports/{batchId}/records", summary.batchId()).param("size", "201"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -202,6 +293,15 @@ class ImportIntegrationTest {
 
     private MockMultipartFile file(String name, byte[] content) {
         return new MockMultipartFile("file", name, "application/octet-stream", content);
+    }
+
+    private void assertGlobalFailure(ImportBatchSummary summary, String expectedCode) {
+        assertThat(summary.status()).isEqualTo(ImportBatchStatus.REJECTED);
+        assertThat(summary.validRows()).isZero();
+        assertThat(summary.previewRows()).isEmpty();
+        assertThat(summary.errors()).extracting(ImportError::code).contains(expectedCode);
+        assertThat(countStaging(summary.batchId())).isZero();
+        assertThat(importService.records(summary.batchId(), 0, 20).total()).isZero();
     }
 
     private String delimited(char delimiter) {
