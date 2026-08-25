@@ -2,11 +2,13 @@ package com.alertmanagement.backend.analysis;
 
 import com.alertmanagement.backend.config.AppProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -64,6 +66,7 @@ class AnalysisResponseValidator {
         require(seen.equals(records.keySet()), "逐记录结果未唯一覆盖全部输入记录");
 
         Set<String> chainIds = new HashSet<>();
+        long chainWindowSeconds = ((Number) request.parameters().get("chain_window_seconds")).longValue();
         for (AlgorithmEventChain chain : response.eventChains()) {
             require(chain != null && chain.chainId() != null && !chain.chainId().isBlank()
                     && chainIds.add(chain.chainId()), "事件链 ID 非法或重复");
@@ -74,14 +77,23 @@ class AnalysisResponseValidator {
                     "事件链起点与首成员不一致");
             require(chain.startTime() != null && chain.endTime() != null
                     && !chain.endTime().isBefore(chain.startTime()), "事件链时间顺序非法");
+            require(Duration.between(chain.startTime(), chain.endTime())
+                    .compareTo(Duration.ofSeconds(chainWindowSeconds)) <= 0, "事件链跨度超过规则窗口");
             require(chain.associationRule() != null && !chain.associationRule().isBlank(), "事件链关联规则为空");
             require(chain.explanation() != null && !chain.explanation().isBlank(), "事件链说明为空");
             Set<UUID> memberIds = new HashSet<>();
             AlarmRecordRequest previous = null;
+            AlarmRecordRequest relationAnchor = null;
             for (UUID memberId : chain.memberRecordIds()) {
                 AlarmRecordRequest member = records.get(memberId);
                 require(member != null, "事件链包含不属于本批次的记录");
                 require(memberIds.add(memberId), "事件链包含重复成员");
+                if (relationAnchor == null) {
+                    relationAnchor = member;
+                }
+                require(Objects.equals(member.site(), relationAnchor.site())
+                        && Objects.equals(member.area(), relationAnchor.area())
+                        && Objects.equals(member.unit(), relationAnchor.unit()), "事件链成员关系范围不一致");
                 require(previous == null || member.eventTime().isAfter(previous.eventTime())
                         || member.eventTime().isEqual(previous.eventTime())
                         && member.sourceRow() > previous.sourceRow(), "事件链成员顺序非法");

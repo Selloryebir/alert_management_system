@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
@@ -170,6 +171,44 @@ class AnalysisIntegrationTest {
     }
 
     @Test
+    void eventChainBeyondConfiguredWindowFailsWithoutPersistingResultsOrChain() throws Exception {
+        UUID batchId = importedBatch(20);
+
+        String body = mockMvc.perform(post("/api/v1/imports/{batchId}/analyses", batchId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.failure").value("事件链跨度超过规则窗口，可重试"))
+                .andExpect(jsonPath("$.results").isEmpty())
+                .andExpect(jsonPath("$.event_chains").isEmpty())
+                .andReturn().getResponse().getContentAsString();
+        UUID runId = UUID.fromString(objectMapper.readTree(body).get("run_id").asText());
+
+        assertZeroResults(runId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM event_chain WHERE run_id = ?", Integer.class, runId)).isZero();
+    }
+
+    @Test
+    void eventChainAcrossSiteAreaUnitRelationFailsWithoutPersistingResultsOrChain() throws Exception {
+        UUID batchId = importedBatch();
+        jdbcTemplate.update(
+                "UPDATE alarm_record SET area = '二区' WHERE batch_id = ? AND source_row = 6", batchId);
+
+        String body = mockMvc.perform(post("/api/v1/imports/{batchId}/analyses", batchId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.failure").value("事件链成员关系范围不一致，可重试"))
+                .andExpect(jsonPath("$.results").isEmpty())
+                .andExpect(jsonPath("$.event_chains").isEmpty())
+                .andReturn().getResponse().getContentAsString();
+        UUID runId = UUID.fromString(objectMapper.readTree(body).get("run_id").asText());
+
+        assertZeroResults(runId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM event_chain WHERE run_id = ?", Integer.class, runId)).isZero();
+    }
+
+    @Test
     void timeoutIsPersistedAsRetryableFailure() throws Exception {
         UUID batchId = importedBatch();
         RESPONDER.set(request -> {
@@ -237,16 +276,25 @@ class AnalysisIntegrationTest {
     }
 
     private UUID importedBatch() throws Exception {
-        UUID batchId = previewBatch();
+        return importedBatch(10);
+    }
+
+    private UUID importedBatch(int intervalSeconds) throws Exception {
+        UUID batchId = previewBatch(intervalSeconds);
         mockMvc.perform(post("/api/v1/imports/{batchId}/confirm", batchId)).andExpect(status().isOk());
         return batchId;
     }
 
     private UUID previewBatch() throws Exception {
+        return previewBatch(10);
+    }
+
+    private UUID previewBatch(int intervalSeconds) throws Exception {
         StringBuilder csv = new StringBuilder(
                 "event_time,site,area,tag,description,priority,state,source_system\n");
+        OffsetDateTime start = OffsetDateTime.parse("2026-08-25T08:00:00+08:00");
         for (int index = 0; index < 5; index++) {
-            csv.append("2026-08-25T08:0").append(index).append(":00+08:00,厂区,一区,TAG-")
+            csv.append(start.plusSeconds((long) index * intervalSeconds)).append(",厂区,一区,TAG-")
                     .append(index + 1).append(",压力高,P1,ACTIVE,SYNTHETIC_DCS\n");
         }
         MockMultipartFile file = new MockMultipartFile("file", "analysis.csv", "text/csv",
