@@ -5,6 +5,7 @@
   "scripts": {
     "test": "playwright test",
     "test:smoke": "playwright test business-workflow.spec.ts",
+    "test:m5": "playwright test report-audit-reset.spec.ts",
     "install:chromium": "playwright install chromium"
   },
   "devDependencies": {

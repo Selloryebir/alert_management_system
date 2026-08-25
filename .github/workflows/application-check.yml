@@ -72,6 +72,11 @@ jobs:
           E2E_DEPS_READY: "1"
           E2E_BROWSER_READY: "1"
         run: scripts/dev/m4-browser-smoke.sh
+      - name: 运行 M5 报告审计复位闭环
+        env:
+          E2E_DEPS_READY: "1"
+          E2E_BROWSER_READY: "1"
+        run: scripts/dev/m5-report-audit-reset-smoke.sh
       - name: 停止测试进程
         if: always()
         run: scripts/dev/stop.sh
