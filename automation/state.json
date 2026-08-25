@@ -30,7 +30,8 @@
     "checks": [],
     "failures": [
       "第一次空卷验收在后端构建层失败：JDK 镜像没有 unzip，Maven Wrapper 改下发 tar.gz 后无法匹配已锁定 ZIP 哈希；只在构建阶段安装 unzip，保留 Maven 3.9.16 与既有 SHA 校验。",
-      "第二次空卷验收已完成三镜像构建、Flyway 空库迁移和三容器健康，但宿主 Python urllib 将 127.0.0.1 请求交给环境代理并收到 502；只为本机验收 HTTP 显式禁用代理。"
+      "第二次空卷验收已完成三镜像构建、Flyway 空库迁移和三容器健康，但宿主 Python urllib 将 127.0.0.1 请求交给环境代理并收到 502；只为本机验收 HTTP 显式禁用代理。",
+      "第四固定候选虽通过本机业务验收，但独立静态审查证明 backend healthcheck 会在 DEGRADED 响应中误命中组件 UP，且清理失败路径缺少诊断；取消其远端 G7，收紧顶层健康、清理证据和 AC-008 字段断言。"
     ],
     "decision": "M7 只容器化现有 Java/Vue 构件、Python 源版本和 PostgreSQL 17，并从空项目卷复用 AC-003、AC-005、AC-008；不修改业务实现，不阻塞已通过的 Windows 原生交付。",
     "next_action": "实现三服务 Compose、跨平台 G7 验收器和独立 Docker CI。",
@@ -116,12 +117,12 @@
     },
     "M7": {
       "status": "in_progress",
-      "attempt": 4,
+      "attempt": 5,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
       "next_action": "实现三服务 Compose、跨平台 G7 验收器和独立 Docker CI。",
-      "note": "前两次失败均返回非零并完成项目资源清理；第三次本机迭代验收通过，第四候选补充恢复后容器健康与诊断保真检查。"
+      "note": "第四固定候选被独立审查拒绝并取消远端 G7；第五次只修复健康假阳性、清理诊断和 AC-008 实值断言。"
     }
   }
 }

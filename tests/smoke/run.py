@@ -243,6 +243,21 @@ def wait_for_services_healthy(compose: Compose, timeout: int = 60) -> dict[str, 
     raise VerificationError(f"服务未在 {timeout} 秒内全部恢复 healthy：{last}")
 
 
+def wait_for_service_health(
+    compose: Compose, service: str, expected: str, timeout: int = 60
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    last: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        last = compose.service_state(service)
+        if last["health"] == expected:
+            return last
+        time.sleep(2)
+    raise VerificationError(
+        f"服务 {service} 未在 {timeout} 秒内变为 {expected}：{last}"
+    )
+
+
 def assert_frontend() -> None:
     html = http_request("/", expect_json=False).decode("utf-8")
     match = re.search(r'<script[^>]+src="([^"]+\.js)"', html)
@@ -442,6 +457,15 @@ def verify_disposition(run_id: str) -> dict[str, int]:
             or not row.get("occurred_at")
         ):
             raise VerificationError(f"处置历史字段不完整：{row}")
+    final_disposition = detail.get("disposition", {})
+    if (
+        final_disposition.get("status") != "CLOSED"
+        or final_disposition.get("operator") != "SYNTHETIC_G7_REVIEWER"
+        or final_disposition.get("note") != transitions[-1][1]
+        or not final_disposition.get("updated_at")
+        or not final_disposition.get("closed_at")
+    ):
+        raise VerificationError(f"最终处置字段不完整：{final_disposition}")
     dashboard = http_request(f"/api/v1/analyses/{run_id}/dashboard")
     disposition = dashboard.get("disposition_counts")
     if disposition != {"OPEN": 299, "IN_PROGRESS": 0, "CLOSED": 1}:
@@ -463,11 +487,29 @@ def verify_disposition(run_id: str) -> dict[str, int]:
         "trace_id",
         "details",
     }
+    expected_notes = {
+        ("OPEN", "IN_PROGRESS"): transitions[0][1],
+        ("IN_PROGRESS", "CLOSED"): transitions[1][1],
+    }
     actual_pairs = set()
     for row in audit["items"]:
         if not required.issubset(row) or any(row[key] in (None, "") for key in required):
             raise VerificationError(f"处置审计字段不完整：{row}")
-        actual_pairs.add((row["details"].get("from_status"), row["details"].get("to_status")))
+        if (
+            row["event_type"] != "DISPOSITION_CHANGED"
+            or row["operator"] != "SYNTHETIC_G7_REVIEWER"
+            or row["target_type"] != "ALARM_RECORD"
+            or row["target_id"] != record_id
+            or row["result"] != "SUCCESS"
+        ):
+            raise VerificationError(f"处置审计身份字段不符：{row}")
+        pair = (row["details"].get("from_status"), row["details"].get("to_status"))
+        if (
+            row["details"].get("run_id") != run_id
+            or row["details"].get("note") != expected_notes.get(pair)
+        ):
+            raise VerificationError(f"处置审计详情字段不符：{row}")
+        actual_pairs.add(pair)
     if actual_pairs != set(expected_pairs):
         raise VerificationError(f"处置审计前后状态不符：{actual_pairs}")
     return disposition
@@ -542,6 +584,7 @@ def verify_docker(fresh_volume: bool) -> dict[str, Any]:
             pass
         else:
             raise VerificationError("正向健康断言错误接受了 DEGRADED 状态。")
+        wait_for_service_health(compose, "backend", "unhealthy", timeout=60)
         compose.run("start", "algorithm", timeout=60)
         wait_for_health("UP", timeout=120)
         states = wait_for_services_healthy(compose)
@@ -574,6 +617,11 @@ def verify_docker(fresh_volume: bool) -> dict[str, Any]:
             compose.assert_no_resources()
         except Exception as exc:
             cleanup_error = exc
+            if primary_error is None:
+                try:
+                    save_diagnostics(compose, output)
+                except Exception as diagnostic_exc:
+                    diagnostic_error = diagnostic_exc
     summary["duration_seconds"] = round(time.monotonic() - started, 3)
     summary["cleanup"] = "PASS" if cleanup_error is None else "FAILED"
     errors = [
