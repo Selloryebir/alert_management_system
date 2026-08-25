@@ -15,12 +15,13 @@ preview_file() {
   local file_path=$1
   local expected_status=$2
   local expected_rows=$3
-  local expected_code=${4:-}
+  local invalid_name=${4:-}
   local response
   response=$(curl --noproxy '*' --fail --silent --show-error \
     --form "file=@$file_path" http://127.0.0.1:8080/api/v1/imports/preview)
   PREVIEW_JSON="$response" EXPECTED_STATUS="$expected_status" \
-      EXPECTED_ROWS="$expected_rows" EXPECTED_CODE="$expected_code" \
+      EXPECTED_ROWS="$expected_rows" INVALID_NAME="$invalid_name" \
+      INVALID_MANIFEST="$REPOSITORY_ROOT/samples/expected/invalid-summary.json" \
       "$PYTHON_VENV/bin/python" - <<'PY'
 import json
 import os
@@ -28,16 +29,22 @@ import os
 payload = json.loads(os.environ["PREVIEW_JSON"])
 assert payload["status"] == os.environ["EXPECTED_STATUS"], payload
 assert payload["total_rows"] == int(os.environ["EXPECTED_ROWS"]), payload
-assert all(
-    error.get("source_row", 0) > 0
-    and error.get("field")
-    and error.get("code")
-    and error.get("message")
-    for error in payload["errors"]
-), payload
-expected_code = os.environ["EXPECTED_CODE"]
-if expected_code:
-    assert expected_code in {error["code"] for error in payload["errors"]}, payload
+invalid_name = os.environ["INVALID_NAME"]
+if invalid_name:
+    manifest = json.load(open(os.environ["INVALID_MANIFEST"], encoding="utf-8"))
+    declaration = manifest["files"][invalid_name]
+    expected = declaration["file_errors"] + declaration["row_errors"]
+    actual = [
+        {key: error[key] for key in ("source_row", "field", "code")}
+        for error in payload["errors"]
+    ]
+    assert payload["valid_rows"] == declaration["valid_rows"], payload
+    assert payload["error_count"] == len(expected), payload
+    assert actual == expected, (actual, expected)
+    assert payload["preview_rows"] == [], payload
+else:
+    assert payload["valid_rows"] == int(os.environ["EXPECTED_ROWS"]), payload
+    assert payload["error_count"] == 0 and payload["errors"] == [], payload
 print(payload["batch_id"])
 PY
 }
@@ -100,25 +107,54 @@ gb_batch=$(preview_file \
 confirm_batch "$gb_batch" 12
 echo "GB18030 中文样例 12 行导入通过。"
 
-declare -A invalid_codes=(
-  [missing_header.csv]=MISSING_HEADER
-  [required_value_missing.csv]=REQUIRED_VALUE_MISSING
-  [invalid_time.csv]=INVALID_TIME
-  [invalid_enum.csv]=INVALID_ENUM
-  [invalid_number.csv]=INVALID_NUMBER
-  [time_order_invalid.csv]=TIME_ORDER_INVALID
-)
-for file_name in "${!invalid_codes[@]}"; do
+for file_name in \
+    missing_header.csv \
+    required_value_missing.csv \
+    invalid_time.csv \
+    invalid_enum.csv \
+    invalid_number.csv \
+    time_order_invalid.csv; do
   data_rows=$(($(wc -l < "$REPOSITORY_ROOT/samples/invalid/$file_name") - 1))
   batch_id=$(preview_file "$REPOSITORY_ROOT/samples/invalid/$file_name" \
-    REJECTED "$data_rows" "${invalid_codes[$file_name]}")
+    REJECTED "$data_rows" "$file_name")
   stored=$(docker_run exec "$POSTGRES_CONTAINER" psql \
     --username alert_management --dbname alert_management --tuples-only --no-align \
     --command "SELECT (SELECT COUNT(*) FROM import_staging WHERE batch_id = '$batch_id')
                      + (SELECT COUNT(*) FROM alarm_record WHERE batch_id = '$batch_id');" | tr -d '\r')
   [[ "$stored" == "0" ]]
 done
-echo "六类非法样例共 42 行均被逐项拒绝，业务与暂存记录为 0。"
+echo "非法样例精确命中 1 个文件级错误和 36 个逐行错误；六批均无业务与暂存记录。"
+
+curl --noproxy '*' --fail --silent --show-error \
+  --output "$M2_RUNTIME/import-list.json" \
+  "http://127.0.0.1:8080/api/v1/imports?limit=20"
+curl --noproxy '*' --fail --silent --show-error \
+  --output "$M2_RUNTIME/records-first.json" \
+  "http://127.0.0.1:8080/api/v1/imports/${smoke_batches[0]}/records?page=0&size=200"
+curl --noproxy '*' --fail --silent --show-error \
+  --output "$M2_RUNTIME/records-last.json" \
+  "http://127.0.0.1:8080/api/v1/imports/${smoke_batches[0]}/records?page=1&size=200"
+EXPECTED_BATCH="${smoke_batches[0]}" "$PYTHON_VENV/bin/python" - \
+    "$M2_RUNTIME/import-list.json" \
+    "$M2_RUNTIME/records-first.json" \
+    "$M2_RUNTIME/records-last.json" <<'PY'
+import json
+import os
+import sys
+
+batches = json.load(open(sys.argv[1], encoding="utf-8"))
+assert 1 <= len(batches) <= 20, batches
+assert os.environ["EXPECTED_BATCH"] in {item["batch_id"] for item in batches}, batches
+assert all(item["preview_rows"] == [] for item in batches), batches
+first = json.load(open(sys.argv[2], encoding="utf-8"))
+last = json.load(open(sys.argv[3], encoding="utf-8"))
+assert (first["total"], first["page"], first["size"], len(first["items"])) == (300, 0, 200, 200), first
+assert (last["total"], last["page"], last["size"], len(last["items"])) == (300, 1, 200, 100), last
+assert first["items"][0]["source_row"] == 2, first["items"][0]
+assert last["items"][-1]["source_row"] == 301, last["items"][-1]
+assert first["items"][0]["raw_payload"]["source_row"] == "2", first["items"][0]
+PY
+echo "批次列表与 300 行分页原始记录追溯通过。"
 
 duplicate_status=$(curl --noproxy '*' --silent --output "$M2_RUNTIME/repeat-confirm.json" \
   --write-out '%{http_code}' --request POST \
