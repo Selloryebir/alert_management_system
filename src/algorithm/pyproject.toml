@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alert-management-algorithm-service"
+version = "0.1.0"
+description = "报警管理系统灾后重建 Demo 的纯计算算法服务"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn==0.52.4",
+]
+
+[project.optional-dependencies]
+test = [
+    "httpx2==2.12.0",
+    "pytest==9.1.1",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q --capture=sys"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["algorithm_service*"]

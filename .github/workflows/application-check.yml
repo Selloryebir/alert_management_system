@@ -1,0 +1,83 @@
+name: M1 应用骨架检查
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/application-check.yml"
+      - "automation/**"
+      - "scripts/dev/**"
+      - "src/**"
+      - "samples/**"
+      - "tests/**"
+      - "mvnw"
+      - "mvnw.cmd"
+      - ".mvn/**"
+  pull_request:
+    paths:
+      - ".github/workflows/application-check.yml"
+      - "automation/**"
+      - "scripts/dev/**"
+      - "src/**"
+      - "samples/**"
+      - "tests/**"
+      - "mvnw"
+      - "mvnw.cmd"
+      - ".mvn/**"
+
+permissions:
+  contents: read
+
+jobs:
+  m1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出完整历史
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 准备 Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: 准备 Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: src/algorithm/requirements.lock
+      - name: 准备 Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            src/frontend/package-lock.json
+            tests/e2e/package-lock.json
+      - name: 运行组件测试
+        run: scripts/dev/test.sh
+      - name: 运行两轮集成冒烟
+        run: scripts/dev/restart-smoke.sh
+      - name: 运行 M2 导入冒烟
+        run: scripts/dev/m2-import-smoke.sh
+      - name: 运行 M3 分析冒烟
+        run: scripts/dev/m3-analysis-smoke.sh
+      - name: 准备 Chromium 浏览器
+        run: |
+          npm ci --prefix tests/e2e
+          npm --prefix tests/e2e run install:chromium -- --with-deps
+      - name: 运行 M4 浏览器业务闭环
+        env:
+          E2E_DEPS_READY: "1"
+          E2E_BROWSER_READY: "1"
+        run: scripts/dev/m4-browser-smoke.sh
+      - name: 运行 M5 报告审计复位闭环
+        env:
+          E2E_DEPS_READY: "1"
+          E2E_BROWSER_READY: "1"
+        run: scripts/dev/m5-report-audit-reset-smoke.sh
+      - name: 停止测试进程
+        if: always()
+        run: scripts/dev/stop.sh

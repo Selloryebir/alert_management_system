@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "workflow_id": "alert-management-rebuild",
+  "name": "报警管理系统灾后重建阶段工作流",
+  "prompt_train": {
+    "start_goal": "automation/prompts/start-goal.md",
+    "controller": "automation/prompts/controller.md",
+    "stage_worker": "automation/prompts/stage-worker.md",
+    "reviewer": "automation/prompts/reviewer.md"
+  },
+  "global_references": [
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "docs/product/README.md",
+    "docs/product/requirements.md",
+    "docs/product/data-contract.md",
+    "docs/architecture/README.md",
+    "docs/planning/README.md",
+    "docs/planning/agent-collaboration.md",
+    "docs/verification/README.md",
+    "docs/automation/README.md",
+    "docs/automation/state-machine.md",
+    "docs/automation/git-workflow.md",
+    "docs/verification/automation-audit.md"
+  ],
+  "stages": [
+    {
+      "id": "M0",
+      "name": "来源提取与产品事实冻结",
+      "depends_on": [],
+      "references": [
+        "docs/backgrounds/README.md",
+        "docs/sources/README.md",
+        "docs/sources/manifest.json",
+        "docs/decisions/README.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "四份来源均有可追溯去向，排除内容和理由已记录",
+          "P0 需求、数据契约、架构和验收入口含义唯一",
+          "仓库结构、文档链接和提取可重复性检查通过"
+        ],
+        "commands": [
+          "python3 scripts/validate_repository.py",
+          "npm --prefix tools/document-extraction run check"
+        ]
+      }
+    },
+    {
+      "id": "M1",
+      "name": "可运行工程骨架",
+      "depends_on": ["M0"],
+      "references": [
+        "src/README.md",
+        "docs/architecture/README.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "Java、Python、Vue 和 PostgreSQL 可按开发说明启动",
+          "浏览器显示灾后重建标识及数据库、算法、主系统健康状态",
+          "基础编译、单元测试、静态检查和迁移重启检查通过"
+        ],
+        "commands": [
+          "scripts/dev/test.sh",
+          "scripts/dev/restart-smoke.sh"
+        ]
+      }
+    },
+    {
+      "id": "M2",
+      "name": "合成数据与导入闭环",
+      "depends_on": ["M1"],
+      "references": [
+        "docs/product/data-contract.md",
+        "docs/verification/README.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "CSV、制表符 TXT、XLSX 等价样例得到相同规范化结果",
+          "非法样例产生逐项中文错误且没有半批次数据",
+          "固定种子的 20000 行演示集可在目标电脑完成导入"
+        ],
+        "commands": [
+          "scripts/dev/test.sh",
+          "scripts/dev/m2-import-smoke.sh"
+        ]
+      }
+    },
+    {
+      "id": "M3",
+      "name": "算法与分析闭环",
+      "depends_on": ["M2"],
+      "references": [
+        "docs/product/data-contract.md",
+        "docs/verification/README.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "固定输入的规则结果和关联事件链可重复并符合独立预期",
+          "Java 校验算法契约并原子保存结果",
+          "算法不可用或响应非法时明确失败且不产生部分结果"
+        ],
+        "commands": [
+          "scripts/dev/test.sh",
+          "scripts/dev/m3-analysis-smoke.sh"
+        ]
+      }
+    },
+    {
+      "id": "M4",
+      "name": "前端业务闭环",
+      "depends_on": ["M3"],
+      "references": [
+        "docs/product/requirements.md",
+        "docs/verification/README.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "浏览器完成导入、分析、查看、事件链和人工处置主流程",
+          "固定抽样的看板数字与 API 或数据库查询一致",
+          "失败和空状态均有可行动的中文提示"
+        ],
+        "commands": [
+          "scripts/dev/test.sh",
+          "scripts/dev/m4-browser-smoke.sh"
+        ]
+      }
+    },
+    {
+      "id": "M5",
+      "name": "报告、审计和演示复位",
+      "depends_on": ["M4"],
+      "references": [
+        "docs/product/requirements.md",
+        "docs/verification/README.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "PDF 和 XLSX 可打开且关键数字与事实源一致",
+          "导入、分析、修订、处置和导出审计字段完整",
+          "演示数据连续复位两次后结果一致且不影响项目外数据"
+        ],
+        "commands": [
+          "scripts/dev/test.sh",
+          "scripts/dev/m5-report-audit-reset-smoke.sh"
+        ]
+      }
+    },
+    {
+      "id": "M6",
+      "name": "Windows 11 x64 原生发布与验收",
+      "depends_on": ["M5"],
+      "references": [
+        "docs/architecture/README.md",
+        "docs/verification/README.md",
+        "docs/verification/automation-audit.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "新解压的自包含发布包无需预装 JDK、Python 或 Node 即可运行",
+          "预检、启动、停止、备份和复位脚本作用域正确且失败不假成功",
+          "两轮完整彩排通过且阻断、严重缺陷为零"
+        ],
+        "commands": [
+          "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native/verify-release.ps1"
+        ]
+      }
+    },
+    {
+      "id": "M7",
+      "name": "Docker Compose 次级交付",
+      "depends_on": ["M6"],
+      "references": [
+        "docs/architecture/README.md",
+        "docs/verification/README.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "Compose 从空项目卷健康启动",
+          "复用原生方案的迁移、配置、样例和冒烟测试",
+          "固定样例摘要与原生运行结果一致"
+        ],
+        "commands": [
+          "python3 tests/smoke/run.py --target docker --fresh-volume"
+        ]
+      }
+    }
+  ]
+}

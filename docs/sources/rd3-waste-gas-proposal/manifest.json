@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "path": "docs/backgrounds/2025RD3立项报告书彭磊.docx",
+    "bytes": 40672,
+    "sha256": "bbd07c4ae2f461b532794cc33f2902257bd9a1612523b43af05cb8762badce56"
+  },
+  "sourceClassification": "unrelated",
+  "currentVerificationStatus": "not-applicable",
+  "documentKind": "立项报告",
+  "declaredProjectId": "2025RD3",
+  "declaredProjectName": "一种用于处理成分复杂废气的处理设备",
+  "status": "excluded",
+  "reason": "该文档描述复杂废气处理实体设备，不属于报警管理系统软件项目",
+  "bodyExtraction": "not-produced"
+}

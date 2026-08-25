@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "generator_version": "1.0.0",
+  "seed": 20260825,
+  "valid_rows_definition": "通过文件级与逐行校验、可进入 READY 的数据行数；文件级阻断时为 0",
+  "row_validation_skipped_on_file_error": true,
+  "total_data_rows": 42,
+  "total_valid_rows": 0,
+  "total_file_errors": 1,
+  "total_row_errors": 36,
+  "files": {
+    "missing_header.csv": {
+      "data_rows": 6,
+      "total_rows": 6,
+      "valid_rows": 0,
+      "expected_error_code": "MISSING_HEADER",
+      "sha256": "b381ecfcc61c373643d6b911115904e733650cabc3c0a333057911ae1f014c94",
+      "file_errors": [
+        {
+          "source_row": 1,
+          "field": "description",
+          "code": "MISSING_HEADER"
+        }
+      ],
+      "row_errors": []
+    },
+    "required_value_missing.csv": {
+      "data_rows": 8,
+      "total_rows": 8,
+      "valid_rows": 0,
+      "expected_error_code": "REQUIRED_VALUE_MISSING",
+      "sha256": "7c7598463733b9d026ae8ae4e7c56207bccdaf6c473880ee3e85874dff844e07",
+      "file_errors": [],
+      "row_errors": [
+        {
+          "source_row": 2,
+          "field": "event_time",
+          "code": "REQUIRED_VALUE_MISSING"
+        },
+        {
+          "source_row": 3,
+          "field": "site",
+          "code": "REQUIRED_VALUE_MISSING"
+        },
+        {
+          "source_row": 4,
+          "field": "area",
+          "code": "REQUIRED_VALUE_MISSING"
+        },
+        {
+          "source_row": 5,
+          "field": "tag",
+          "code": "REQUIRED_VALUE_MISSING"
+        },
+        {
+          "source_row": 6,
+          "field": "description",
+          "code": "REQUIRED_VALUE_MISSING"
+        },
+        {
+          "source_row": 7,
+          "field": "priority",
+          "code": "REQUIRED_VALUE_MISSING"
+        },
+        {
+          "source_row": 8,
+          "field": "state",
+          "code": "REQUIRED_VALUE_MISSING"
+        },
+        {
+          "source_row": 9,
+          "field": "source_system",
+          "code": "REQUIRED_VALUE_MISSING"
+        }
+      ]
+    },
+    "invalid_time.csv": {
+      "data_rows": 7,
+      "total_rows": 7,
+      "valid_rows": 0,
+      "expected_error_code": "INVALID_TIME",
+      "sha256": "69238ad410b17c91a158a6215b0a23770bc9f9db28fcd4441d949218b105ae0a",
+      "file_errors": [],
+      "row_errors": [
+        {
+          "source_row": 2,
+          "field": "event_time",
+          "code": "INVALID_TIME"
+        },
+        {
+          "source_row": 3,
+          "field": "event_time",
+          "code": "INVALID_TIME"
+        },
+        {
+          "source_row": 4,
+          "field": "event_time",
+          "code": "INVALID_TIME"
+        },
+        {
+          "source_row": 5,
+          "field": "return_time",
+          "code": "INVALID_TIME"
+        },
+        {
+          "source_row": 6,
+          "field": "return_time",
+          "code": "INVALID_TIME"
+        },
+        {
+          "source_row": 7,
+          "field": "ack_time",
+          "code": "INVALID_TIME"
+        },
+        {
+          "source_row": 8,
+          "field": "ack_time",
+          "code": "INVALID_TIME"
+        }
+      ]
+    },
+    "invalid_enum.csv": {
+      "data_rows": 7,
+      "total_rows": 7,
+      "valid_rows": 0,
+      "expected_error_code": "INVALID_ENUM",
+      "sha256": "819d2a65def599352aed7b0191046ff2f63cc3832e1ba5fff53d34125462e748",
+      "file_errors": [],
+      "row_errors": [
+        {
+          "source_row": 2,
+          "field": "priority",
+          "code": "INVALID_ENUM"
+        },
+        {
+          "source_row": 3,
+          "field": "priority",
+          "code": "INVALID_ENUM"
+        },
+        {
+          "source_row": 4,
+          "field": "priority",
+          "code": "INVALID_ENUM"
+        },
+        {
+          "source_row": 5,
+          "field": "priority",
+          "code": "INVALID_ENUM"
+        },
+        {
+          "source_row": 6,
+          "field": "state",
+          "code": "INVALID_ENUM"
+        },
+        {
+          "source_row": 7,
+          "field": "state",
+          "code": "INVALID_ENUM"
+        },
+        {
+          "source_row": 8,
+          "field": "state",
+          "code": "INVALID_ENUM"
+        }
+      ]
+    },
+    "invalid_number.csv": {
+      "data_rows": 7,
+      "total_rows": 7,
+      "valid_rows": 0,
+      "expected_error_code": "INVALID_NUMBER",
+      "sha256": "a848ac293299109a312a1675eb2204a358ae2e68c3458ebc73ba022c6412ed53",
+      "file_errors": [],
+      "row_errors": [
+        {
+          "source_row": 2,
+          "field": "value",
+          "code": "INVALID_NUMBER"
+        },
+        {
+          "source_row": 3,
+          "field": "value",
+          "code": "INVALID_NUMBER"
+        },
+        {
+          "source_row": 4,
+          "field": "value",
+          "code": "INVALID_NUMBER"
+        },
+        {
+          "source_row": 5,
+          "field": "value",
+          "code": "INVALID_NUMBER"
+        },
+        {
+          "source_row": 6,
+          "field": "threshold",
+          "code": "INVALID_NUMBER"
+        },
+        {
+          "source_row": 7,
+          "field": "threshold",
+          "code": "INVALID_NUMBER"
+        },
+        {
+          "source_row": 8,
+          "field": "threshold",
+          "code": "INVALID_NUMBER"
+        }
+      ]
+    },
+    "time_order_invalid.csv": {
+      "data_rows": 7,
+      "total_rows": 7,
+      "valid_rows": 0,
+      "expected_error_code": "TIME_ORDER_INVALID",
+      "sha256": "2c9c3f9dc8597294192e3cd4493463869de01356f4bfc4a8caf5cf5e98a5b8c3",
+      "file_errors": [],
+      "row_errors": [
+        {
+          "source_row": 2,
+          "field": "return_time",
+          "code": "TIME_ORDER_INVALID"
+        },
+        {
+          "source_row": 3,
+          "field": "ack_time",
+          "code": "TIME_ORDER_INVALID"
+        },
+        {
+          "source_row": 4,
+          "field": "return_time",
+          "code": "TIME_ORDER_INVALID"
+        },
+        {
+          "source_row": 5,
+          "field": "ack_time",
+          "code": "TIME_ORDER_INVALID"
+        },
+        {
+          "source_row": 6,
+          "field": "return_time",
+          "code": "TIME_ORDER_INVALID"
+        },
+        {
+          "source_row": 7,
+          "field": "ack_time",
+          "code": "TIME_ORDER_INVALID"
+        },
+        {
+          "source_row": 8,
+          "field": "return_time",
+          "code": "TIME_ORDER_INVALID"
+        }
+      ]
+    }
+  }
+}

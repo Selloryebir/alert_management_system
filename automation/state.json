@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "workflow_id": "alert-management-rebuild",
+  "current_stage": "M7",
+  "active_run": null,
+  "stages": {
+    "M0": {
+      "status": "passed",
+      "attempt": 2,
+      "evidence_files": [
+        "docs/verification/evidence/M0.md"
+      ],
+      "checkpoint_commit": "6d10fc175044a53f9c3d457e23f93962bdee2f95",
+      "remote_verified": true,
+      "next_action": "无；M0 已通过并解锁 M1。",
+      "note": "来源隔离、产品事实、架构、计划和验收基线已落盘，检查点已在 origin/dev 核验。"
+    },
+    "M1": {
+      "status": "passed",
+      "attempt": 1,
+      "evidence_files": [
+        "docs/verification/evidence/M1.md"
+      ],
+      "checkpoint_commit": "971dfa57815e48068af473a712be5fc1bbe4a54d",
+      "remote_verified": true,
+      "next_action": "无；M1 已通过并解锁 M2。",
+      "note": "四组件骨架、健康契约、迁移、状态页和启停闭环已通过本机、独立审查及 dev 远端 CI。"
+    },
+    "M2": {
+      "status": "passed",
+      "attempt": 2,
+      "evidence_files": [
+        "docs/verification/evidence/M2.md"
+      ],
+      "checkpoint_commit": "4f4e251365915ad6cae6c60391d4ab44a833890a",
+      "remote_verified": true,
+      "next_action": "无；M2 已通过并解锁 M3。",
+      "note": "合成样例、精确校验、原子导入、原始行追溯和最小导入向导已通过本机、独立审查及 dev 远端 CI。"
+    },
+    "M3": {
+      "status": "passed",
+      "attempt": 2,
+      "evidence_files": [
+        "docs/verification/evidence/M3.md"
+      ],
+      "checkpoint_commit": "dacfdf28d9b79a7f9ccd6b24dae339846f65e6fe",
+      "remote_verified": true,
+      "next_action": "无；M3 已通过并解锁 M4。",
+      "note": "可解释规则、关系/时间窗事件链、Java 契约与原子保存已通过本机、第二次独立审查及 dev 远端 CI。"
+    },
+    "M4": {
+      "status": "passed",
+      "attempt": 1,
+      "evidence_files": [
+        "docs/verification/evidence/M4.md"
+      ],
+      "checkpoint_commit": "937320e8df2e7959f368f4c4074621dd66a922f2",
+      "remote_verified": true,
+      "next_action": "无；M4 已通过并解锁 M5。",
+      "note": "看板、详情、事件链和人工处置已通过作者检查、独立审查及 dev 远端真实浏览器回归。"
+    },
+    "M5": {
+      "status": "passed",
+      "attempt": 4,
+      "evidence_files": [
+        "docs/verification/evidence/M5.md"
+      ],
+      "checkpoint_commit": "de98a05eed9052383a30881ef85760440cf93667",
+      "remote_verified": true,
+      "next_action": "无；M5 已通过并解锁 M6。",
+      "note": "报告、统一业务审计、人工分类修订、项目备份和演示复位已通过作者检查、第四候选独立审查及 dev 远端回归。"
+    },
+    "M6": {
+      "status": "passed",
+      "attempt": 10,
+      "evidence_files": [
+        "docs/verification/evidence/M6.md"
+      ],
+      "checkpoint_commit": "fae9c0b28623784f65b35d7f907b3e439770421b",
+      "remote_verified": true,
+      "next_action": "无；M6 已通过并解锁 M7。",
+      "note": "第十固定候选已通过本机 Windows 11、远端临时标准用户双目录 G6、独立审查及 dev 合并检查点三条远端流水线。"
+    },
+    "M7": {
+      "status": "passed",
+      "attempt": 5,
+      "evidence_files": [
+        "docs/verification/evidence/M7.md"
+      ],
+      "checkpoint_commit": "a0526c0bf1c040dee2d017405e051cf92ef8cf29",
+      "remote_verified": true,
+      "next_action": "等待人工审核，并由人工决定是否将 dev 合并到 main。",
+      "note": "第五固定候选已通过本机 Windows 11 Docker Desktop、远端 Ubuntu G7、独立审查及 dev 合并检查点三条远端流水线；自动开发阶段全部完成。"
+    }
+  }
+}

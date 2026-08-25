@@ -1,0 +1,57 @@
+name: M7 Docker Compose 检查
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/docker-compose-check.yml"
+      - "automation/workflow.json"
+      - "compose.yaml"
+      - ".dockerignore"
+      - "packaging/docker/**"
+      - "tests/smoke/**"
+      - "src/**"
+      - "samples/**"
+      - "mvnw"
+      - "mvnw.cmd"
+      - ".mvn/**"
+  pull_request:
+    paths:
+      - ".github/workflows/docker-compose-check.yml"
+      - "automation/workflow.json"
+      - "compose.yaml"
+      - ".dockerignore"
+      - "packaging/docker/**"
+      - "tests/smoke/**"
+      - "src/**"
+      - "samples/**"
+      - "mvnw"
+      - "mvnw.cmd"
+      - ".mvn/**"
+
+permissions:
+  contents: read
+
+jobs:
+  g7:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: 检出完整历史
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 准备 Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 从空项目卷执行 G7
+        run: python3 tests/smoke/run.py --target docker --fresh-volume
+      - name: 保存 G7 摘要和失败日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m7-docker-evidence-${{ github.sha }}
+          path: .runtime/m7/
+          if-no-files-found: error
+          retention-days: 14

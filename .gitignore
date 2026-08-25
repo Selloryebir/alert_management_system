@@ -1,0 +1,48 @@
+# 操作系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# 本地配置和日志
+.env
+.env.*
+!.env.example
+*.log
+/logs/
+
+# Java
+.gradle/
+target/
+build/
+out/
+*.class
+
+# JavaScript / TypeScript
+node_modules/
+dist/
+.vite/
+coverage/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# 本地运行数据与临时文件
+/data/
+/tmp/
+/temp/
+/.runtime/
+*.pid
+*.sqlite
+*.sqlite3
+
+# 原生交付产物
+/release/
+/artifacts/
