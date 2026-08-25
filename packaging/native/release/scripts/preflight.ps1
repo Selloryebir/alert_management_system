@@ -123,14 +123,15 @@ try {
     Assert-WindowsX64Pe $context.Java
     Assert-WindowsX64Pe (Get-PostgresExecutable $context "postgres")
 
-    $javaVersion = Invoke-BundledCommand $context.Java @("-version")
-    if ($javaVersion -notmatch '21\.0\.12') {
-        throw "包内 Java 版本不是锁定的 21.0.12.1：$javaVersion"
-    }
-    $postgresRoot = Initialize-PostgresWorkingRoot $context
+    $workingRoot = Initialize-PostgresWorkingRoot $context
     try {
+        $workingJava = Join-Path $workingRoot "runtime\jre\bin\java.exe"
+        $javaVersion = Invoke-BundledCommand $workingJava @("-version") $workingRoot
+        if ($javaVersion -notmatch '21\.0\.12') {
+            throw "包内 Java 版本不是锁定的 21.0.12.1：$javaVersion"
+        }
         $postgresVersion = Invoke-BundledCommand `
-            (Get-PostgresExecutable $context "postgres" $postgresRoot) @("--version") $postgresRoot
+            (Get-PostgresExecutable $context "postgres" $workingRoot) @("--version") $workingRoot
     } finally {
         Remove-PostgresWorkingRoot $context
     }

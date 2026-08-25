@@ -33,10 +33,11 @@
       "首个远端候选误把 packaging/native/release 源码模板判作生成目录，且预创建空 PgData 在 runner ACL 下失败；收窄模板例外并改由 initdb 自建目录",
       "第四个固定候选被独立审查拒绝：GitHub Windows runner 高权限账户不能运行 PostgreSQL，且显式 ZIP 验收未拒绝脏工作树/source_dirty；改为管理员只构建、临时标准用户验收并收紧固定候选检查",
       "第五个固定候选在 GitHub Actions 生成的无 BOM 内联 PowerShell 中解析中文异常文本失败，尚未进入构建；只将该内联异常文本改为 ASCII",
-      "第六个固定候选已由标准用户完成第一轮业务闭环，但 start/backup 的 pg_isready 在设置 PGPASSWORD 前留下两条认证 FATAL；收紧两次探测的口令作用域，不放宽日志门禁"
+      "第六个固定候选已由标准用户完成第一轮业务闭环，但 start/backup 的 pg_isready 在设置 PGPASSWORD 前留下两条认证 FATAL；收紧两次探测的口令作用域，不放宽日志门禁",
+      "第七个固定候选的远端标准用户首轮 ASCII 目录完整验收通过，但第二轮中文目录下 jlink Java 无法加载 java.dll；复用同一精确 ASCII Junction 承载 Java 与 PostgreSQL 路径"
     ],
     "decision": "M6 只组装 Windows 11 x64 自包含 ZIP 和发布运维/验收路径；复用同一 JAR、算法、Flyway、样例及浏览器测试，不修改业务实现，不建设安装器、Windows 服务或第二套运行逻辑。",
-    "next_action": "验证标准用户远端运行路径和固定候选完整性修复，重新固定候选并独立审查。",
+    "next_action": "验证第八候选在标准用户 ASCII 与中文目录下的双轮运行、日志洁净度和独立审查结论。",
     "resume_status": null
   },
   "stages": {
@@ -108,12 +109,12 @@
     },
     "M6": {
       "status": "in_progress",
-      "attempt": 7,
+      "attempt": 8,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "验证第七候选的标准用户双目录远端运行、日志洁净度和独立审查结论。",
-      "note": "第六个固定候选证明标准用户可运行完整业务链，但两次未携带口令的 pg_isready 在服务日志留下 FATAL，未通过 G6 日志门禁。"
+      "next_action": "验证第八候选在标准用户 ASCII 与中文目录下的双轮运行、日志洁净度和独立审查结论。",
+      "note": "第七个固定候选在远端标准用户首轮 ASCII 目录完整验收通过，但第二轮中文目录下 jlink Java 无法加载 java.dll；第八候选复用 PostgreSQL 的精确 ASCII Junction 运行 Java 主程序。"
     },
     "M7": {
       "status": "blocked",

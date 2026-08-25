@@ -8,7 +8,15 @@ $ErrorActionPreference = "Stop"
 try {
     $context = Get-RuntimeContext
     Assert-FixedRuntimeConfig $context
-    Assert-OwnedProcess $context "backend" $context.Java $context.BackendJar | Out-Null
+    $workingRoot = Get-PostgresAliasPath $context
+    if (-not (Normalize-DirectoryPath $workingRoot).Equals((Normalize-DirectoryPath $context.Root),
+            [StringComparison]::OrdinalIgnoreCase)) {
+        Assert-PostgresAliasTarget $context $workingRoot
+    }
+    $backendJava = Join-Path $workingRoot "runtime\jre\bin\java.exe"
+    $backendJar = Join-Path $workingRoot "app\core-api.jar"
+    $backendExpectedExecutables = @($backendJava, $context.Java) | Select-Object -Unique
+    Assert-OwnedProcess $context "backend" $backendExpectedExecutables $backendJar | Out-Null
 
     if (-not $Force) {
         $answer = Read-Host "此操作将清空当前发布包的演示业务数据，但保留数据库、备份和样例。请输入 RESET_DEMO 继续"

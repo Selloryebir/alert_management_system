@@ -8,21 +8,24 @@ $ErrorActionPreference = "Stop"
 try {
     $context = Get-RuntimeContext
     Initialize-ReleaseDirectories $context
+    $workingRoot = Initialize-PostgresWorkingRoot $context
+    $backendJava = Join-Path $workingRoot "runtime\jre\bin\java.exe"
+    $backendJar = Join-Path $workingRoot "app\core-api.jar"
+    $backendExpectedExecutables = @($backendJava, $context.Java) | Select-Object -Unique
 
-    Stop-OwnedProcess $context "backend" $context.Java $context.BackendJar
+    Stop-OwnedProcess $context "backend" $backendExpectedExecutables $backendJar
     Stop-OwnedProcess $context "algorithm" $context.Algorithm
 
     $pgCtl = Get-PostgresExecutable $context "pg_ctl"
     if ((Test-Path -LiteralPath $pgCtl -PathType Leaf) -and
             (Test-Path -LiteralPath (Join-Path $context.PgData "PG_VERSION") -PathType Leaf)) {
-        $postgresRoot = Initialize-PostgresWorkingRoot $context
-        $postgresDataArgument = Join-Path $postgresRoot $context.PgDataArgument
-        $pgCtl = Get-PostgresExecutable $context "pg_ctl" $postgresRoot
+        $postgresDataArgument = Join-Path $workingRoot $context.PgDataArgument
+        $pgCtl = Get-PostgresExecutable $context "pg_ctl" $workingRoot
         $statusResult = Invoke-BundledCommandResult $pgCtl @(
-            "-D", $postgresDataArgument, "status") $postgresRoot
+            "-D", $postgresDataArgument, "status") $workingRoot
         if ($statusResult.ExitCode -eq 0) {
             Invoke-BundledCommand $pgCtl @(
-                "-D", $postgresDataArgument, "-m", "fast", "-w", "stop") $postgresRoot | Out-Null
+                "-D", $postgresDataArgument, "-m", "fast", "-w", "stop") $workingRoot | Out-Null
         }
     }
     Remove-PidRecord $context "postgresql"

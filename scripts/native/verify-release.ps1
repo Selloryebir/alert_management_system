@@ -323,6 +323,8 @@ function Assert-ProcessInventory {
     )
     $captured = @()
     $postgresAlias = $null
+    $releasePath = [IO.Path]::GetFullPath($ReleaseRoot).TrimEnd('\')
+    $nonAsciiRelease = $releasePath -match '[^\x00-\x7F]'
     foreach ($definition in $definitions) {
         $recordPath = Join-Path $ReleaseRoot "pids\$($definition.Name).json"
         Assert-True (Test-Path -LiteralPath $recordPath -PathType Leaf) "缺少 PID 记录：$recordPath"
@@ -337,8 +339,7 @@ function Assert-ProcessInventory {
 
         if ($definition.Name -eq "postgresql") {
             $workingRoot = [IO.Path]::GetFullPath([string]$record.working_directory).TrimEnd('\')
-            $releasePath = [IO.Path]::GetFullPath($ReleaseRoot).TrimEnd('\')
-            if ($releasePath -notmatch '[^\x00-\x7F]') {
+            if (-not $nonAsciiRelease) {
                 Assert-True ($workingRoot.Equals($releasePath, [StringComparison]::OrdinalIgnoreCase)) "ASCII 发布目录下 PostgreSQL 工作目录必须是当前发布根。"
             } else {
                 Assert-True (-not $workingRoot.Equals($releasePath, [StringComparison]::OrdinalIgnoreCase)) "非 ASCII 发布目录下 PostgreSQL 工作目录未使用受控 Junction。"
@@ -350,6 +351,14 @@ function Assert-ProcessInventory {
             Assert-True (([string]$record.command_line).IndexOf($postgresDataArgument, [StringComparison]::OrdinalIgnoreCase) -ge 0) "PostgreSQL 命令行未使用受控 ASCII -D 路径。"
             Assert-True (Test-Path -LiteralPath (Join-Path $ReleaseRoot "data\postgresql\PG_VERSION") -PathType Leaf) "当前发布根看不到 PostgreSQL 实际数据。"
             Assert-PathOwnedByReleaseOrAlias ([string]$record.executable_path) $ReleaseRoot $postgresAlias "postgresql 记录的可执行路径"
+        } elseif ($definition.Name -eq "backend" -and $nonAsciiRelease) {
+            Assert-True (-not [string]::IsNullOrWhiteSpace($postgresAlias)) "非 ASCII 发布目录下缺少 PostgreSQL 受控 Junction。"
+            $backendWorkingRoot = [IO.Path]::GetFullPath([string]$record.working_directory).TrimEnd('\')
+            Assert-True ($backendWorkingRoot.Equals($postgresAlias, [StringComparison]::OrdinalIgnoreCase)) "非 ASCII 发布目录下主程序与 PostgreSQL 未使用同一受控 Junction。"
+            Assert-JunctionTargetsRelease $backendWorkingRoot $ReleaseRoot
+            Assert-PathOwnedByReleaseOrAlias ([string]$record.executable_path) $ReleaseRoot $postgresAlias "backend 记录的可执行路径"
+            $aliasJar = Join-Path $postgresAlias "app\core-api.jar"
+            Assert-True (([string]$record.command_line).IndexOf($aliasJar, [StringComparison]::OrdinalIgnoreCase) -ge 0) "非 ASCII 发布目录下主程序命令行未使用 Junction 内的 JAR。"
         } else {
             Assert-PathUnderRoot ([string]$record.executable_path) $ReleaseRoot "$($definition.Name) 记录的可执行路径"
             Assert-PathUnderRoot ([string]$record.working_directory) $ReleaseRoot "$($definition.Name) 记录的工作目录"
@@ -357,7 +366,11 @@ function Assert-ProcessInventory {
 
         $actual = Get-CimInstance Win32_Process -Filter "ProcessId = $processId"
         Assert-True ($null -ne $actual) "$($definition.Name) 记录的进程不存在：$processId"
-        Assert-PathOwnedByReleaseOrAlias ([string]$actual.ExecutablePath) $ReleaseRoot $postgresAlias "$($definition.Name) 实际可执行路径"
+        if ($definition.Name -eq "algorithm") {
+            Assert-PathUnderRoot ([string]$actual.ExecutablePath) $ReleaseRoot "algorithm 实际可执行路径"
+        } else {
+            Assert-PathOwnedByReleaseOrAlias ([string]$actual.ExecutablePath) $ReleaseRoot $postgresAlias "$($definition.Name) 实际可执行路径"
+        }
         Assert-True ([IO.Path]::GetFullPath([string]$actual.ExecutablePath) -eq [IO.Path]::GetFullPath([string]$record.executable_path)) "$($definition.Name) 记录与实际可执行路径不一致。"
         Assert-True (([string]$actual.CommandLine).Trim() -eq ([string]$record.command_line).Trim()) "$($definition.Name) 记录与实际命令行不一致。"
 
@@ -475,12 +488,52 @@ function Stop-ReleaseSafely {
             Write-Warning "清理时 stop.ps1 失败：$($_.Exception.Message)"
         }
     }
+    $cleanupAlias = $null
+    $postgresRecordPath = Join-Path $ReleaseRoot "pids\postgresql.json"
+    if (Test-Path -LiteralPath $postgresRecordPath -PathType Leaf) {
+        try {
+            $postgresRecord = Get-Content -LiteralPath $postgresRecordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            Assert-True ([IO.Path]::GetFullPath([string]$postgresRecord.release_root).Equals(
+                    [IO.Path]::GetFullPath($ReleaseRoot), [StringComparison]::OrdinalIgnoreCase)) "PostgreSQL 清理记录的发布根不一致。"
+            $recordWorkingRoot = [IO.Path]::GetFullPath([string]$postgresRecord.working_directory).TrimEnd('\')
+            $releasePath = [IO.Path]::GetFullPath($ReleaseRoot).TrimEnd('\')
+            if (-not $recordWorkingRoot.Equals($releasePath, [StringComparison]::OrdinalIgnoreCase)) {
+                Assert-JunctionTargetsRelease $recordWorkingRoot $ReleaseRoot
+                Assert-PathOwnedByReleaseOrAlias ([string]$postgresRecord.executable_path) `
+                    $ReleaseRoot $recordWorkingRoot "PostgreSQL 清理记录的可执行路径"
+                $recordProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$postgresRecord.pid)" `
+                    -ErrorAction SilentlyContinue
+                if ($null -ne $recordProcess) {
+                    Assert-PathOwnedByReleaseOrAlias ([string]$recordProcess.ExecutablePath) `
+                        $ReleaseRoot $recordWorkingRoot "PostgreSQL 清理进程"
+                    Assert-True ([IO.Path]::GetFullPath([string]$recordProcess.ExecutablePath).Equals(
+                            [IO.Path]::GetFullPath([string]$postgresRecord.executable_path),
+                            [StringComparison]::OrdinalIgnoreCase)) "PostgreSQL 清理记录与实际可执行路径不一致。"
+                    Assert-True (([string]$recordProcess.CommandLine).Trim() -eq
+                            ([string]$postgresRecord.command_line).Trim()) "PostgreSQL 清理记录与实际命令行不一致。"
+                }
+                $cleanupAlias = $recordWorkingRoot
+            }
+        } catch {
+            Write-Warning "未能验证 PostgreSQL 清理 Junction：$($_.Exception.Message)"
+        }
+    }
     foreach ($recordPath in @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "pids") -Filter "*.json" -File -ErrorAction SilentlyContinue)) {
         try {
             $record = Get-Content -LiteralPath $recordPath.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+            Assert-True ([IO.Path]::GetFullPath([string]$record.release_root).Equals(
+                    [IO.Path]::GetFullPath($ReleaseRoot), [StringComparison]::OrdinalIgnoreCase)) "清理 PID 记录的发布根不一致。"
             $actual = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$record.pid)" -ErrorAction SilentlyContinue
             if ($null -ne $actual) {
-                Assert-PathUnderRoot ([string]$actual.ExecutablePath) $ReleaseRoot "清理候选进程"
+                if ($recordPath.BaseName -eq "algorithm") {
+                    Assert-PathUnderRoot ([string]$actual.ExecutablePath) $ReleaseRoot "清理算法进程"
+                } else {
+                    Assert-PathOwnedByReleaseOrAlias ([string]$actual.ExecutablePath) $ReleaseRoot $cleanupAlias "清理候选进程"
+                }
+                Assert-True ([IO.Path]::GetFullPath([string]$actual.ExecutablePath).Equals(
+                        [IO.Path]::GetFullPath([string]$record.executable_path),
+                        [StringComparison]::OrdinalIgnoreCase)) "清理 PID 记录与实际可执行路径不一致。"
+                Assert-True (([string]$actual.CommandLine).Trim() -eq ([string]$record.command_line).Trim()) "清理 PID 记录与实际命令行不一致。"
                 Stop-Process -Id ([int]$record.pid) -Force -ErrorAction SilentlyContinue
             }
         } catch {
@@ -492,12 +545,25 @@ function Stop-ReleaseSafely {
             try {
                 $actual = Get-CimInstance Win32_Process -Filter "ProcessId = $owner" -ErrorAction SilentlyContinue
                 if ($null -ne $actual) {
-                    Assert-PathUnderRoot ([string]$actual.ExecutablePath) $ReleaseRoot "清理端口 $port 的进程"
+                    if ($port -eq 8001) {
+                        Assert-PathUnderRoot ([string]$actual.ExecutablePath) $ReleaseRoot "清理端口 $port 的进程"
+                    } else {
+                        Assert-PathOwnedByReleaseOrAlias ([string]$actual.ExecutablePath) $ReleaseRoot $cleanupAlias "清理端口 $port 的进程"
+                    }
                     Stop-Process -Id ([int]$owner) -Force -ErrorAction SilentlyContinue
                 }
             } catch {
                 Write-Warning "清理端口 $port 的发布进程失败：$($_.Exception.Message)"
             }
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($cleanupAlias) -and (Test-Path -LiteralPath $cleanupAlias)) {
+        try {
+            Assert-JunctionTargetsRelease $cleanupAlias $ReleaseRoot
+            [IO.Directory]::Delete($cleanupAlias, $false)
+            Assert-True (-not (Test-Path -LiteralPath $cleanupAlias)) "清理后受控 Junction 仍存在：$cleanupAlias"
+        } catch {
+            Write-Warning "清理受控 Junction 失败：$($_.Exception.Message)"
         }
     }
 }

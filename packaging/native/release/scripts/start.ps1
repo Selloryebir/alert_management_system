@@ -9,7 +9,10 @@ $context = Get-RuntimeContext
 $postgresStarted = $false
 $algorithmStarted = $false
 $backendStarted = $false
-$postgresRoot = $null
+$workingRoot = $null
+$backendJava = $null
+$backendJar = $null
+$backendExpectedExecutables = @()
 
 function Remove-StalePidRecord {
     param([Parameter(Mandatory = $true)][string]$Name)
@@ -65,16 +68,16 @@ function Initialize-PostgresData {
     }
     $passwordName = ".pg-password-" + [Guid]::NewGuid().ToString("N")
     $passwordFile = Join-Path (Split-Path $context.PgData -Parent) $passwordName
-    $passwordArgument = Join-Path $postgresRoot (Join-Path "data" $passwordName)
-    $postgresDataArgument = Join-Path $postgresRoot $context.PgDataArgument
+    $passwordArgument = Join-Path $workingRoot (Join-Path "data" $passwordName)
+    $postgresDataArgument = Join-Path $workingRoot $context.PgDataArgument
     try {
         [IO.File]::WriteAllText($passwordFile, [string]$context.Config.database.password,
             (New-Object Text.UTF8Encoding($false)))
-        Invoke-BundledCommand (Get-PostgresExecutable $context "initdb" $postgresRoot) @(
+        Invoke-BundledCommand (Get-PostgresExecutable $context "initdb" $workingRoot) @(
             "-D", $postgresDataArgument,
             "-U", [string]$context.Config.database.user,
             "--encoding=UTF8", "--locale=C", "--auth-local=trust", "--auth-host=scram-sha-256",
-            "--pwfile=$passwordArgument") $postgresRoot | Out-Null
+            "--pwfile=$passwordArgument") $workingRoot | Out-Null
     } finally {
         if (Test-Path -LiteralPath $passwordFile) {
             Remove-Item -LiteralPath $passwordFile -Force
@@ -90,13 +93,13 @@ function Ensure-DemoDatabase {
             "-U", [string]$context.Config.database.user)
         $queryArguments = $common + @("-d", "postgres", "-Atc",
             ("SELECT 1 FROM pg_database WHERE datname = '" + [string]$context.Config.database.name + "'"))
-        $queryOutput = Invoke-BundledCommand (Get-PostgresExecutable $context "psql" $postgresRoot) `
-            $queryArguments $postgresRoot
+        $queryOutput = Invoke-BundledCommand (Get-PostgresExecutable $context "psql" $workingRoot) `
+            $queryArguments $workingRoot
         if ($queryOutput.Trim() -ne "1") {
             $createArguments = $common + @("-T", "template0", "-E", "UTF8",
                 [string]$context.Config.database.name)
-            Invoke-BundledCommand (Get-PostgresExecutable $context "createdb" $postgresRoot) `
-                $createArguments $postgresRoot | Out-Null
+            Invoke-BundledCommand (Get-PostgresExecutable $context "createdb" $workingRoot) `
+                $createArguments $workingRoot | Out-Null
         }
     } finally {
         [Environment]::SetEnvironmentVariable("PGPASSWORD", $oldPassword, "Process")
@@ -116,27 +119,30 @@ try {
         Write-Host $preflightOutput
     }
 
-    $postgresRoot = Initialize-PostgresWorkingRoot $context
+    $workingRoot = Initialize-PostgresWorkingRoot $context
+    $backendJava = Join-Path $workingRoot "runtime\jre\bin\java.exe"
+    $backendJar = Join-Path $workingRoot "app\core-api.jar"
+    $backendExpectedExecutables = @($backendJava, $context.Java) | Select-Object -Unique
     Initialize-PostgresData
     $stamp = [DateTime]::Now.ToString("yyyyMMdd-HHmmss-fff")
     $postgresOut = Join-Path $context.Logs ("postgresql-" + $stamp + ".out.log")
     $postgresError = Join-Path $context.Logs ("postgresql-" + $stamp + ".err.log")
-    $postgresDataArgument = Join-Path $postgresRoot $context.PgDataArgument
+    $postgresDataArgument = Join-Path $workingRoot $context.PgDataArgument
     $postgresArguments = '-D "' + $postgresDataArgument + '" -p ' +
         [string]$context.Config.ports.postgres + ' -h 127.0.0.1'
-    $postgresProcess = Start-BundledProcess (Get-PostgresExecutable $context "postgres" $postgresRoot) `
-        $postgresArguments $postgresRoot $postgresOut $postgresError
+    $postgresProcess = Start-BundledProcess (Get-PostgresExecutable $context "postgres" $workingRoot) `
+        $postgresArguments $workingRoot $postgresOut $postgresError
     $postgresStarted = $true
     Save-RunningProcess "postgresql" $postgresProcess.Id `
-        (Get-PostgresExpectedExecutables $context $postgresRoot "postgres") $postgresRoot @(
+        (Get-PostgresExpectedExecutables $context $workingRoot "postgres") $workingRoot @(
             $postgresOut, $postgresError)
 
     $readinessOldPassword = [Environment]::GetEnvironmentVariable("PGPASSWORD", "Process")
     [Environment]::SetEnvironmentVariable("PGPASSWORD", [string]$context.Config.database.password, "Process")
     try {
-        Invoke-BundledCommand (Get-PostgresExecutable $context "pg_isready" $postgresRoot) @(
+        Invoke-BundledCommand (Get-PostgresExecutable $context "pg_isready" $workingRoot) @(
             "-h", "127.0.0.1", "-p", [string]$context.Config.ports.postgres,
-            "-U", [string]$context.Config.database.user, "-d", "postgres", "-t", "30") $postgresRoot | Out-Null
+            "-U", [string]$context.Config.database.user, "-d", "postgres", "-t", "30") $workingRoot | Out-Null
     } finally {
         [Environment]::SetEnvironmentVariable("PGPASSWORD", $readinessOldPassword, "Process")
     }
@@ -162,8 +168,8 @@ try {
     $backendError = Join-Path $context.Logs ("backend-" + $stamp + ".err.log")
     $databaseUrl = "jdbc:postgresql://127.0.0.1:" + [string]$context.Config.ports.postgres + "/" +
         [string]$context.Config.database.name
-    $jarArgument = '-jar "' + $context.BackendJar + '"'
-    $backendProcess = Start-BundledProcess $context.Java $jarArgument $context.Root $backendOut $backendError @{
+    $jarArgument = '-jar "' + $backendJar + '"'
+    $backendProcess = Start-BundledProcess $backendJava $jarArgument $workingRoot $backendOut $backendError @{
         SERVER_PORT = [string]$context.Config.ports.backend
         DB_URL = $databaseUrl
         DB_USERNAME = [string]$context.Config.database.user
@@ -173,7 +179,7 @@ try {
         ALGORITHM_ANALYSIS_URL = "http://127.0.0.1:$($context.Config.ports.algorithm)/api/v1/analyze"
     }
     $backendStarted = $true
-    Save-RunningProcess "backend" $backendProcess.Id $context.Java $context.Root @(
+    Save-RunningProcess "backend" $backendProcess.Id $backendExpectedExecutables $workingRoot @(
         $backendOut, $backendError)
     $backendHealth = Wait-JsonHealth (
         "http://127.0.0.1:" + [string]$context.Config.ports.backend + "/api/v1/health") {
@@ -189,21 +195,21 @@ try {
 } catch {
     Write-Error ("启动失败：" + $_.Exception.Message + " 日志已保留在 " + $context.Logs)
     if ($backendStarted) {
-        try { Stop-OwnedProcess $context "backend" $context.Java $context.BackendJar } catch { Write-Warning $_.Exception.Message }
+        try { Stop-OwnedProcess $context "backend" $backendExpectedExecutables $backendJar } catch { Write-Warning $_.Exception.Message }
     }
     if ($algorithmStarted) {
         try { Stop-OwnedProcess $context "algorithm" $context.Algorithm } catch { Write-Warning $_.Exception.Message }
     }
     if ($postgresStarted) {
         try {
-            $postgresDataArgument = Join-Path $postgresRoot $context.PgDataArgument
-            Invoke-BundledCommand (Get-PostgresExecutable $context "pg_ctl" $postgresRoot) @(
-                "-D", $postgresDataArgument, "-m", "fast", "-w", "stop") $postgresRoot | Out-Null
+            $postgresDataArgument = Join-Path $workingRoot $context.PgDataArgument
+            Invoke-BundledCommand (Get-PostgresExecutable $context "pg_ctl" $workingRoot) @(
+                "-D", $postgresDataArgument, "-m", "fast", "-w", "stop") $workingRoot | Out-Null
             Remove-PidRecord $context "postgresql"
             $postgresStarted = $false
         } catch { Write-Warning $_.Exception.Message }
     }
-    if (-not $postgresStarted -and $null -ne $postgresRoot) {
+    if (-not $postgresStarted -and $null -ne $workingRoot) {
         try { Remove-PostgresWorkingRoot $context } catch { Write-Warning $_.Exception.Message }
     }
     exit 1
