@@ -23,10 +23,20 @@
       "automation/state.json",
       "docs/verification/evidence/M3.md"
     ],
-    "checks": [],
-    "failures": [],
-    "decision": "M2 远端状态转换已核验；M3 采用 Python 纯计算规则、Java 同步编排与 PostgreSQL 原子保存的最小闭环。",
-    "next_action": "先建立独立黄金预期和 v1 请求/响应契约，再并行实现 Python 规则与 Java 编排，最后执行 G3 故障和确定性门槛。",
+    "checks": [
+      "scripts/dev/test.sh：后端 27、算法 27、合成数据 5、跨组件契约 4、前端 5 项通过",
+      "scripts/dev/m3-analysis-smoke.sh：实际 Java、Python、PostgreSQL 17.6 两次逐行结果及 12 条关联链与独立黄金预期一致",
+      "算法服务中断时任务为 FAILED 且结果零写入；恢复后同批次 attempt=2 成功",
+      "固定种子 20,000 行在实际组件闭环中 4,796 ms 完成分析",
+      "嵌入式 PostgreSQL 集成测试覆盖超时、503、非法契约、强制完成失败回滚和 HTTP 边界"
+    ],
+    "failures": [
+      "初版 Java 参数提议与已冻结黄金规则冲突；已删除兼容分支并统一为 rules-v1.0.0",
+      "首次冒烟因空 failure 字段被 JSON 省略而失败；断言按契约允许缺省空值后通过",
+      "首次跨批次比较受时区文本、随机记录 UUID 和链排序影响；改为瞬时时间、源行证据和稳定排序后通过"
+    ],
+    "decision": "实现已满足 G3 作者门槛；固定候选后只允许独立审查发现项，不扩展 M4 功能。",
+    "next_action": "提交固定候选并推送，等待远端 CI 与独立审查；两者通过后非快进合入 dev。",
     "resume_status": null
   },
   "stages": {
@@ -64,13 +74,13 @@
       "note": "合成样例、精确校验、原子导入、原始行追溯和最小导入向导已通过本机、独立审查及 dev 远端 CI。"
     },
     "M3": {
-      "status": "in_progress",
+      "status": "review",
       "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "实现固定规则、关联事件链、Java 调用/契约校验/原子保存和 G3 自动测试。",
-      "note": "活动分支 feat/m3-analysis-pipeline 已从远端核验的 M2 状态转换提交建立。"
+      "next_action": "对固定候选执行独立审查和远端 CI，确认 G3 后合入 dev。",
+      "note": "规则、事件链、Java 编排、原子保存、黄金契约和真实组件冒烟均已完成作者检查。"
     },
     "M4": {
       "status": "blocked",
