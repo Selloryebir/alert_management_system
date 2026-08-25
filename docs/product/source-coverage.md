@@ -19,7 +19,7 @@ M8–M14 的唯一职责来自 `automation/workflow.json`：M8 冻结正式产�
 
 | ID | 来源能力 | 来源路径/章节 | 唯一处置 | 当前证据或缺口 | 裁决理由 | 业务人员可见位置/最终验收位置 |
 |---|---|---|---|---|---|---|
-| SC-001 | 正式产品名称、版本和历史重建事实分层表达 | `alarm-management-v1-pdf/01-project-records.md` 项目名称；`02-requirements-and-design.md` 1.1–1.3 | M8 | 当前运行路径仍广泛显示“灾后重建 Demo”，历史来源的产品名为“报警管理系统 V1.0” | 正式产品不应把灾情或研发处境作为主标题；历史重建事实仍须在来源与差距说明中保留 | 网页标题/关于信息、健康响应、报告页眉、根 README、原生发布说明和 manifest |
+| SC-001 | 正式产品名称、版本和历史重建事实分层表达 | `alarm-management-v1-pdf/01-project-records.md` 项目名称；`02-requirements-and-design.md` 1.1–1.3 | 已实现 | 网页、健康响应、报告、README、Windows 运行包、manifest 和 CI artifact 已统一为“报警管理系统”/`alert-management-system`；原始来源与历史验收证据保持原文 | 正式产品不把灾情或研发处境作为主标题；历史事实只在来源、决策与验收证据中追溯 | 网页标题/关于信息、健康响应、报告页眉、根 README、原生发布说明和 manifest |
 | SC-002 | 原始资料、占位代码、无关项目与当前产品事实隔离 | `docs/backgrounds/README.md`；`docs/sources/README.md` | 已实现 | 四份原件保留；PDF 66–131 页占位代码排除；RD3 仅登记；提取 manifest 可追溯 | 防止历史“已完成”陈述和伪代码污染实现，同时不删除证据 | 文档入口和来源索引；普通业务运行界面不展示原始研发材料 |
 | SC-003 | Java 主业务、Python 算法、Vue 页面、关系数据库的 B/S 分层 | `02-requirements-and-design.md` 第 24–27 页；RD1 架构章节 | 已实现 | Java 独占业务写入，Python 纯计算，Vue 由 Java 托管，PostgreSQL/Flyway 为事实源 | 保留历史职责目标并纠正 MySQL、双写和过度拆分路径 | 浏览器访问 Java 8080；组件健康状态；源码和架构说明 |
 | SC-004 | CSV、XLSX、制表符 TXT 批量导入与统一格式转换 | `02-requirements-and-design.md` 3.1、4.2、2.1；用户手册第 39–40 页 | 已实现 | M2 支持三格式、UTF-8/BOM/GB18030、首个可见 XLSX 工作表和字段映射 | 是离线分析北极星的直接入口，已有格式等价和非法批次零落库证据 | 单页“导入向导”、批次预览、最近导入批次 |

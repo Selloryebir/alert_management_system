@@ -46,7 +46,7 @@
       "独立审查发现第二候选 968e5c4 的 Windows 目录、ZIP、manifest 与 CI artifact 仍使用旧 demo 构件名，版本标签门槛也未明确限定 main；候选未判通过，已按正式构件和 main 发布边界修正并扩展自动校验。"
     ],
     "decision": "M8 只冻结正式身份、来源能力处置、产品化阶段和研究/安全基线，并同步必要的用户可见身份；不提前实现 M9-M14 业务能力。",
-    "next_action": "固定 M8 候选，执行完整验收、独立审查和远端检查。",
+    "next_action": "保存 M8 候选证据并合入 dev，随后核验远端检查点。",
     "resume_status": null
   },
   "stages": {
@@ -139,13 +139,15 @@
       "note": "第五固定候选已通过本机 Windows 11 Docker Desktop、远端 Ubuntu G7、独立审查及 dev 合并检查点三条远端流水线；PR #1 的四条发布检查与 main 合并后四条检查均成功。"
     },
     "M8": {
-      "status": "in_progress",
-      "attempt": 1,
-      "evidence_files": [],
+      "status": "review",
+      "attempt": 3,
+      "evidence_files": [
+        "docs/verification/evidence/M8.md"
+      ],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "固定 M8 候选，执行完整验收、独立审查和远端检查。",
-      "note": "以 main/dev 同步且已标记 v0.1.0 的提交为基线；正式身份、来源闭环和本机运行验收已完成，尚待固定候选与独立审查。"
+      "next_action": "把独立审查通过的固定候选 b1f3c16 合入 dev 并核验远端检查点。",
+      "note": "第三固定候选已通过全部 G8 命令、独立复审、远端仓库/应用检查和 Windows 标准用户双目录验收。"
     },
     "M9": {
       "status": "blocked",
