@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: ".",
-  testMatch: "business-workflow.spec.ts",
+  testMatch: "*.spec.ts",
   fullyParallel: false,
   workers: 1,
   timeout: 180_000,

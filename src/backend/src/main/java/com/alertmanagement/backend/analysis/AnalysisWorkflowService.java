@@ -1,6 +1,7 @@
 package com.alertmanagement.backend.analysis;
 
 import com.alertmanagement.backend.api.BusinessApiException;
+import com.alertmanagement.backend.audit.AuditService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,6 +24,7 @@ class AnalysisWorkflowService {
     private static final Set<String> PRIORITIES = Set.of("P1", "P2", "P3", "P4");
     private static final Set<String> NOISE_TYPES = Set.of(
             "NORMAL", "DUPLICATE", "CHATTER", "SHORT_LIVED", "PERSISTENT");
+    private static final Set<String> ALARM_CLASSES = Set.of("STANDARD", "NUISANCE", "ACTIONABLE");
     private static final Set<String> CAUSE_CATEGORIES = Set.of(
             "PROCESS_DISTURBANCE", "EQUIPMENT_FAULT", "INSTRUMENT_ISSUE", "MAINTENANCE_TEST", "UNKNOWN");
     private static final Set<String> DISPOSITION_STATUSES = Set.of("OPEN", "IN_PROGRESS", "CLOSED");
@@ -31,10 +33,12 @@ class AnalysisWorkflowService {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final AuditService auditService;
 
-    AnalysisWorkflowService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    AnalysisWorkflowService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, AuditService auditService) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.auditService = auditService;
     }
 
     DashboardView dashboard(UUID runId) {
@@ -80,12 +84,20 @@ class AnalysisWorkflowService {
                          GROUP BY COALESCE(NULLIF(a.unit_name, ''), '未指定单元') ORDER BY category
                         """, runId),
                 counts("""
-                        SELECT r.noise_type AS category, COUNT(*) AS amount
-                          FROM analysis_result r WHERE r.run_id = ? GROUP BY r.noise_type ORDER BY category
+                        SELECT COALESCE(o.noise_type, r.noise_type) AS category, COUNT(*) AS amount
+                          FROM analysis_result r
+                          LEFT JOIN analysis_result_override o
+                            ON o.run_id = r.run_id AND o.record_id = r.record_id
+                         WHERE r.run_id = ?
+                         GROUP BY COALESCE(o.noise_type, r.noise_type) ORDER BY category
                         """, runId),
                 counts("""
-                        SELECT r.cause_category AS category, COUNT(*) AS amount
-                          FROM analysis_result r WHERE r.run_id = ? GROUP BY r.cause_category ORDER BY category
+                        SELECT COALESCE(o.cause_category, r.cause_category) AS category, COUNT(*) AS amount
+                          FROM analysis_result r
+                          LEFT JOIN analysis_result_override o
+                            ON o.run_id = r.run_id AND o.record_id = r.record_id
+                         WHERE r.run_id = ?
+                         GROUP BY COALESCE(o.cause_category, r.cause_category) ORDER BY category
                         """, runId));
     }
 
@@ -114,14 +126,16 @@ class AnalysisWorkflowService {
                 addFilter(where, arguments, "a.unit_name = ?", unit);
             }
         }
-        addFilter(where, arguments, "r.noise_type = ?", noiseType);
-        addFilter(where, arguments, "r.cause_category = ?", causeCategory);
+        addFilter(where, arguments, "COALESCE(o.noise_type, r.noise_type) = ?", noiseType);
+        addFilter(where, arguments, "COALESCE(o.cause_category, r.cause_category) = ?", causeCategory);
         addFilter(where, arguments, "COALESCE(d.status, 'OPEN') = ?", dispositionStatus);
 
         String from = """
                  FROM analysis_result r
                  JOIN alarm_record a ON a.record_id = r.record_id
                  LEFT JOIN alarm_disposition d ON d.run_id = r.run_id AND d.record_id = r.record_id
+                 LEFT JOIN analysis_result_override o
+                   ON o.run_id = r.run_id AND o.record_id = r.record_id
                 """;
         long total = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*)" + from + where, Long.class, arguments.toArray());
@@ -131,7 +145,9 @@ class AnalysisWorkflowService {
         List<AlarmItem> items = jdbcTemplate.query("""
                 SELECT a.record_id, a.source_row, a.event_time, a.site, a.area, a.unit_name,
                        a.tag, a.description, a.priority, a.alarm_state,
-                       r.noise_type, r.alarm_class, r.cause_category, r.score,
+                       COALESCE(o.noise_type, r.noise_type) AS noise_type,
+                       COALESCE(o.alarm_class, r.alarm_class) AS alarm_class,
+                       COALESCE(o.cause_category, r.cause_category) AS cause_category, r.score,
                        COALESCE(d.status, 'OPEN') AS disposition_status
                 """ + from + where + " ORDER BY a.source_row LIMIT ? OFFSET ?",
                 (resultSet, rowNumber) -> new AlarmItem(
@@ -153,12 +169,20 @@ class AnalysisWorkflowService {
                        a.site, a.area, a.unit_name, a.tag, a.description, a.priority, a.alarm_state,
                        a.alarm_value, a.threshold, a.engineering_unit, a.source_system,
                        a.operator_name AS alarm_operator, a.raw_payload::text,
-                       r.noise_type, r.alarm_class, r.cause_category, r.score, r.evidence::text,
+                       COALESCE(o.noise_type, r.noise_type) AS noise_type,
+                       COALESCE(o.alarm_class, r.alarm_class) AS alarm_class,
+                       COALESCE(o.cause_category, r.cause_category) AS cause_category,
+                       r.noise_type AS algorithm_noise_type, r.alarm_class AS algorithm_alarm_class,
+                       r.cause_category AS algorithm_cause_category, r.score, r.evidence::text,
+                       o.operator_name AS override_operator, o.reason AS override_reason,
+                       o.updated_at AS override_updated_at,
                        COALESCE(d.status, 'OPEN') AS disposition_status,
                        d.operator_name AS disposition_operator, d.note, d.updated_at, d.closed_at
                   FROM analysis_result r
                   JOIN alarm_record a ON a.record_id = r.record_id
                   LEFT JOIN alarm_disposition d ON d.run_id = r.run_id AND d.record_id = r.record_id
+                  LEFT JOIN analysis_result_override o
+                    ON o.run_id = r.run_id AND o.record_id = r.record_id
                  WHERE r.run_id = ? AND r.record_id = ?
                 """, (resultSet, rowNumber) -> new AlarmDetail(
                 resultSet.getObject("record_id", UUID.class), resultSet.getInt("source_row"),
@@ -174,6 +198,12 @@ class AnalysisWorkflowService {
                 resultSet.getString("source_system"), resultSet.getString("alarm_operator"),
                 readJson(resultSet.getString("raw_payload"), STRING_MAP),
                 readJson(resultSet.getString("evidence"), STRING_LIST),
+                new ClassificationValues(resultSet.getString("algorithm_noise_type"),
+                        resultSet.getString("algorithm_alarm_class"),
+                        resultSet.getString("algorithm_cause_category")),
+                resultSet.getString("override_operator") == null ? null : new ClassificationOverrideView(
+                        resultSet.getString("override_operator"), resultSet.getString("override_reason"),
+                        resultSet.getObject("override_updated_at", OffsetDateTime.class)),
                 new DispositionView(resultSet.getString("disposition_status"),
                         resultSet.getString("disposition_operator"), resultSet.getString("note"),
                         resultSet.getObject("updated_at", OffsetDateTime.class),
@@ -235,7 +265,76 @@ class AnalysisWorkflowService {
                     run_id, record_id, from_status, to_status, operator_name, note
                 ) VALUES (?, ?, ?, ?, ?, ?)
                 """, runId, recordId, current, target, operator, note);
+        auditService.record("DISPOSITION_CHANGED", operator, "ALARM_RECORD", recordId, "SUCCESS",
+                Map.of("run_id", runId, "from_status", current, "to_status", target, "note", note));
         return disposition(runId, recordId);
+    }
+
+    @Transactional
+    public AlarmDetail updateClassification(UUID runId, UUID recordId, ClassificationRequest request) {
+        requireCompleted(runId);
+        if (request == null) {
+            throw badRequest("请求体不能为空");
+        }
+        String noiseType = required(request.noiseType(), "noise_type", 20);
+        String alarmClass = required(request.alarmClass(), "alarm_class", 100);
+        String causeCategory = required(request.causeCategory(), "cause_category", 30);
+        String operator = required(request.operator(), "operator", 100);
+        String reason = required(request.reason(), "reason", 500);
+        if (!NOISE_TYPES.contains(noiseType)) {
+            throw badRequest("noise_type 取值非法");
+        }
+        if (!ALARM_CLASSES.contains(alarmClass)) {
+            throw badRequest("alarm_class 取值非法");
+        }
+        if (!CAUSE_CATEGORIES.contains(causeCategory)) {
+            throw badRequest("cause_category 取值非法");
+        }
+        List<ClassificationRow> rows = jdbcTemplate.query("""
+                SELECT r.noise_type, r.alarm_class, r.cause_category,
+                       o.noise_type AS override_noise_type, o.alarm_class AS override_alarm_class,
+                       o.cause_category AS override_cause_category
+                  FROM analysis_result r
+                  LEFT JOIN analysis_result_override o
+                    ON o.run_id = r.run_id AND o.record_id = r.record_id
+                 WHERE r.run_id = ? AND r.record_id = ?
+                 FOR UPDATE OF r
+                """, (resultSet, rowNumber) -> new ClassificationRow(
+                resultSet.getString("noise_type"), resultSet.getString("alarm_class"),
+                resultSet.getString("cause_category"), resultSet.getString("override_noise_type"),
+                resultSet.getString("override_alarm_class"), resultSet.getString("override_cause_category")),
+                runId, recordId);
+        if (rows.isEmpty()) {
+            throw notFound("该分析运行中不存在此报警记录");
+        }
+        ClassificationRow row = rows.getFirst();
+        String currentNoise = row.overrideNoiseType() == null ? row.noiseType() : row.overrideNoiseType();
+        String currentClass = row.overrideAlarmClass() == null ? row.alarmClass() : row.overrideAlarmClass();
+        String currentCause = row.overrideCauseCategory() == null ? row.causeCategory() : row.overrideCauseCategory();
+        if (noiseType.equals(currentNoise) && alarmClass.equals(currentClass) && causeCategory.equals(currentCause)) {
+            throw new BusinessApiException(HttpStatus.CONFLICT, "RESULT_OVERRIDE_NO_CHANGE", "修订值与当前有效分类相同");
+        }
+        jdbcTemplate.update("""
+                INSERT INTO analysis_result_override (
+                    run_id, record_id, noise_type, alarm_class, cause_category,
+                    operator_name, reason, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (run_id, record_id) DO UPDATE SET
+                    noise_type = EXCLUDED.noise_type,
+                    alarm_class = EXCLUDED.alarm_class,
+                    cause_category = EXCLUDED.cause_category,
+                    operator_name = EXCLUDED.operator_name,
+                    reason = EXCLUDED.reason,
+                    updated_at = CURRENT_TIMESTAMP
+                """, runId, recordId, noiseType, alarmClass, causeCategory, operator, reason);
+        auditService.record("RESULT_OVERRIDDEN", operator, "ALARM_RECORD", recordId, "SUCCESS",
+                Map.of("run_id", runId,
+                        "old_value", Map.of("noise_type", currentNoise, "alarm_class", currentClass,
+                                "cause_category", currentCause),
+                        "new_value", Map.of("noise_type", noiseType, "alarm_class", alarmClass,
+                                "cause_category", causeCategory),
+                        "reason", reason));
+        return alarm(runId, recordId);
     }
 
     private List<DispositionHistoryView> dispositionHistory(UUID runId, UUID recordId) {
@@ -373,5 +472,14 @@ class AnalysisWorkflowService {
     }
 
     private record RunIdentity(UUID batchId, String status) {
+    }
+
+    private record ClassificationRow(
+            String noiseType,
+            String alarmClass,
+            String causeCategory,
+            String overrideNoiseType,
+            String overrideAlarmClass,
+            String overrideCauseCategory) {
     }
 }

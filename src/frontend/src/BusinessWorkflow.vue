@@ -1,19 +1,24 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
 
+import ReviewOperations from "./ReviewOperations.vue";
 import {
   fetchAlarmDetail,
   fetchDashboard,
   latestAnalysis,
   listAlarms,
   startAnalysis,
+  updateClassification,
   updateDisposition,
+  type AlarmClass,
   type AlarmDetail,
   type AlarmFilters,
   type AlarmPage,
   type AnalysisRun,
   type Dashboard,
   type DispositionStatus,
+  type CauseCategory,
+  type NoiseType,
 } from "./business";
 import type { ImportBatch } from "./imports";
 
@@ -21,6 +26,7 @@ const props = defineProps<{
   currentBatch?: ImportBatch;
   batches: ImportBatch[];
 }>();
+const emit = defineEmits<{ demoReset: [] }>();
 
 const PAGE_SIZE = 20;
 const analysisBusy = ref(false);
@@ -33,6 +39,11 @@ const alarmPage = ref<AlarmPage>();
 const selectedAlarm = ref<AlarmDetail>();
 const dispositionOperator = ref("");
 const dispositionNote = ref("");
+const classificationNoise = ref<NoiseType>("NORMAL");
+const classificationClass = ref<AlarmClass>("STANDARD");
+const classificationCause = ref<CauseCategory>("UNKNOWN");
+const classificationOperator = ref("");
+const classificationReason = ref("");
 const filters = reactive<AlarmFilters>({
   priority: "",
   area: "",
@@ -164,11 +175,75 @@ async function selectAlarm(recordId: string) {
     selectedAlarm.value = await fetchAlarmDetail(analysis.value.run_id, recordId);
     dispositionOperator.value = selectedAlarm.value.disposition.operator ?? "";
     dispositionNote.value = "";
+    classificationNoise.value = selectedAlarm.value.noise_type as NoiseType;
+    classificationClass.value = selectedAlarm.value.alarm_class as AlarmClass;
+    classificationCause.value = selectedAlarm.value.cause_category as CauseCategory;
+    classificationOperator.value = selectedAlarm.value.classification_override?.operator ?? "";
+    classificationReason.value = "";
   } catch (error) {
     businessError.value = `报警详情加载失败：${error instanceof Error ? error.message : "未知错误"}。请重试。`;
   } finally {
     detailBusy.value = false;
   }
+}
+
+async function saveClassification() {
+  if (!analysis.value || !selectedAlarm.value) return;
+  const operator = classificationOperator.value.trim();
+  const reason = classificationReason.value.trim();
+  if (!operator || !reason) {
+    businessError.value = "请填写分类修订操作者和修订理由后再保存。";
+    return;
+  }
+  detailBusy.value = true;
+  clearBusinessState();
+  try {
+    selectedAlarm.value = await updateClassification(
+      analysis.value.run_id,
+      selectedAlarm.value.record_id,
+      {
+        noise_type: classificationNoise.value,
+        alarm_class: classificationClass.value,
+        cause_category: classificationCause.value,
+      },
+      operator,
+      reason,
+    );
+    classificationNoise.value = selectedAlarm.value.noise_type as NoiseType;
+    classificationClass.value = selectedAlarm.value.alarm_class as AlarmClass;
+    classificationCause.value = selectedAlarm.value.cause_category as CauseCategory;
+    classificationReason.value = "";
+    const page = alarmPage.value?.page ?? 0;
+    [dashboard.value, alarmPage.value] = await Promise.all([
+      fetchDashboard(analysis.value.run_id),
+      listAlarms(analysis.value.run_id, page, PAGE_SIZE, filters),
+    ]);
+    businessMessage.value = "人工分类修订已保存；算法原值保持不变。";
+  } catch (error) {
+    businessError.value = `分类修订失败：${error instanceof Error ? error.message : "未知错误"}。请核对当前有效值后重试。`;
+  } finally {
+    detailBusy.value = false;
+  }
+}
+
+function handleDemoReset() {
+  analysis.value = undefined;
+  dashboard.value = undefined;
+  alarmPage.value = undefined;
+  selectedAlarm.value = undefined;
+  businessError.value = "";
+  businessMessage.value = "";
+  dispositionOperator.value = "";
+  dispositionNote.value = "";
+  classificationOperator.value = "";
+  classificationReason.value = "";
+  filters.priority = "";
+  filters.area = "";
+  filters.unit = "";
+  filters.noise_type = "";
+  filters.cause_category = "";
+  filters.disposition_status = "";
+  emit("demoReset");
 }
 
 async function changeDisposition(status: DispositionStatus) {
@@ -374,6 +449,32 @@ async function changeDisposition(status: DispositionStatus) {
           </article>
         </section>
 
+        <section class="classification-editor">
+          <h4>人工分类修订</h4>
+          <p class="association-warning">人工修订只影响当前有效结论、看板和报告；算法原始结论保持不变。</p>
+          <div class="classification-comparison">
+            <div data-testid="classification-original">
+              <strong>算法原值</strong>
+              <span>{{ selectedAlarm.algorithm_classification.noise_type }} / {{ selectedAlarm.algorithm_classification.alarm_class }} / {{ selectedAlarm.algorithm_classification.cause_category }}</span>
+            </div>
+            <div data-testid="classification-effective">
+              <strong>当前有效值</strong>
+              <span>{{ selectedAlarm.noise_type }} / {{ selectedAlarm.alarm_class }} / {{ selectedAlarm.cause_category }}</span>
+            </div>
+          </div>
+          <p v-if="selectedAlarm.classification_override" class="empty-copy">
+            最近修订：{{ selectedAlarm.classification_override.operator }} · {{ selectedAlarm.classification_override.updated_at }} · {{ selectedAlarm.classification_override.reason }}
+          </p>
+          <div class="classification-grid">
+            <label>噪声类型<select v-model="classificationNoise" data-testid="classification-noise" :disabled="detailBusy"><option v-for="value in ['NORMAL','DUPLICATE','CHATTER','SHORT_LIVED','PERSISTENT']" :key="value" :value="value">{{ value }}</option></select></label>
+            <label>报警分类<select v-model="classificationClass" data-testid="classification-alarm-class" :disabled="detailBusy"><option v-for="value in ['NUISANCE','ACTIONABLE','STANDARD']" :key="value" :value="value">{{ value }}</option></select></label>
+            <label>原因建议<select v-model="classificationCause" data-testid="classification-cause" :disabled="detailBusy"><option v-for="value in ['PROCESS_DISTURBANCE','EQUIPMENT_FAULT','INSTRUMENT_ISSUE','MAINTENANCE_TEST','UNKNOWN']" :key="value" :value="value">{{ value }}</option></select></label>
+            <label>操作者（必填）<input v-model="classificationOperator" data-testid="classification-operator" :disabled="detailBusy" /></label>
+            <label class="classification-reason">修订理由（必填）<textarea v-model="classificationReason" rows="2" data-testid="classification-reason" :disabled="detailBusy" /></label>
+          </div>
+          <button type="button" data-testid="classification-save" :disabled="detailBusy" @click="saveClassification">保存分类修订</button>
+        </section>
+
         <section class="disposition-editor">
           <h4>人工处置</h4>
           <div class="editor-grid">
@@ -394,5 +495,7 @@ async function changeDisposition(status: DispositionStatus) {
       </article>
       <p v-if="detailBusy" class="import-message" role="status">正在加载或更新报警详情…</p>
     </template>
+
+    <ReviewOperations :run-id="analysis?.status === 'COMPLETED' ? analysis.run_id : undefined" @demo-reset="handleDemoReset" />
   </section>
 </template>

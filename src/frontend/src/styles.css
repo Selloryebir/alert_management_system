@@ -88,6 +88,12 @@ h1 {
   font-weight: 800;
 }
 
+.demo-identity {
+  display: inline-block;
+  margin: 0 0 1rem 0.75rem;
+  color: #394d60;
+}
+
 .identity-copy {
   max-width: 48rem;
   margin-bottom: 0;
@@ -458,10 +464,126 @@ dd {
 }
 
 .chain-section,
+.classification-editor,
 .disposition-editor {
   margin-top: 1.5rem;
   border-top: 1px solid #d8e0e7;
   padding-top: 1.25rem;
+}
+
+.classification-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.classification-comparison div {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid #d8e0e7;
+  border-radius: 0.65rem;
+  padding: 0.8rem;
+  background: #f3f6f8;
+}
+
+.classification-grid,
+.reset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+
+.classification-grid label,
+.operation-card label,
+.audit-controls label,
+.reset-grid label {
+  display: grid;
+  gap: 0.35rem;
+  color: #394d60;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.classification-reason {
+  grid-column: span 2;
+}
+
+.review-operations {
+  margin-top: 2rem;
+  border-top: 1px solid #d8e0e7;
+  padding-top: 1.5rem;
+}
+
+.demo-operator {
+  border-radius: 99rem;
+  padding: 0.45rem 0.75rem;
+  color: #164e79;
+  background: #dceefb;
+}
+
+.operations-grid {
+  display: grid;
+  grid-template-columns: minmax(17rem, 0.7fr) minmax(25rem, 1.3fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.operation-card,
+.danger-zone {
+  border: 1px solid #d8e0e7;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: #ffffff;
+}
+
+.operation-card h4,
+.danger-zone h4 {
+  margin-top: 0;
+}
+
+.operation-actions,
+.audit-controls {
+  display: flex;
+  align-items: end;
+  gap: 0.65rem;
+  margin-top: 0.8rem;
+}
+
+.audit-controls label {
+  flex: 1;
+}
+
+.audit-details {
+  max-width: 22rem;
+  overflow-wrap: anywhere;
+}
+
+.compact-message {
+  margin-top: 0.8rem;
+}
+
+.danger-zone {
+  margin-top: 1rem;
+  border-color: #d98b91;
+  background: #fff8f8;
+}
+
+.danger-zone > p {
+  color: #721f25;
+}
+
+.reset-grid {
+  align-items: end;
+  margin-bottom: 0;
+}
+
+.danger-button {
+  background: #a72f36;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: #84242a;
 }
 
 .association-warning {
@@ -566,10 +688,24 @@ dd {
   .dashboard-grid,
   .filter-grid,
   .editor-grid,
+  .classification-comparison,
+  .classification-grid,
   .detail-grid,
   .raw-grid,
-  .detail-columns {
+  .detail-columns,
+  .operations-grid,
+  .reset-grid {
     grid-template-columns: 1fr;
+  }
+
+  .classification-reason {
+    grid-column: auto;
+  }
+
+  .operation-actions,
+  .audit-controls {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .batch-action-card {

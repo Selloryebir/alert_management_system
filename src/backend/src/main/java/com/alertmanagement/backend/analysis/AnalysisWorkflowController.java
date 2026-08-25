@@ -51,4 +51,12 @@ class AnalysisWorkflowController {
             @RequestBody(required = false) DispositionRequest request) {
         return workflowService.updateDisposition(runId, recordId, request);
     }
+
+    @PatchMapping("/alarms/{recordId}/classification")
+    AlarmDetail updateClassification(
+            @PathVariable UUID runId,
+            @PathVariable UUID recordId,
+            @RequestBody(required = false) ClassificationRequest request) {
+        return workflowService.updateClassification(runId, recordId, request);
+    }
 }

@@ -7,7 +7,7 @@
 ```bash
 npm ci --prefix tests/e2e
 npm --prefix tests/e2e run install:chromium
-npm --prefix tests/e2e test
+npm --prefix tests/e2e run test:smoke
 ```
 
 统一验收入口为：
@@ -26,3 +26,13 @@ scripts/dev/m4-browser-smoke.sh
 - `E2E_EXPECTED_TOTAL`：默认 `300`。
 
 算法不可用状态通过当前浏览器页内的单次请求故障注入验证，不停止机器上由其他测试使用的服务。
+
+# M5 报告、审计和演示复位验收
+
+M5 在真实 Chromium 中执行两轮 300 行完整闭环，比较移除 UUID 和时间后的固定摘要；随后执行一次 20,000 行 PDF/XLSX 报告门槛。浏览器只验证下载、类型和文件签名，报告内容深度解析由后端集成测试负责。
+
+```bash
+scripts/dev/m5-report-audit-reset-smoke.sh
+```
+
+脚本会先将本项目 PostgreSQL 写入 `.runtime/backups/` 的可读自定义格式备份，再建立不属于业务表的 SQL 哨兵，验证每次演示复位都不会越界删除。报告耗时、大小和规范化摘要保存在 `.runtime/m5/results/`。

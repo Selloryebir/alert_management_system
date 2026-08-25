@@ -141,8 +141,8 @@
           "演示数据连续复位两次后结果一致且不影响项目外数据"
         ],
         "commands": [
-          "./mvnw -f src/backend/pom.xml test -Dtest=*Report*Test,*Audit*Test,*Reset*Test",
-          "npm --prefix tests/e2e test"
+          "scripts/dev/test.sh",
+          "scripts/dev/m5-report-audit-reset-smoke.sh"
         ]
       }
     },
