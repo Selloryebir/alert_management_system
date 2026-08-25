@@ -32,7 +32,8 @@
       "scripts/dev/test.sh：PASS（Java 35、算法 35、数据 5、契约 4、前端 13）",
       "scripts/dev/m9-algorithm-v2-smoke.sh：PASS（静态隔离及 12 组泛化/负控）",
       "scripts/dev/m3-analysis-smoke.sh：PASS（300 行双轮、失败重试、20000 行完整分析 6572ms）",
-      "scripts/dev/m4-browser-smoke.sh：PASS（300 行双轮业务用例；20000 行上传、分析和看板首屏 19952ms）"
+      "scripts/dev/m4-browser-smoke.sh：PASS（300 行双轮业务用例；20000 行上传、分析和看板首屏 19952ms）",
+      "scripts/dev/m5-report-audit-reset-smoke.sh：PASS（300 行双轮；20000 行 PDF/XLSX 与复位 20229ms）"
     ],
     "failures": [
       "已修复：Markov 解释缺少明确 P(v|u)/P(v) 标签。",
@@ -45,10 +46,11 @@
       "首固定候选远端应用检查失败：浏览器 E2E 仍使用 v1 原因计数 90/130；已更新为 v2 的 30/190。",
       "首候选本机 20000 行浏览器检查失败：Playwright 读取被 inspector 驱逐的大 POST 响应体；已改为只验证响应状态并从页面状态读取运行 ID。",
       "已披露模型更正：M8 初始 mu=max(全部窗口 A) 收窄为每右端点最早合格窗口候选的最大 A；分类命中集合不变，反例锁定末条强度 0.8。",
-      "第二固定候选独立审查失败：长 Markov 链把完整成员列表复制到每条记录证据，导致输出近 O(n²)；已改为常量大小成员摘要并增加三段各 400 条长链回归。"
+      "第二固定候选独立审查失败：长 Markov 链把完整成员列表复制到每条记录证据，导致输出近 O(n²)；已改为常量大小成员摘要并增加三段各 400 条长链回归。",
+      "第三固定候选独立审查失败：远端 M5 的 20000 行流程证实报告 E2E 仍无条件读取大分析响应体；已改为只查状态并从页面提取运行 ID，报告二进制也仅在失败时读取短错误文本。"
     ],
     "decision": "实现显式数学规则、一阶 Markov 统计和可弃权专家分类；对 M8 抖动强度初始定义作显式更正：保持全部合法窗口的精确命中集合，但只在每个右端点的最早合格窗口中取强度，避免未经证明的最大密度算法或 O(n²) 枚举。",
-    "next_action": "建立第三固定候选，重新执行独立审查、G9 和远端发布检查。",
+    "next_action": "建立第四固定候选，重新执行独立审查、G9 和远端发布检查。",
     "resume_status": null
   },
   "stages": {
@@ -153,12 +155,12 @@
     },
     "M9": {
       "status": "review",
-      "attempt": 2,
+      "attempt": 3,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "建立第三固定候选并重新独立审查、G9 验收和远端发布检查。",
-      "note": "首候选 0897c42 与第二候选 70d2918 均被独立审查否决；抖动与 Markov 证据复杂度、模型披露和 E2E 漂移已完成针对性修复。"
+      "next_action": "建立第四固定候选并重新独立审查、G9 验收和远端发布检查。",
+      "note": "前三个固定候选先后暴露抖动与 Markov 证据复杂度、模型披露及两处大响应 E2E 问题；均已完成针对性修复。"
     },
     "M10": {
       "status": "blocked",
