@@ -1,12 +1,14 @@
-import { expect, test, type APIResponse, type Page, type Response } from "@playwright/test";
+import { expect, type APIResponse, type Page, type Response } from "@playwright/test";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { injectNextFetchFailure, test } from "./test-fixtures";
 
 test.setTimeout(600_000);
 
 const repositoryRoot = path.resolve(__dirname, "../..");
 const mode = process.env.E2E_MODE ?? "smoke";
 const expectedTotal = Number(process.env.E2E_EXPECTED_TOTAL ?? "300");
+const cycles = Number(process.env.E2E_CYCLES ?? "2");
 const dataset = path.resolve(
   repositoryRoot,
   process.env.E2E_DATASET ?? "samples/smoke/synthetic_smoke_utf8.csv",
@@ -190,43 +192,29 @@ async function auditSnapshot(
 }
 
 async function assertReportFailureKeepsState(page: Page, runId: string): Promise<void> {
-  const url = `**/api/v1/analyses/${runId}/reports/pdf`;
-  await page.route(url, (route) => route.fulfill({
-    status: 500,
-    contentType: "application/json",
-    body: JSON.stringify({ code: "REPORT_FAILED", message: "报告生成失败，请重试" }),
-  }));
-  const responsePromise = page.waitForResponse(
-    (response) => response.url().endsWith(`/api/v1/analyses/${runId}/reports/pdf`),
-  );
+  await injectNextFetchFailure(page, `/api/v1/analyses/${runId}/reports/pdf`, {
+    code: "REPORT_FAILED",
+    message: "报告生成失败，请重试",
+  });
   await page.getByTestId("report-pdf").click();
-  expect((await responsePromise).status()).toBe(500);
   await expect(page.getByTestId("report-message")).toContainText("失败");
   await expect(page.getByTestId("report-message")).toContainText("重试");
   await expect(page.getByTestId("dashboard-total")).toContainText("300");
   expect((await page.request.get(`/api/v1/analyses/${runId}/dashboard`)).ok()).toBeTruthy();
-  await page.unroute(url);
 }
 
 async function resetDemo(page: Page, injectFailure: boolean): Promise<ResetResponse> {
   await expect(page.getByTestId("reset-operator")).toHaveValue("demo-reviewer");
   await page.getByTestId("reset-confirmation").fill("RESET_DEMO");
   if (injectFailure) {
-    const url = "**/api/v1/demo/reset";
-    await page.route(url, (route) => route.fulfill({
-      status: 500,
-      contentType: "application/json",
-      body: JSON.stringify({ code: "RESET_FAILED", message: "演示复位失败，请重试" }),
-    }));
-    const failedPromise = page.waitForResponse(
-      (response) => response.url().endsWith("/api/v1/demo/reset"),
-    );
+    await injectNextFetchFailure(page, "/api/v1/demo/reset", {
+      code: "RESET_FAILED",
+      message: "演示复位失败，请重试",
+    });
     await page.getByTestId("reset-button").click();
-    expect((await failedPromise).status()).toBe(500);
     await expect(page.getByTestId("reset-message")).toContainText("失败");
     await expect(page.getByTestId("reset-message")).toContainText("重试");
     await expect(page.getByTestId("dashboard-total")).toContainText("300");
-    await page.unroute(url);
     await page.getByTestId("reset-confirmation").fill("RESET_DEMO");
   }
 
@@ -246,12 +234,13 @@ async function resetDemo(page: Page, injectFailure: boolean): Promise<ResetRespo
   return reset;
 }
 
-test("两轮报告、审计、人工修订和明确复位结果一致", async ({ page }) => {
+test("报告、审计、人工修订和明确复位结果一致", async ({ page }) => {
   test.skip(mode !== "smoke", "仅 Smoke 模式执行两轮完整 G5 闭环");
+  expect(Number.isInteger(cycles) && cycles > 0, "E2E_CYCLES 必须是正整数").toBeTruthy();
   mkdirSync(outputRoot, { recursive: true });
   const summaries: Array<Record<string, unknown>> = [];
 
-  for (let cycle = 1; cycle <= 2; cycle += 1) {
+  for (let cycle = 1; cycle <= cycles; cycle += 1) {
     await page.goto("/");
     await expect(page.getByText("2026 年灾后重建 Demo", { exact: false }).first()).toBeVisible();
     await expect(page.getByText("本地演示身份 demo-reviewer", { exact: false }).first()).toBeVisible();
@@ -301,7 +290,9 @@ test("两轮报告、审计、人工修订和明确复位结果一致", async ({
     });
   }
 
-  expect(summaries[1]).toEqual(summaries[0]);
+  for (const summary of summaries.slice(1)) {
+    expect(summary).toEqual(summaries[0]);
+  }
   writeFileSync(
     path.join(outputRoot, "smoke-normalized-summary.json"),
     `${JSON.stringify(summaries[0], null, 2)}\n`,
