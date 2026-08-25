@@ -36,7 +36,8 @@
       "2026-08-25 Windows 11 x64/WSL2：scripts/dev/restart-smoke.sh 退出码 0；两轮启停、聚合健康、Vue 静态资源、Flyway V1 幂等通过。",
       "2026-08-25 负向检查：停机时 status.sh 非零；算法停止使后端 DEGRADED 时后端显示 DOWN 且 status.sh 非零。",
       "2026-08-25 重复启动检查：运行中连续执行 start.sh 两次均成功，避免 Windows JAR 文件锁并保持三组件健康。",
-      "2026-08-25 静态检查：bash -n scripts/dev/*.sh、PowerShell AST 解析、git diff --check 均通过。"
+      "2026-08-25 静态检查：bash -n scripts/dev/*.sh、PowerShell AST 解析、git diff --check 均通过。",
+      "2026-08-25 固定候选 bc1887a8c084f5b5da7b2ec63076715ba2b0ce2e：独立审查 PASS；远端仓库检查 run 32829892698、应用检查 run 32829892826 均成功。"
     ],
     "failures": [
       "初始依赖准备中的 Windows Java 路径、PostgreSQL 环境和页面资源断言问题已按实际环境修复并回归。",
@@ -46,8 +47,8 @@
       "DEGRADED 恢复时发现运行中 JAR 文件锁，已前移旧进程停止动作并连续启动两次验证。",
       "固定候选 6c069bab88c4fb47d6e87711e1e7705f20500e55 的应用 CI 因 Shell 脚本缺少 Git 可执行位退出 126；已仅补齐 mvnw 和开发脚本模式，等待新候选 CI。"
     ],
-    "decision": "M1 作者门槛已通过；首个远端候选暴露脚本模式问题，保持 review 并形成最小修复候选。",
-    "next_action": "提交并推送 Shell 可执行位修复，等待新候选 SHA 的独立审查和 CI。",
+    "decision": "M1 固定代码候选已通过作者门槛、独立终审和两项远端 CI；保持 review，保存证据后合入 dev。",
+    "next_action": "提交并推送 M1 证据，确认功能分支 CI 后非快进合入 dev。",
     "resume_status": null
   },
   "stages": {
@@ -68,8 +69,8 @@
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "创建并推送固定候选提交，完成独立审查和功能分支 CI。",
-      "note": "G1 作者检查已通过；尚未建立和远端核验最终检查点，不得解锁 M2。"
+      "next_action": "提交并推送 M1 证据，确认功能分支 CI 后非快进合入 dev。",
+      "note": "固定候选已通过 G1 与独立终审；尚未建立和远端核验 dev 检查点，不得解锁 M2。"
     },
     "M2": {
       "status": "blocked",
