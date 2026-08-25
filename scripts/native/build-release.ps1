@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [string]$OutputRoot = "",
-    [string]$ReleaseVersion = "0.1.0-m6",
+    [string]$ReleaseVersion = "0.2.0-m9",
     [switch]$AllowDirty
 )
 
@@ -447,8 +447,8 @@ try {
             backend = [ordered]@{ version = "0.1.0" }
             frontend = [ordered]@{ version = "0.1.0" }
             algorithm = [ordered]@{
-                version = "0.1.0"
-                contract_version = "v1"
+                version = "0.2.0"
+                contract_version = "v2"
                 python_version = [string]$runtimeLock.artifacts.python.version
                 packager = "PyInstaller 6.22.2"
             }

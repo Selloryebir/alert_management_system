@@ -284,7 +284,7 @@ class ReportAuditResetIntegrationTest {
         assertThat(count("analysis_run")).isZero();
         assertThat(count("audit_event")).isZero();
         assertThat(count("app_metadata")).isZero();
-        assertThat(count("flyway_schema_history")).isEqualTo(5);
+        assertThat(count("flyway_schema_history")).isEqualTo(6);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT value FROM external_sentinel WHERE id = 1", String.class)).isEqualTo("keep");
 

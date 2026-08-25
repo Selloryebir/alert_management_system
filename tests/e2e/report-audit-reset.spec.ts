@@ -19,7 +19,6 @@ const outputRoot = path.resolve(
 const operator = "SYNTHETIC_M5_REVIEWER";
 
 type PreviewResponse = { batch_id: string; total_rows: number; status: string };
-type AnalysisResponse = { run_id: string; status: string };
 type DashboardResponse = {
   total: number;
   disposition_counts: Record<string, number>;
@@ -46,8 +45,23 @@ type ResetResponse = {
 type ReportMetric = { format: "pdf" | "xlsx"; duration_ms: number; bytes: number; file: string };
 
 async function responseJson<T>(response: APIResponse | Response): Promise<T> {
-  expect(response.ok(), await response.text()).toBeTruthy();
-  return (await response.json()) as T;
+  const body = await response.text();
+  expect(response.ok(), body).toBeTruthy();
+  return JSON.parse(body) as T;
+}
+
+async function assertSuccessfulWithoutBody(
+  response: APIResponse | Response,
+  label: string,
+): Promise<void> {
+  if (response.ok()) return;
+  let details = "响应体不可读取";
+  try {
+    details = (await response.text()).slice(0, 2_000);
+  } catch {
+    // 大响应可能已被浏览器回收；HTTP 状态仍足以判定失败。
+  }
+  throw new Error(`${label}失败：HTTP ${response.status()}；${details}`);
 }
 
 async function importAndAnalyze(page: Page): Promise<string> {
@@ -72,10 +86,15 @@ async function importAndAnalyze(page: Page): Promise<string> {
       && response.request().method() === "POST",
   );
   await page.getByTestId("start-analysis").click();
-  const analysis = await responseJson<AnalysisResponse>(await analysisPromise);
-  expect(analysis.status).toBe("COMPLETED");
+  const analysisResponse = await analysisPromise;
+  await assertSuccessfulWithoutBody(analysisResponse, "报警分析");
+  const status = page.getByRole("status").filter({ hasText: "分析运行" });
+  await expect(status).toContainText(/分析运行 [0-9a-f-]{36} 已加载/);
+  const statusText = (await status.textContent()) ?? "";
+  const runId = statusText.match(/[0-9a-f-]{36}/)?.[0];
+  expect(runId).toBeTruthy();
   await expect(page.getByTestId("dashboard-total")).toContainText(String(expectedTotal));
-  return analysis.run_id;
+  return runId!;
 }
 
 async function openSyntheticChainAlarm(page: Page): Promise<void> {
@@ -146,7 +165,7 @@ async function downloadReport(
   const started = Date.now();
   await page.getByTestId(`report-${format}`).click();
   const [response, download] = await Promise.all([responsePromise, downloadPromise]);
-  expect(response.ok(), await response.text()).toBeTruthy();
+  await assertSuccessfulWithoutBody(response, `${format.toUpperCase()} 报告生成`);
   const expectedType = format === "pdf"
     ? "application/pdf"
     : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";

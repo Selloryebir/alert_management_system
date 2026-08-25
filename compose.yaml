@@ -28,7 +28,7 @@ services:
         - CMD
         - python
         - -c
-        - "import json, urllib.request; value=json.load(urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2)); assert value == {'status':'UP','service':'algorithm-service','version':'0.1.0','contract_version':'v1'}"
+        - "import json, urllib.request; value=json.load(urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2)); assert value == {'status':'UP','service':'algorithm-service','version':'0.2.0','contract_version':'v2'}"
       interval: 5s
       timeout: 3s
       retries: 20
@@ -44,7 +44,7 @@ services:
       DB_USERNAME: alert_management
       DB_PASSWORD: alert_management
       ALGORITHM_HEALTH_URL: http://algorithm:8001/health
-      ALGORITHM_ANALYSIS_URL: http://algorithm:8001/api/v1/analyze
+      ALGORITHM_ANALYSIS_URL: http://algorithm:8001/api/v2/analyze
       APP_IDENTITY: 报警管理系统
     depends_on:
       postgres:

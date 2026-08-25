@@ -1,4 +1,4 @@
-# 报警数据契约 v1
+# 报警数据与算法接口契约
 
 ## 1. 设计目标
 
@@ -58,21 +58,27 @@ UPLOADED -> VALIDATING -> READY -> IMPORTED -> ANALYZING -> COMPLETED
 - `FAILED` 保留失败原因，可从明确步骤重试；不得显示为完成。
 - 数据复位是演示维护动作，不使用业务状态伪装删除。
 
-## 5. Java 与 Python 的算法接口
+## 5. Java 与 Python 的算法接口 v2
 
-接口采用版本化 HTTP JSON，v1 最小端点：
+规范化报警字段与浏览器业务 API 继续使用兼容的 v1 结构；Java 与 Python 之间的算法 HTTP 契约因新增必填参数及链窗口语义变化升级为 v2。两类版本轴互相独立，旧分析运行中的 v1 版本和参数继续只读展示，不迁移或重写。
+
+算法接口采用版本化 HTTP JSON，v2 最小端点：
 
 - `GET /health`：进程存活和算法版本。
-- `POST /api/v1/analyze`：接收单批规范化记录和规则参数，返回逐记录标签、事件链和运行摘要。
+- `POST /api/v2/analyze`：接收单批规范化记录和规则参数，返回逐记录标签、事件链和运行摘要。
 
-请求必须包含 `analysis_run_id`、`contract_version: "v1"`、`algorithm_version`、`records` 和显式规则参数。响应必须回传相同运行标识，并包含：
+请求必须包含 `analysis_run_id`、`contract_version: "v2"`、`algorithm_version: "0.2.0"`、`records` 和以下 14 个显式参数；响应必须原样回传这些参数：
+
+`duplicate_window_seconds`、`chatter_window_seconds`、`chatter_min_count`、`chatter_min_transition_ratio`、`short_lived_seconds`、`persistent_requires_ack`、`episode_gap_seconds`、`chain_window_seconds`、`chain_min_steps`、`min_episode_support`、`min_transition_probability`、`min_lift`、`expert_min_score`、`expert_min_margin`。
+
+响应必须回传相同运行标识，并包含：
 
 - `record_results[]`：`record_id`、`noise_type`、`alarm_class`、`cause_category`、`score`、`evidence[]`；
 - `event_chains[]`：链标识、成员记录、起止时间、关联规则和说明；
 - `summary`：输入数、成功数、失败数、各类计数；
 - `errors[]`：记录标识、稳定错误码和中文消息。
 
-`noise_type` v1 允许值为 `NORMAL`、`DUPLICATE`、`CHATTER`、`SHORT_LIVED`、`PERSISTENT`；一条记录只保存一个主要类型，其他命中放入 `evidence`。`cause_category` v1 使用 `PROCESS_DISTURBANCE`、`EQUIPMENT_FAULT`、`INSTRUMENT_ISSUE`、`MAINTENANCE_TEST`、`UNKNOWN`。`UNKNOWN` 是有效结果，禁止为提高符合率强行分类。
+`noise_type` 允许值为 `NORMAL`、`DUPLICATE`、`CHATTER`、`SHORT_LIVED`、`PERSISTENT`；一条记录只保存一个主要类型，其他命中放入 `evidence`。`cause_category` 使用 `PROCESS_DISTURBANCE`、`EQUIPMENT_FAULT`、`INSTRUMENT_ISSUE`、`MAINTENANCE_TEST`、`UNKNOWN`。`UNKNOWN` 是有效结果，禁止为提高符合率强行分类。
 
 Java 对数据库和业务状态拥有最终写权限。Python 不连接 PostgreSQL，不改变处置状态，不生成审计主体。超时、非 2xx、响应版本不符或记录数不一致时，Java 将本次分析标为失败并展示可重试原因，不伪造兜底成功。
 

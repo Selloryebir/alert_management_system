@@ -1,7 +1,6 @@
 package com.alertmanagement.backend.analysis;
 
 import com.alertmanagement.backend.config.AppProperties;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -22,8 +21,9 @@ class AnalysisService {
         this.properties = properties;
     }
 
-    AnalysisView analyze(UUID batchId) {
-        Map<String, Object> parameters = defaultParameters();
+    AnalysisView analyze(UUID batchId, AnalysisParameters requestedParameters) {
+        Map<String, Object> parameters = (requestedParameters == null
+                ? AnalysisParameters.defaults() : requestedParameters).validatedMap();
         StartedAnalysis started = persistence.begin(batchId, properties.algorithm().contractVersion(),
                 properties.algorithm().version(), parameters);
         UUID runId = started.request().analysisRunId();
@@ -49,15 +49,7 @@ class AnalysisService {
         return persistence.findLatest(batchId);
     }
 
-    private Map<String, Object> defaultParameters() {
-        Map<String, Object> parameters = new LinkedHashMap<>();
-        parameters.put("duplicate_window_seconds", 30);
-        parameters.put("chatter_window_seconds", 60);
-        parameters.put("chatter_min_count", 4);
-        parameters.put("short_lived_seconds", 10);
-        parameters.put("persistent_requires_ack", true);
-        parameters.put("chain_window_seconds", 60);
-        parameters.put("chain_min_steps", 5);
-        return parameters;
+    Map<String, Object> defaultParameters() {
+        return AnalysisParameters.defaults().validatedMap();
     }
 }

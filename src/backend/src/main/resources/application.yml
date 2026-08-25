@@ -27,10 +27,10 @@ app:
   identity: ${APP_IDENTITY:报警管理系统}
   algorithm:
     health-url: ${ALGORITHM_HEALTH_URL:http://127.0.0.1:8001/health}
-    analysis-url: ${ALGORITHM_ANALYSIS_URL:http://127.0.0.1:8001/api/v1/analyze}
+    analysis-url: ${ALGORITHM_ANALYSIS_URL:http://127.0.0.1:8001/api/v2/analyze}
     connect-timeout: ${ALGORITHM_CONNECT_TIMEOUT:500ms}
     request-timeout: ${ALGORITHM_REQUEST_TIMEOUT:1s}
     analysis-timeout: ${ALGORITHM_ANALYSIS_TIMEOUT:60s}
     service: ${ALGORITHM_SERVICE:algorithm-service}
-    version: ${ALGORITHM_VERSION:0.1.0}
-    contract-version: ${ALGORITHM_CONTRACT_VERSION:v1}
+    version: ${ALGORITHM_VERSION:0.2.0}
+    contract-version: ${ALGORITHM_CONTRACT_VERSION:v2}

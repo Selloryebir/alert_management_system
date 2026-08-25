@@ -1,4 +1,4 @@
-"""分析接口 v1 的 Pydantic 契约。"""
+"""分析接口 v2 的 Pydantic 契约。"""
 
 from __future__ import annotations
 
@@ -31,10 +31,17 @@ class RuleParameters(ContractModel):
     duplicate_window_seconds: Annotated[int, Field(gt=0)]
     chatter_window_seconds: Annotated[int, Field(gt=0)]
     chatter_min_count: Annotated[int, Field(ge=2)]
+    chatter_min_transition_ratio: Annotated[float, Field(ge=0.0, le=1.0)]
     short_lived_seconds: Annotated[int, Field(gt=0)]
     persistent_requires_ack: bool
+    episode_gap_seconds: Annotated[int, Field(gt=0)]
     chain_window_seconds: Annotated[int, Field(gt=0)]
     chain_min_steps: Annotated[int, Field(ge=2, le=5)]
+    min_episode_support: Annotated[int, Field(ge=2)]
+    min_transition_probability: Annotated[float, Field(gt=0.0, le=1.0)]
+    min_lift: Annotated[float, Field(ge=1.0)]
+    expert_min_score: Annotated[float, Field(ge=0.0, le=1.0)]
+    expert_min_margin: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class AlarmRecord(ContractModel):
@@ -76,8 +83,8 @@ class AlarmRecord(ContractModel):
 
 class AnalysisRequest(ContractModel):
     analysis_run_id: UUID
-    contract_version: Literal["v1"]
-    algorithm_version: Literal["0.1.0"]
+    contract_version: Literal["v2"]
+    algorithm_version: Literal["0.2.0"]
     parameters: RuleParameters
     records: list[AlarmRecord]
 
@@ -127,9 +134,9 @@ class AnalysisError(ContractModel):
 
 class AnalysisResponse(ContractModel):
     analysis_run_id: UUID
-    contract_version: Literal["v1"]
-    algorithm_version: Literal["0.1.0"]
-    rule_version: Literal["rules-v1.0.0"]
+    contract_version: Literal["v2"]
+    algorithm_version: Literal["0.2.0"]
+    rule_version: Literal["hybrid-v2.0.0"]
     parameters: RuleParameters
     record_results: list[RecordResult]
     event_chains: list[EventChain]
