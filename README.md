@@ -1,6 +1,6 @@
 # 报警管理系统（灾后重建）
 
-本仓库用于重建报警管理系统的可演示版本。M1 至 M5 已完成可运行骨架、合成数据导入、可解释分析、浏览器业务闭环、报告、审计、人工修订和演示复位；当前进入 Windows 11 x64 原生发布阶段。
+本仓库用于重建报警管理系统的可演示版本。M1 至 M6 已完成可运行骨架、合成数据导入、可解释分析、浏览器业务闭环、报告审计和 Windows 11 x64 原生发布；当前实现 Docker Compose 次级交付。
 
 阶段目标是交付一个可重复演示的最小闭环：导入报警样例文件，完成校验、分析和展示，并能导出处置结果。实现与验收以稳定、可解释、可复现为优先，不把历史材料中未经验证的指标直接作为承诺。
 
@@ -85,9 +85,38 @@ scripts/dev/m5-report-audit-reset-smoke.sh
 
 - Windows 11 x64 原生启动包为首要交付物，应提供环境预检、启动、停止、演示数据复位和日志定位入口。
 - Docker Compose 为次级交付方式，必须复用同一套应用、数据库迁移和配置语义。
-- 不为了模拟团队分工而拆出无必要的运行组件。Java 负责业务主流程，Python 仅在算法需求成立时承担算法计算，PostgreSQL 作为业务事实源，前端独立开发后随原生包交付。
-- 在实现出现前，不提供空启动脚本、空服务或虚假的“可运行”说明。
+- 不为了模拟团队分工而拆出无必要的运行组件。Java 负责业务主流程，Python 仅承担算法计算，PostgreSQL 作为业务事实源，前端构建后由 Java 托管。
+- 不提供空启动脚本、空服务或虚假的“可运行”说明。
+
+## Docker Compose 次级交付
+
+Docker Desktop 或 Docker Engine 可用时，从仓库根目录启动同一套 Java、Python 和 PostgreSQL 17 实现：
+
+```bash
+docker compose -p alert-management-m7 up --build --detach --wait
+```
+
+浏览器访问 `http://127.0.0.1:8080`。停止并保留项目数据使用：
+
+```bash
+docker compose -p alert-management-m7 down --remove-orphans
+```
+
+删除并仅重建本项目数据卷使用：
+
+```bash
+docker compose -p alert-management-m7 down --volumes --remove-orphans
+docker compose -p alert-management-m7 up --build --detach --wait
+```
+
+正式 G7 验收会使用隔离的临时 project，从空卷完成健康、CSV/TXT/XLSX 导入、固定分析、处置审计和清理闭环：
+
+```bash
+python3 tests/smoke/run.py --target docker --fresh-volume
+```
+
+Compose 只向本机发布 Java 的 8080 端口；PostgreSQL 与算法服务仅在项目网络内可达。不要使用全局容器或卷清理命令。
 
 ## 当前状态
 
-M0 至 M5 已通过；M6 Windows 11 x64 自包含原生发布已解锁。状态以 `automation/state.json` 及对应阶段的当前提交证据为准。
+M0 至 M6 已通过；M7 Docker Compose 次级交付正在实现。状态以 `automation/state.json` 及对应阶段的当前提交证据为准。
