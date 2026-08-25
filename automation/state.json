@@ -15,6 +15,7 @@
       "automation/",
       "docs/algorithm/",
       "docs/architecture/",
+      "docs/automation/",
       "docs/decisions/",
       "docs/planning/",
       "docs/product/",
@@ -23,6 +24,7 @@
       "packaging/native/",
       "scripts/validate_formal_baseline.py",
       "scripts/dev/",
+      "scripts/native/",
       "src/README.md",
       "src/algorithm/README.md",
       "src/backend/",
@@ -40,7 +42,8 @@
     "failures": [
       "首次把组件测试与来源提取并行调度时 scripts/dev/test.sh 以 141 退出且无组件失败输出；改为符合验收定义的顺序执行后全部通过，不把并发调度结果计为验收。",
       "首次 restart-smoke 在应用启动前中止，容器退出码为 0 且无新应用日志；随后用 bash -x 完整启动成功，并再次顺序执行两轮 restart-smoke 成功。现有证据只支持瞬时环境启动失败，不引入无依据代码修复。",
-      "Windows 测试工具初始化 PostgreSQL 时控制台第三方输出受宿主代码页影响显示问号；发布服务日志未复现，列入 M12 中文编码与日志可靠性审计。"
+      "Windows 测试工具初始化 PostgreSQL 时控制台第三方输出受宿主代码页影响显示问号；发布服务日志未复现，列入 M12 中文编码与日志可靠性审计。",
+      "独立审查发现第二候选 968e5c4 的 Windows 目录、ZIP、manifest 与 CI artifact 仍使用旧 demo 构件名，版本标签门槛也未明确限定 main；候选未判通过，已按正式构件和 main 发布边界修正并扩展自动校验。"
     ],
     "decision": "M8 只冻结正式身份、来源能力处置、产品化阶段和研究/安全基线，并同步必要的用户可见身份；不提前实现 M9-M14 业务能力。",
     "next_action": "固定 M8 候选，执行完整验收、独立审查和远端检查。",

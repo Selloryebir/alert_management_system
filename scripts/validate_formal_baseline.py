@@ -13,9 +13,15 @@ ROOT = Path(__file__).resolve().parents[1]
 FORMAL_FILES = (
     "README.md",
     "compose.yaml",
+    ".github/workflows/windows-native-check.yml",
+    "docs/architecture/README.md",
+    "docs/automation/git-workflow.md",
+    "docs/releases/versioning.md",
+    "packaging/native/release/THIRD-PARTY-NOTICES.txt",
     "packaging/native/release/README.txt",
     "packaging/native/release/config/runtime.json",
     "packaging/native/release/scripts/common.ps1",
+    "scripts/native/build-release.ps1",
     "src/README.md",
     "src/algorithm/README.md",
     "src/algorithm/pyproject.toml",
@@ -28,17 +34,28 @@ FORMAL_FILES = (
     "src/frontend/src/App.vue",
     "src/frontend/src/ReviewOperations.vue",
 )
-BANNED_PRODUCT_PHRASES = ("灾后重建", "重建 Demo", "灾后")
+BANNED_PRODUCT_PHRASES = (
+    "灾后重建",
+    "重建 Demo",
+    "灾后",
+    "alert-management-demo",
+)
 EXPECTED_IDENTITY_FILES = (
     "README.md",
     "compose.yaml",
     "packaging/native/release/README.txt",
+    "packaging/native/release/THIRD-PARTY-NOTICES.txt",
     "packaging/native/release/config/runtime.json",
     "packaging/native/release/scripts/common.ps1",
     "src/backend/src/main/java/com/alertmanagement/backend/analysis/ReportService.java",
     "src/backend/src/main/resources/application.yml",
     "src/frontend/index.html",
     "src/frontend/src/App.vue",
+)
+EXPECTED_CONSTRUCT_FILES = (
+    ".github/workflows/windows-native-check.yml",
+    "docs/architecture/README.md",
+    "scripts/native/build-release.ps1",
 )
 ALLOWED_DISPOSITIONS = {
     "已实现",
@@ -66,6 +83,9 @@ def validate_identity(errors: list[str]) -> None:
     for relative in EXPECTED_IDENTITY_FILES:
         if "报警管理系统" not in read(relative, errors):
             errors.append(f"正式身份未覆盖：{relative}")
+    for relative in EXPECTED_CONSTRUCT_FILES:
+        if "alert-management-system" not in read(relative, errors):
+            errors.append(f"正式构件标识未覆盖：{relative}")
 
     readme = read("README.md", errors)
     for marker in ("v0.1.0", "M8", "docs/releases/versioning.md"):
