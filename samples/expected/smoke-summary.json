@@ -1,0 +1,18 @@
+{
+  "synthetic": true,
+  "generator_version": "1.0.0",
+  "seed": 20260825,
+  "row_count": 300,
+  "scenario_counts": {
+    "ALARM_FLOOD": 60,
+    "CHATTER": 40,
+    "DUPLICATE": 30,
+    "EQUIPMENT_TRIP": 30,
+    "INSTRUMENT_DRIFT": 30,
+    "MAINTENANCE_TEST": 20,
+    "PERSISTENT": 30,
+    "PROCESS_CASCADE": 30,
+    "SHORT_LIVED": 30
+  },
+  "utf8_csv_sha256": "476f4c7cded5709cd1b6a4e91f0f24f9efdb1499715494a9f0ea34e2b9bf76c3"
+}

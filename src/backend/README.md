@@ -1,6 +1,6 @@
 # Java 后端
 
-本模块是报警管理系统灾后重建 Demo 的 Java 主系统骨架，使用 Java 21、Spring Boot 3.5.16、PostgreSQL JDBC 和 Flyway。当前只提供工程启动、数据库迁移和聚合健康接口，不包含业务功能。
+本模块是报警管理系统灾后重建 Demo 的 Java 主系统，使用 Java 21、Spring Boot 3.5.16、PostgreSQL JDBC 和 Flyway。当前提供聚合健康接口，以及 CSV、制表符 TXT、XLSX 的两阶段报警文件导入。
 
 ## 构建与测试
 
@@ -15,7 +15,7 @@ Linux 或 WSL 使用 `./mvnw`。构建时如果 `src/frontend/dist/` 存在，�
 
 ## 运行
 
-运行前需要可连接的 PostgreSQL 17 实例和目标数据库。默认连接为 `127.0.0.1:5432/alert_management`，首次启动由 Flyway 创建 `app_metadata` 迁移验证表。
+运行前需要可连接的 PostgreSQL 17 实例和目标数据库。默认连接为 `127.0.0.1:5432/alert_management`，首次启动由 Flyway 创建迁移验证表和导入业务表。
 
 ```powershell
 .\mvnw.cmd -f src/backend/pom.xml spring-boot:run
@@ -38,6 +38,8 @@ GET http://127.0.0.1:8080/api/v1/health
 | `DB_USERNAME` | `alert_management` | 数据库用户 |
 | `DB_PASSWORD` | `alert_management` | 数据库口令 |
 | `DB_CONNECTION_TIMEOUT_MS` | `1000` | 数据库连接超时毫秒数 |
+| `IMPORT_MAX_FILE_SIZE` | `50MB` | 单个导入文件上限 |
+| `IMPORT_MAX_REQUEST_SIZE` | `50MB` | 单次 multipart 请求上限 |
 | `ALGORITHM_HEALTH_URL` | `http://127.0.0.1:8001/health` | Python 健康地址 |
 | `ALGORITHM_CONNECT_TIMEOUT` | `500ms` | 算法连接超时 |
 | `ALGORITHM_REQUEST_TIMEOUT` | `1s` | 算法请求总超时 |
@@ -49,3 +51,23 @@ GET http://127.0.0.1:8080/api/v1/health
 | `APP_IDENTITY` | `2026 年灾后重建 Demo` | 审核身份标识 |
 
 算法服务默认监听 `127.0.0.1:8001`。其 `/health` 必须返回 2xx，且 `status`、`service`、`version`、`contract_version` 与配置完全匹配，否则算法组件状态为 `DOWN`。
+
+## 两阶段文件导入
+
+```text
+POST /api/v1/imports/preview
+POST /api/v1/imports/{batchId}/confirm
+GET  /api/v1/imports?limit=20
+GET  /api/v1/imports/{batchId}
+GET  /api/v1/imports/{batchId}/records?page=0&size=20
+```
+
+`preview` 使用 `multipart/form-data`，必填字段 `file`，可选字段 `mapping`。`mapping` 是“目标字段到源表头”的 JSON 对象，例如 `{"event_time":"报警时间","tag":"位号"}`。系统支持 UTF-8（含 BOM）及 GB18030 CSV、制表符 TXT，并读取 XLSX 的首个可见工作表；公式仅作为原始文本读取，不执行。
+
+预览会校验全文件并把批次置为 `READY` 或 `REJECTED`。错误包含 `source_row`、`field`、稳定错误码和中文说明。只有 `READY` 批次可确认；确认在单一 PostgreSQL 事务中把全部暂存记录写入 `alarm_record`。重复确认返回 HTTP 409，不会重复写入。
+
+批次列表 `limit` 默认为 20、最大为 100。记录追溯接口按 `source_row` 排序，响应为 `{items,total,page,size}`；`page` 从 0 开始，`size` 默认为 20、最大为 200，`items` 同时包含规范化字段和 `raw_payload`。
+
+业务 API 的 HTTP 失败响应包含稳定的 `code`、中文 `message` 和 `trace_id`；例如重复确认使用 `IMPORT_STATUS_CONFLICT`，不得把英文框架错误直接交给界面。
+
+文件大小默认上限为 50 MB，可通过 `IMPORT_MAX_FILE_SIZE` 和 `IMPORT_MAX_REQUEST_SIZE` 调整。集成测试使用真实嵌入式 PostgreSQL，首次运行会下载对应平台测试二进制。

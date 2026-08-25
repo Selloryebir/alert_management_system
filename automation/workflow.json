@@ -81,9 +81,8 @@
           "固定种子的 20000 行演示集可在目标电脑完成导入"
         ],
         "commands": [
-          "./mvnw -f src/backend/pom.xml test -Dtest=*Import*Test",
-          "python3 -m pytest tests/data",
-          "npm --prefix src/frontend test -- --run"
+          "scripts/dev/test.sh",
+          "scripts/dev/m2-import-smoke.sh"
         ]
       }
     },
