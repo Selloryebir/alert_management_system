@@ -26,4 +26,9 @@ class AnalysisController {
     AnalysisView get(@PathVariable UUID runId) {
         return analysisService.get(runId);
     }
+
+    @GetMapping("/imports/{batchId}/analyses/latest")
+    AnalysisView latest(@PathVariable UUID batchId) {
+        return analysisService.getLatest(batchId);
+    }
 }

@@ -210,6 +210,20 @@ class AnalysisPersistenceService {
                 results, chains, summary, run.startedAt(), run.completedAt());
     }
 
+    public AnalysisView findLatest(UUID batchId) {
+        List<UUID> runIds = jdbcTemplate.queryForList("""
+                SELECT run_id
+                  FROM analysis_run
+                 WHERE batch_id = ?
+                 ORDER BY attempt DESC, started_at DESC
+                 LIMIT 1
+                """, UUID.class, batchId);
+        if (runIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "该批次不存在分析运行");
+        }
+        return find(runIds.getFirst());
+    }
+
     private void requireState(UUID runId, UUID batchId) {
         String runStatus = jdbcTemplate.queryForObject(
                 "SELECT status FROM analysis_run WHERE run_id = ? FOR UPDATE", String.class, runId);

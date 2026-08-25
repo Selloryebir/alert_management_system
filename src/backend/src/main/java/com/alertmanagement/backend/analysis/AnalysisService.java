@@ -45,6 +45,10 @@ class AnalysisService {
         return persistence.find(runId);
     }
 
+    AnalysisView getLatest(UUID batchId) {
+        return persistence.findLatest(batchId);
+    }
+
     private Map<String, Object> defaultParameters() {
         Map<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("duplicate_window_seconds", 30);
