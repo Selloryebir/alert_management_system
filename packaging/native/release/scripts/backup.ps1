@@ -16,11 +16,6 @@ try {
         (Get-PostgresExpectedExecutables $context $postgresRoot "postgres") `
         $postgresDataArgument | Out-Null
 
-    Invoke-BundledCommand (Get-PostgresExecutable $context "pg_isready" $postgresRoot) @(
-        "-h", "127.0.0.1", "-p", [string]$context.Config.ports.postgres,
-        "-U", [string]$context.Config.database.user, "-d", [string]$context.Config.database.name,
-        "-t", "10") $postgresRoot | Out-Null
-
     $fileName = "alert-management-" + [DateTime]::Now.ToString("yyyyMMdd-HHmmss-fff") + ".dump"
     $final = Join-Path $context.Backups $fileName
     if (Test-Path -LiteralPath $final) {
@@ -33,6 +28,10 @@ try {
     $oldPassword = [Environment]::GetEnvironmentVariable("PGPASSWORD", "Process")
     [Environment]::SetEnvironmentVariable("PGPASSWORD", [string]$context.Config.database.password, "Process")
     try {
+        Invoke-BundledCommand (Get-PostgresExecutable $context "pg_isready" $postgresRoot) @(
+            "-h", "127.0.0.1", "-p", [string]$context.Config.ports.postgres,
+            "-U", [string]$context.Config.database.user, "-d", [string]$context.Config.database.name,
+            "-t", "10") $postgresRoot | Out-Null
         Invoke-BundledCommand (Get-PostgresExecutable $context "pg_dump" $postgresRoot) @(
             "-h", "127.0.0.1", "-p", [string]$context.Config.ports.postgres,
             "-U", [string]$context.Config.database.user, "-d", [string]$context.Config.database.name,

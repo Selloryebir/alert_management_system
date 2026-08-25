@@ -131,9 +131,15 @@ try {
         (Get-PostgresExpectedExecutables $context $postgresRoot "postgres") $postgresRoot @(
             $postgresOut, $postgresError)
 
-    Invoke-BundledCommand (Get-PostgresExecutable $context "pg_isready" $postgresRoot) @(
-        "-h", "127.0.0.1", "-p", [string]$context.Config.ports.postgres,
-        "-U", [string]$context.Config.database.user, "-t", "30") $postgresRoot | Out-Null
+    $readinessOldPassword = [Environment]::GetEnvironmentVariable("PGPASSWORD", "Process")
+    [Environment]::SetEnvironmentVariable("PGPASSWORD", [string]$context.Config.database.password, "Process")
+    try {
+        Invoke-BundledCommand (Get-PostgresExecutable $context "pg_isready" $postgresRoot) @(
+            "-h", "127.0.0.1", "-p", [string]$context.Config.ports.postgres,
+            "-U", [string]$context.Config.database.user, "-d", "postgres", "-t", "30") $postgresRoot | Out-Null
+    } finally {
+        [Environment]::SetEnvironmentVariable("PGPASSWORD", $readinessOldPassword, "Process")
+    }
     Ensure-DemoDatabase
 
     $algorithmOut = Join-Path $context.Logs ("algorithm-" + $stamp + ".out.log")
