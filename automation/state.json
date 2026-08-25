@@ -2,7 +2,36 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M7",
-  "active_run": null,
+  "active_run": {
+    "stage": "M7",
+    "base_commit": "7f54e126127b831967e67dbdb5c775d3a9b08bf8",
+    "requirements": [
+      "PRD-007",
+      "PRD-008",
+      "PRD-009",
+      "PRD-010",
+      "PRD-013",
+      "PRD-015",
+      "PRD-017",
+      "PRD-018"
+    ],
+    "allowed_paths": [
+      "packaging/docker/",
+      "compose.yaml",
+      "tests/smoke/",
+      ".github/workflows/docker-compose-check.yml",
+      "README.md",
+      "automation/workflow.json",
+      "automation/state.json",
+      "docs/planning/M7-implementation.md",
+      "docs/verification/evidence/M7.md"
+    ],
+    "checks": [],
+    "failures": [],
+    "decision": "M7 只容器化现有 Java/Vue 构件、Python 源版本和 PostgreSQL 17，并从空项目卷复用 AC-003、AC-005、AC-008；不修改业务实现，不阻塞已通过的 Windows 原生交付。",
+    "next_action": "实现三服务 Compose、跨平台 G7 验收器和独立 Docker CI。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -82,13 +111,13 @@
       "note": "第十固定候选已通过本机 Windows 11、远端临时标准用户双目录 G6、独立审查及 dev 合并检查点三条远端流水线。"
     },
     "M7": {
-      "status": "ready",
-      "attempt": 0,
+      "status": "in_progress",
+      "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "冻结 M7 实施契约并在 feat/m7-docker-compose 开始 Docker Compose 次级交付。",
-      "note": "M6 已通过；M7 可开始，且不得复制或分叉业务实现。"
+      "next_action": "实现三服务 Compose、跨平台 G7 验收器和独立 Docker CI。",
+      "note": "实施契约已冻结；只允许容器化与验收路径，不得复制或分叉业务实现。"
     }
   }
 }
