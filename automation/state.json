@@ -18,17 +18,35 @@
       "src/backend/",
       "src/algorithm/",
       "src/frontend/",
+      "src/README.md",
       "scripts/dev/",
       "tests/",
+      ".mvn/",
+      ".github/workflows/",
+      "mvnw",
+      "mvnw.cmd",
       "README.md",
       ".gitignore",
       "automation/state.json",
+      "automation/workflow.json",
       "docs/verification/evidence/M1.md"
     ],
-    "checks": [],
-    "failures": [],
-    "decision": "G0 已通过；按 G1 只建立四组件健康、迁移、静态资源和统一启停闭环。",
-    "next_action": "并行实现后端、算法和前端骨架，主智能体建立 PostgreSQL 与统一启动链。",
+    "checks": [
+      "2026-08-25 Windows 11 x64/WSL2：scripts/dev/test.sh 退出码 0；仓库与自动化校验通过，Java 12、Python 9、前端 3 项测试通过。",
+      "2026-08-25 Windows 11 x64/WSL2：scripts/dev/restart-smoke.sh 退出码 0；两轮启停、聚合健康、Vue 静态资源、Flyway V1 幂等通过。",
+      "2026-08-25 负向检查：停机时 status.sh 非零；算法停止使后端 DEGRADED 时后端显示 DOWN 且 status.sh 非零。",
+      "2026-08-25 重复启动检查：运行中连续执行 start.sh 两次均成功，避免 Windows JAR 文件锁并保持三组件健康。",
+      "2026-08-25 静态检查：bash -n scripts/dev/*.sh、PowerShell AST 解析、git diff --check 均通过。"
+    ],
+    "failures": [
+      "初始依赖准备中的 Windows Java 路径、PostgreSQL 环境和页面资源断言问题已按实际环境修复并回归。",
+      "初始 WSL nohup 进程无法跨执行会话存活，改为 Windows 分离进程并验证启停和 PID 身份作用域。",
+      "首轮独立审查发现 status 假成功、算法健康契约不足、PID 复用风险和部分启动泄漏，均已针对性修复。",
+      "二轮独立审查发现嵌套 UP 导致 DEGRADED 假健康，已改为解析顶层 JSON status 并用实机负例验证。",
+      "DEGRADED 恢复时发现运行中 JAR 文件锁，已前移旧进程停止动作并连续启动两次验证。"
+    ],
+    "decision": "M1 作者门槛已在同一工作树通过，修复均限定于 G1；进入固定候选提交与独立终审。",
+    "next_action": "创建并推送 M1 固定候选提交，等待候选 SHA 的独立审查和 CI。",
     "resume_status": null
   },
   "stages": {
@@ -44,13 +62,13 @@
       "note": "来源隔离、产品事实、架构、计划和验收基线已落盘，检查点已在 origin/dev 核验。"
     },
     "M1": {
-      "status": "in_progress",
+      "status": "review",
       "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "按 M1 验收标准初始化可运行工程骨架。",
-      "note": "依赖 M0 已通过，可开始工程骨架实现。"
+      "next_action": "创建并推送固定候选提交，完成独立审查和功能分支 CI。",
+      "note": "G1 作者检查已通过；尚未建立和远端核验最终检查点，不得解锁 M2。"
     },
     "M2": {
       "status": "blocked",
