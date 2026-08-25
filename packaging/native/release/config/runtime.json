@@ -1,0 +1,13 @@
+{
+  "identity": "2026 年灾后重建 Demo",
+  "ports": {
+    "postgres": 55432,
+    "algorithm": 8001,
+    "backend": 8080
+  },
+  "database": {
+    "name": "alert_management",
+    "user": "alert_management",
+    "password": "alert_management"
+  }
+}

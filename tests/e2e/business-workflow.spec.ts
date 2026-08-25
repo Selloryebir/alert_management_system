@@ -1,5 +1,6 @@
-import { expect, test, type Page, type APIResponse, type Response } from "@playwright/test";
+import { expect, type Page, type APIResponse, type Response } from "@playwright/test";
 import path from "node:path";
+import { injectNextFetchFailure, test } from "./test-fixtures";
 
 const repositoryRoot = path.resolve(__dirname, "../..");
 const mode = process.env.E2E_MODE ?? "smoke";
@@ -130,19 +131,12 @@ test("浏览器完成导入、分析、详情、事件链和人工处置闭环",
 
 test("页面显示算法不可用的可重试提示", async ({ page }) => {
   test.skip(mode === "demo", "20,000 行冒烟只执行首屏主路径");
-  await page.route("**/api/v1/imports/*/analyses", async (route) => {
-    if (route.request().method() !== "POST") {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({
-      status: 503,
-      contentType: "application/json",
-      body: JSON.stringify({ code: "ALGORITHM_UNAVAILABLE", message: "算法服务不可用，可重试" }),
-    });
+  await page.goto("/");
+  await injectNextFetchFailure(page, "/analyses", {
+    code: "ALGORITHM_UNAVAILABLE",
+    message: "算法服务不可用，可重试",
   });
 
-  await page.goto("/");
   await page.getByTestId("file-input").setInputFiles(dataset);
   await page.getByTestId("preview-button").click();
   await expect(page.getByTestId("preview-summary")).toContainText("300");

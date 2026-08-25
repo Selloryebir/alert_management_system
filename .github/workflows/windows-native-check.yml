@@ -1,0 +1,76 @@
+name: M6 Windows 原生发布检查
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/windows-native-check.yml"
+      - "packaging/native/**"
+      - "scripts/native/**"
+      - "src/**"
+      - "samples/**"
+      - "tests/e2e/**"
+      - "mvnw"
+      - "mvnw.cmd"
+      - ".mvn/**"
+  pull_request:
+    paths:
+      - ".github/workflows/windows-native-check.yml"
+      - "packaging/native/**"
+      - "scripts/native/**"
+      - "src/**"
+      - "samples/**"
+      - "tests/e2e/**"
+      - "mvnw"
+      - "mvnw.cmd"
+      - ".mvn/**"
+
+permissions:
+  contents: read
+
+jobs:
+  native-release:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: 检出完整历史
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 缓存锁定运行时和 Chromium
+        uses: actions/cache@v4
+        with:
+          path: |
+            .runtime/native/cache
+            .runtime/native/tools
+          key: m6-native-v1-${{ runner.os }}-${{ hashFiles('scripts/native/build-release.ps1', 'packaging/native/runtime-lock.json', 'packaging/native/pyinstaller.lock', 'packaging/native/algorithm-service.spec', 'src/algorithm/requirements.lock', 'src/frontend/package-lock.json', 'tests/e2e/package-lock.json') }}
+
+      - name: 构建并执行双目录正式验收
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native/verify-release.ps1
+
+      - name: 保存原生发布包
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alert-management-demo-windows-x64
+          path: |
+            .runtime/native/artifacts/**/*.zip
+            .runtime/native/artifacts/**/*.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: 保存验收摘要和失败日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m6-native-verification-evidence
+          path: |
+            .runtime/native/verification/**/verification-summary.json
+            .runtime/native/verification/**/round-*-summary.json
+            .runtime/native/verification/**/logs/*.log
+            .runtime/native/verification/**/test-results/**
+          if-no-files-found: warn
+          retention-days: 14
