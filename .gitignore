@@ -38,6 +38,7 @@ venv/
 /data/
 /tmp/
 /temp/
+/.runtime/
 *.pid
 *.sqlite
 *.sqlite3

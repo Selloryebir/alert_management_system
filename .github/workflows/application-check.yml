@@ -1,0 +1,58 @@
+name: M1 应用骨架检查
+
+on:
+  push:
+    paths:
+      - ".github/workflows/application-check.yml"
+      - "automation/**"
+      - "scripts/dev/**"
+      - "src/**"
+      - "mvnw"
+      - "mvnw.cmd"
+      - ".mvn/**"
+  pull_request:
+    paths:
+      - ".github/workflows/application-check.yml"
+      - "automation/**"
+      - "scripts/dev/**"
+      - "src/**"
+      - "mvnw"
+      - "mvnw.cmd"
+      - ".mvn/**"
+
+permissions:
+  contents: read
+
+jobs:
+  m1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出完整历史
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 准备 Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: 准备 Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: src/algorithm/requirements.lock
+      - name: 准备 Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - name: 运行组件测试
+        run: scripts/dev/test.sh
+      - name: 运行两轮集成冒烟
+        run: scripts/dev/restart-smoke.sh
+      - name: 停止测试进程
+        if: always()
+        run: scripts/dev/stop.sh

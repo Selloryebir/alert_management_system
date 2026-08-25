@@ -61,11 +61,8 @@
           "基础编译、单元测试、静态检查和迁移重启检查通过"
         ],
         "commands": [
-          "python3 scripts/validate_repository.py",
-          "python3 scripts/validate_automation.py",
-          "./mvnw -f src/backend/pom.xml test",
-          "python3 -m pytest src/algorithm",
-          "npm --prefix src/frontend test -- --run"
+          "scripts/dev/test.sh",
+          "scripts/dev/restart-smoke.sh"
         ]
       }
     },

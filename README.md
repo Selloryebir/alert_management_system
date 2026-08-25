@@ -1,6 +1,6 @@
 # 报警管理系统（灾后重建）
 
-本仓库用于重建报警管理系统的可演示版本。当前处于资料提取、需求收敛和工程基础初始化阶段，尚未形成可运行的业务系统。
+本仓库用于重建报警管理系统的可演示版本。M1 已建立 Java、Python、Vue 和 PostgreSQL 的可运行工程骨架；导入、分析、处置和报告等业务闭环按后续里程碑实现。
 
 阶段目标是交付一个可重复演示的最小闭环：导入报警样例文件，完成校验、分析和展示，并能导出处置结果。实现与验收以稳定、可解释、可复现为优先，不把历史材料中未经验证的指标直接作为承诺。
 
@@ -13,7 +13,7 @@
 - [`docs/architecture/`](docs/architecture/)：系统边界与已接受的技术决策。
 - [`docs/planning/`](docs/planning/)：阶段规划、范围和验收入口。
 - [`automation/`](automation/)：可恢复的阶段状态、机器可读工作流和 Codex 提示链。
-- [`src/`](src/)：产品代码的职责边界说明；业务代码尚未初始化。
+- [`src/`](src/)：Java 后端、Python 算法服务和 Vue 前端源码。
 - [`tools/document-extraction/`](tools/document-extraction/)：可重复的历史材料提取工具。
 - [`scripts/validate_repository.py`](scripts/validate_repository.py)：无第三方依赖的仓库结构与文档链接检查。
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)：开发、验证和提交约定。
@@ -40,6 +40,19 @@ python3 scripts/validate_automation.py
 
 这些命令只验证仓库基础结构、文档链接和自动化状态定义；它们不代表业务功能已经实现或通过验收。
 
+## M1 开发启动
+
+当前 Windows 11 + WSL2 开发路径要求 Docker Desktop 已启动，并在 WSL 中提供 Node.js 22.12+、`curl`、`tar`、`sha256sum`；Windows 侧提供 JDK 21。Docker 在 M1 只承载 PostgreSQL 17.6，不是最终原生交付方案。脚本会在忽略的 `.runtime/` 中准备固定 Python 3.12 环境：
+
+```bash
+scripts/dev/test.sh
+scripts/dev/start.sh
+scripts/dev/status.sh
+scripts/dev/stop.sh
+```
+
+启动成功后访问 `http://127.0.0.1:8080`。`status.sh` 在任一进程、数据库或健康状态异常时返回非零。`scripts/dev/restart-smoke.sh` 会连续执行两轮启停，验证三项聚合健康、Vue 静态资源和 Flyway 重复迁移。
+
 ## 交付约束
 
 - Windows 11 x64 原生启动包为首要交付物，应提供环境预检、启动、停止、演示数据复位和日志定位入口。
@@ -49,4 +62,4 @@ python3 scripts/validate_automation.py
 
 ## 当前状态
 
-M0 的材料提取、信息隔离、产品事实、架构和验收基线已经建立；业务代码尚未初始化。下一步由[自动化开发入口](automation/)从 `M1` 开始，并以 [`M1 可运行工程骨架`](docs/planning/#m1可运行工程骨架)为验收依据。
+M0 已通过；M1 工程骨架正在按[自动化开发入口](automation/)实施和验收。状态以 `automation/state.json` 及 `scripts/dev/test.sh`、`scripts/dev/restart-smoke.sh` 的当前提交证据为准。
