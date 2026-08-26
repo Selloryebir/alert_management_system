@@ -22,6 +22,8 @@
       "scripts/dev/",
       "scripts/native/verify-release.ps1",
       "packaging/native/release/scripts/reset-demo.ps1",
+      "docs/architecture/README.md",
+      "docs/planning/M10-implementation.md",
       "docs/product/",
       "docs/verification/",
       "automation/state.json"
@@ -40,7 +42,7 @@
       "git diff --check: PASS"
     ],
     "failures": [
-      "固定候选 d5f730e 的远端 M1、Docker 与 Windows 流水线返回 HTTP 400：M2/M3/Docker 黑盒和原生复位后的空批次查询未传 M10 新增的必填 project_id；修复过程中还发现成功预览无条件返回全部 source_rows 会放大大批次响应。第二候选 85f60e0 修复上述问题后，Docker/仓库远端已通过，但本机原生验收发现既有 Playwright 未等待项目就绪、未填写新增必填责任人且仍断言英文处置状态。第三候选 23de3d2 已对齐测试契约，但 Windows PowerShell 5 在直接启动器已退出而后台服务继续运行时返回了不可靠的 Process.ExitCode。第四候选 9197780 添加成功标记回退后，发现默认代码页读取 UTF-8 中文日志时会吞并 URL 首字母；第五候选改用不受编码影响的 127.0.0.1:8080 标记，后续强校验保持不变。"
+      "固定候选 d5f730e 的远端 M1、Docker 与 Windows 流水线返回 HTTP 400：M2/M3/Docker 黑盒和原生复位后的空批次查询未传 M10 新增的必填 project_id；修复过程中还发现成功预览无条件返回全部 source_rows 会放大大批次响应。第二候选 85f60e0 修复上述问题后，Docker/仓库远端已通过，但本机原生验收发现既有 Playwright 未等待项目就绪、未填写新增必填责任人且仍断言英文处置状态。第三候选 23de3d2 已对齐测试契约，但 Windows PowerShell 5 在直接启动器已退出而后台服务继续运行时返回了不可靠的 Process.ExitCode。第四候选 9197780 添加成功标记回退后，发现默认代码页读取 UTF-8 中文日志时会吞并 URL 首字母。第五候选 723b7e3 的本机 Windows 与四条远端门槛通过，但独立审查发现六种可达导入错误码仍会在页面显示英文；第六候选仅补齐当前后端错误词典和显示层断言。"
     ],
     "decision": "以项目作为导入、分析、处置和报告的统一业务作用域；在现有单体架构内补齐最小项目生命周期、图形化字段映射、全中文界面和首次使用引导，不引入通用工作流或任意模板引擎。",
     "next_action": "提交并推送固定候选，由独立审查者在该提交上复跑 G10、检查实际差异和阻断/严重问题。",
@@ -159,12 +161,12 @@
     },
     "M10": {
       "status": "review",
-      "attempt": 5,
+      "attempt": 6,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "固定第五候选并重跑 Windows 原生验收；通过后执行独立 G10 复审和四条远端流水线。",
-      "note": "业务与浏览器契约有效；原生验收继续阻断了终态标记的默认代码页乱码，当前改用纯 ASCII IP/端口并保留其后的全部强校验。"
+      "next_action": "在第六固定候选上重跑 G10，并由独立审查者复核英文错误码 P1 已关闭。",
+      "note": "六种可达导入错误码已补齐中文词典；项目规则与文件结构错误的真实显示层断言、M10 前端测试和生产构建通过。"
     },
     "M11": {
       "status": "blocked",

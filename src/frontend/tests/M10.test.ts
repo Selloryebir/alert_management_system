@@ -138,8 +138,12 @@ describe("M10 全中文项目化入口", () => {
     const rejected = {
       batch_id: "33333333-3333-3333-3333-333333333333", project_id: project.project_id,
       file_name: "invalid.csv", format: "CSV", status: "REJECTED", total_rows: 1,
-      valid_rows: 0, error_count: 1,
-      errors: [{ source_row: 2, field: "priority", code: "INVALID_ENUM", message: "优先级无效" }],
+      valid_rows: 0, error_count: 3,
+      errors: [
+        { source_row: 2, field: "priority", code: "INVALID_ENUM", message: "优先级无效" },
+        { source_row: 2, field: "value", code: "PROJECT_RULE_RANGE", message: "值低于项目下限" },
+        { source_row: 2, field: "file", code: "COLUMN_COUNT_MISMATCH", message: "数据列数与表头不一致" },
+      ],
       headers: ["优先级", "位号"], mapping: { priority: "优先级", tag: "位号" }, corrections: {},
       source_rows: [{ source_row: 2, values: { 优先级: "PX", 位号: "PT-001" } }],
       preview_rows: [], created_at: "2026-08-26T08:00:00+08:00",
@@ -165,6 +169,10 @@ describe("M10 全中文项目化入口", () => {
     await fireEvent.change(screen.getByTestId("file-input"), { target: { files: [new File(["x"], "invalid.csv", { type: "text/csv" })] } });
     await fireEvent.click(screen.getByTestId("preview-button"));
 
+    expect(await screen.findByText("超出项目允许范围")).toBeInTheDocument();
+    expect(screen.getByText("列数与表头不一致")).toBeInTheDocument();
+    expect(screen.queryByText("PROJECT_RULE_RANGE")).not.toBeInTheDocument();
+    expect(screen.queryByText("COLUMN_COUNT_MISMATCH")).not.toBeInTheDocument();
     const correction = await screen.findByTestId("correction-row-2-priority");
     const input = within(correction).getByLabelText("第 2 行 优先级修正值");
     expect(input).toHaveValue("PX");
@@ -311,6 +319,13 @@ describe("M10 人工补录和中文词典", () => {
     expect(auditDetails({ from_status: "OPEN", to_status: "CLOSED", reason: "复核" })).toBe("原状态：待处理；新状态：已关闭；原因：复核");
     expect(localizedEvidence("NORMAL / EQUIPMENT_FAULT，状态 ACTIVE")).toBe("一般报警 / 设备故障，状态 活动报警");
     expect(localizedEvidence("NORMALIZED 与 PRE_ACTIVE_CODE 保持原文")).toBe("NORMALIZED 与 PRE_ACTIVE_CODE 保持原文");
+    expect([
+      "PROJECT_RULE_REQUIRED", "PROJECT_RULE_RANGE", "VALUE_TOO_LONG",
+      "COLUMN_COUNT_MISMATCH", "DUPLICATE_HEADER", "INVALID_MAPPING",
+    ].map(zh)).toEqual([
+      "不符合项目必填规则", "超出项目允许范围", "内容长度超限",
+      "列数与表头不一致", "表头名称重复", "字段映射无效",
+    ]);
   });
 
   it("审计筛选和表格只显示中文事件及结果", async () => {
