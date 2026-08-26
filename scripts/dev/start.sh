@@ -26,6 +26,7 @@ else
   docker_run run --detach \
     --name "$POSTGRES_CONTAINER" \
     --label alert-management-demo=m1 \
+    --label "alert-management-runtime-scope=$POSTGRES_RUNTIME_SCOPE" \
     --publish "127.0.0.1:${POSTGRES_PORT}:5432" \
     --env POSTGRES_DB=alert_management \
     --env POSTGRES_USER=alert_management \
