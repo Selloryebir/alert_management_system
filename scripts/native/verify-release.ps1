@@ -643,6 +643,16 @@ function Invoke-BackupCheck {
     $metadata = Get-Content -LiteralPath $metadataPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $instance = Get-Content -LiteralPath (Join-Path $ReleaseRoot "data\instance.json") -Raw -Encoding UTF8 | ConvertFrom-Json
     $manifest = Get-Content -LiteralPath (Join-Path $ReleaseRoot "release-manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $preexistingForeignNames = @()
+    foreach ($existingBackup in $before) {
+        $existingMetadataPath = $existingBackup.FullName + ".meta.json"
+        Assert-True (Test-Path -LiteralPath $existingMetadataPath -PathType Leaf) `
+            "既有恢复点缺少元数据：$existingMetadataPath"
+        $existingMetadata = Get-Content -LiteralPath $existingMetadataPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        Assert-True ([string]$existingMetadata.origin_instance_id -ne [string]$instance.instance_id) `
+            "全新验收目录不应预先存在当前实例恢复点：$($existingBackup.Name)"
+        $preexistingForeignNames += $existingBackup.Name
+    }
     Assert-True ($metadata.origin_instance_id -eq $instance.instance_id -and
         $metadata.origin_source_commit -eq $manifest.source_commit -and
         [Int64]$metadata.size_bytes -eq [Int64]$newBackup[0].Length -and
@@ -695,10 +705,30 @@ function Invoke-BackupCheck {
     $retainedDumps = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "backups") -Filter "*.dump" -File)
     $retainedMetadata = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "backups") `
         -Filter "*.dump.meta.json" -File)
-    Assert-True ($retainedDumps.Count -eq 2 -and $retainedMetadata.Count -eq 2) `
-        "RetentionCount=2 未精确保留两个恢复点。"
+    $retainedPoints = @($retainedDumps | ForEach-Object {
+        $pointMetadataPath = $_.FullName + ".meta.json"
+        Assert-True (Test-Path -LiteralPath $pointMetadataPath -PathType Leaf) `
+            "保留后的恢复点缺少元数据：$pointMetadataPath"
+        [PSCustomObject]@{
+            Dump = $_
+            Metadata = (Get-Content -LiteralPath $pointMetadataPath -Raw -Encoding UTF8 | ConvertFrom-Json)
+        }
+    })
+    $currentRetained = @($retainedPoints | Where-Object {
+            [string]$_.Metadata.origin_instance_id -eq [string]$instance.instance_id })
+    $foreignRetained = @($retainedPoints | Where-Object {
+            [string]$_.Metadata.origin_instance_id -ne [string]$instance.instance_id })
+    Assert-True ($currentRetained.Count -eq 2 -and $retainedMetadata.Count -eq $retainedDumps.Count) `
+        "RetentionCount=2 未精确保留两个当前实例恢复点。"
+    Assert-True ($foreignRetained.Count -eq $preexistingForeignNames.Count) `
+        "保留策略改变了外部迁移恢复点数量。"
+    foreach ($foreignName in $preexistingForeignNames) {
+        Assert-True (@($foreignRetained | Where-Object { $_.Dump.Name -eq $foreignName }).Count -eq 1) `
+            "保留策略删除或替换了外部迁移恢复点：$foreignName"
+    }
     Invoke-ReleaseScript $ReleaseRoot "backup-status.ps1" | Out-Null
-    $latestBackup = @($retainedDumps | Sort-Object LastWriteTimeUtc -Descending)[0]
+    $latestCurrentPoint = @($currentRetained | Sort-Object { $_.Dump.LastWriteTimeUtc } -Descending)[0]
+    $latestBackup = $latestCurrentPoint.Dump
     return [PSCustomObject]@{
         BackupPath = $latestBackup.FullName
         EvidencePath = $savedEvidence
