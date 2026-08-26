@@ -33,6 +33,19 @@ class DemoResetService {
             "import_staging",
             "import_batch",
             "audit_event");
+    private static final List<String> RESET_LOCK_TABLES = List.of(
+            "business_project",
+            "import_batch",
+            "import_staging",
+            "alarm_record",
+            "analysis_run",
+            "analysis_result",
+            "analysis_result_override",
+            "event_chain",
+            "event_chain_member",
+            "alarm_disposition",
+            "disposition_history",
+            "audit_event");
 
     private final JdbcTemplate jdbcTemplate;
     private final ProjectAccessService accessService;
@@ -56,7 +69,7 @@ class DemoResetService {
         if (request == null || !CONFIRMATION.equals(request.confirmation())) {
             throw badRequest("confirmation 必须是 RESET_DEMO");
         }
-        jdbcTemplate.execute("LOCK TABLE " + String.join(", ", BUSINESS_TABLES) + ", business_project"
+        jdbcTemplate.execute("LOCK TABLE " + String.join(", ", RESET_LOCK_TABLES)
                 + " IN ACCESS EXCLUSIVE MODE");
         int analyzing = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM analysis_run WHERE status = 'ANALYZING'", Integer.class);
