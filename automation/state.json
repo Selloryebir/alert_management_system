@@ -45,7 +45,7 @@
       "第二候选 ec9563b0：高风险声明可经冒号借用限定词；项目负责人页面展示后端仅系统管理员可执行的空项目删除入口。"
     ],
     "decision": "以 Markdown 为唯一事实源，直接生成并验证中文 DOCX/PDF；正式材料只采用当前 Git、产品契约和固定提交证据，历史人员、预算、试点、准确率、合规及长稳陈述不继承。业务正文优先 Windows 原生包，Docker/HTTPS 放部署管理员说明；恢复仅表述为隔离恢复验证。",
-    "next_action": "固定第三候选，执行本机、Windows、独立复审和远端门槛。",
+    "next_action": "提交 M13 证据并通过 PR 合入 dev；随后在 dev 合并提交重跑阶段门槛和远端检查。",
     "resume_status": null
   },
   "stages": {
@@ -193,13 +193,15 @@
       "note": "第二固定候选经独立对抗复审和 PR #11 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、可靠性、Windows 原生和 Docker 五条远端流水线全部成功。"
     },
     "M13": {
-      "status": "in_progress",
+      "status": "review",
       "attempt": 1,
-      "evidence_files": [],
+      "evidence_files": [
+        "docs/verification/evidence/M13.md"
+      ],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "在第三候选重跑生成、原生包、独立复审和远端门槛。",
-      "note": "正式手册、过程文件和确定性生成链已形成候选；922108cf 与 ec9563b0 的复审问题均已修复，但二者不作为阶段检查点。"
+      "next_action": "将固定候选通过 PR 合入 dev，并在合并提交重跑 G13 与远端检查。",
+      "note": "第三固定候选 0b0f630 已通过本机 G13、Windows 原生双目录全链、独立复审和五条远端检查；阶段尚未建立 dev 检查点。"
     },
     "M14": {
       "status": "blocked",
