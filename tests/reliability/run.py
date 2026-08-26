@@ -549,6 +549,21 @@ def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def filter_expected_postgres_bootstrap_shutdown(content: str) -> tuple[str, int]:
+    """仅过滤官方镜像首次初始化时成组出现的受控 fast shutdown 提示。"""
+    lines = content.splitlines(keepends=True)
+    ignored = 0
+    for index, line in enumerate(lines):
+        if not re.search(r"FATAL:\s+the database system is shutting down\s*$", line):
+            continue
+        before = "".join(lines[max(0, index - 20):index])
+        after = "".join(lines[index + 1:index + 31])
+        if "received fast shutdown request" in before and "database system is shut down" in after:
+            lines[index] = ""
+            ignored += 1
+    return "".join(lines), ignored
+
+
 def assert_logs_clean(
     result_dir: Path, baseline: dict[str, int], started_at: datetime
 ) -> dict[str, dict[str, Any]]:
@@ -598,7 +613,12 @@ def assert_logs_clean(
         for secret in secret_values:
             if secret in content:
                 raise ReliabilityError(f"服务日志泄露实例密钥：{path.name}")
-        match = patterns.search(content)
+        scan_content = content
+        ignored_postgres_shutdowns = 0
+        if path.name == "postgres.log":
+            scan_content, ignored_postgres_shutdowns = \
+                filter_expected_postgres_bootstrap_shutdown(content)
+        match = patterns.search(scan_content)
         if match:
             raise ReliabilityError(f"服务日志出现乱码或未处理异常：{path.name}: {match.group(0)}")
         destination = saved_root / path.name
@@ -611,6 +631,7 @@ def assert_logs_clean(
             "scan_rule": pattern_text,
             "matches": 0,
             "secret_matches": 0,
+            "ignored_expected_postgres_bootstrap_shutdowns": ignored_postgres_shutdowns,
         }
     return metadata
 
