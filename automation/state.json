@@ -2,7 +2,50 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M11",
-  "active_run": null,
+  "active_run": {
+    "stage": "M11",
+    "base_commit": "9ea61eb36e4258770215c08118964abb7c1e581e",
+    "requirements": [
+      "PRD-002",
+      "PRD-003",
+      "PRD-005",
+      "PRD-006",
+      "PRD-007",
+      "PRD-008",
+      "PRD-013",
+      "PRD-014",
+      "PRD-018",
+      "PRD-033"
+    ],
+    "allowed_paths": [
+      ".github/workflows/",
+      ".gitignore",
+      "README.md",
+      "compose.yaml",
+      "compose.network.yaml",
+      "config/",
+      "src/backend/",
+      "src/frontend/",
+      "packaging/native/",
+      "packaging/docker/",
+      "scripts/dev/",
+      "scripts/security/",
+      "scripts/native/",
+      "tests/",
+      "docs/architecture/",
+      "docs/planning/",
+      "docs/product/",
+      "docs/security/",
+      "docs/verification/",
+      "automation/state.json",
+      "automation/workflow.json"
+    ],
+    "checks": [],
+    "failures": [],
+    "decision": "采用同源有状态会话、CSRF、BCrypt 和三种最小职责：SYSTEM_ADMIN 为全局角色，MANAGER/ANALYST 为项目成员角色；Windows 本机仅回环 HTTP，网络模式仅 HTTPS；输入限制覆盖上传、结构、行列、单元格、查询和请求体，不引入 JWT、网关或通用权限平台。",
+    "next_action": "冻结 M11 身份授权、部署和输入边界契约，按后端、前端、部署验收三个互斥路径实现并集成 G11。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -126,13 +169,13 @@
       "note": "第六固定候选经 PR #6 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、Windows 原生和 Docker 四条流水线全部成功。"
     },
     "M11": {
-      "status": "ready",
-      "attempt": 0,
+      "status": "in_progress",
+      "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "冻结最小身份、项目授权、HTTPS 部署和输入资源边界，建立短期功能分支并实现 G11。",
-      "note": "M10 项目作用域和完整业务路径已通过，可开始 M11。"
+      "next_action": "在 feat/m11-security-boundary 冻结最小身份、项目授权、HTTPS 部署和输入资源边界并实现 G11。",
+      "note": "M11 第一次增量已从 v0.5.0 发布证据后的 dev 提交启动。"
     },
     "M12": {
       "status": "blocked",

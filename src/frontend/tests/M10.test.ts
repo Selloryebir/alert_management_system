@@ -8,6 +8,22 @@ import ProjectWorkspace from "../src/ProjectWorkspace.vue";
 import ReviewOperations from "../src/ReviewOperations.vue";
 import { auditDetails, localizedEvidence, priorityLabel, zh } from "../src/labels";
 
+const authenticatedUser = vi.hoisted(() => ({
+  user_id: "00000000-0000-0000-0000-000000000099",
+  username: "test-admin",
+  display_name: "测试管理员",
+  global_role: "SYSTEM_ADMIN" as const,
+  must_change_password: false,
+}));
+
+vi.mock("../src/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/auth")>()),
+  initializeCsrf: async () => ({ token: "test-csrf", header_name: "X-CSRF-TOKEN", parameter_name: "_csrf" }),
+  currentUser: async () => ({ ...authenticatedUser }),
+  logout: async () => undefined,
+  changePassword: async () => ({ ...authenticatedUser }),
+}));
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -24,6 +40,7 @@ const project = {
   report_title: "一号装置报警分析报告",
   report_fields: ["summary", "priority", "area", "unit", "noise", "cause", "disposition", "chains"],
   validation_rules: { required_fields: [], value_min: null, value_max: null, threshold_min: null, threshold_max: null },
+  project_role: "SYSTEM_ADMIN" as const,
   created_at: "2026-08-26T08:00:00+08:00",
   updated_at: "2026-08-26T08:00:00+08:00",
 };
@@ -51,7 +68,7 @@ describe("M10 全中文项目化入口", () => {
     expect(screen.getByRole("heading", { name: "报警管理系统" })).toBeInTheDocument();
     expect(screen.getByText("仅使用合成数据")).toBeInTheDocument();
     for (let index = 1; index <= 6; index += 1) {
-      expect(screen.getByTestId(`onboarding-step-${index}`)).toBeInTheDocument();
+      expect(await screen.findByTestId(`onboarding-step-${index}`)).toBeInTheDocument();
     }
     await waitFor(() => expect(screen.getAllByText("正常")).toHaveLength(3));
     expect(screen.queryByText("UP")).not.toBeInTheDocument();
@@ -67,7 +84,7 @@ describe("M10 全中文项目化入口", () => {
       throw new Error(`未处理请求 ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(ProjectWorkspace);
+    render(ProjectWorkspace, { props: { systemAdmin: true } });
 
     await fireEvent.click(screen.getByRole("button", { name: "新建项目" }));
     await fireEvent.update(screen.getByLabelText(/项目编号/), project.code);
@@ -114,10 +131,14 @@ describe("M10 全中文项目化入口", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(App);
     await fireEvent.click(await screen.findByTestId(`select-project-${project.code}`));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      `/api/v1/imports?limit=20&project_id=${project.project_id}`,
-      expect.objectContaining({ headers: { Accept: "application/json" } }),
-    ));
+    await waitFor(() => {
+      const request = fetchMock.mock.calls.find(([input]) =>
+        String(input) === `/api/v1/imports?limit=20&project_id=${project.project_id}`,
+      );
+      expect(request).toBeDefined();
+      expect((request?.[1]?.headers as Headers).get("Accept")).toBe("application/json");
+      expect(request?.[1]?.credentials).toBe("same-origin");
+    });
     await fireEvent.change(screen.getByTestId("file-input"), { target: { files: [new File(["x"], "alarm.csv", { type: "text/csv" })] } });
     await fireEvent.click(screen.getByTestId("preview-button"));
 
@@ -193,7 +214,7 @@ describe("M10 全中文项目化入口", () => {
       throw new Error(`未处理请求 ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(ProjectWorkspace);
+    render(ProjectWorkspace, { props: { systemAdmin: true } });
 
     const deletePanel = await screen.findByTestId("delete-project");
     const deleteButton = within(deletePanel).getByRole("button", { name: "删除项目" });
@@ -215,7 +236,7 @@ describe("M10 全中文项目化入口", () => {
       throw new Error(`未处理请求 ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(ProjectWorkspace);
+    render(ProjectWorkspace, { props: { systemAdmin: true } });
     await screen.findByText("300");
     await fireEvent.click(screen.getByRole("button", { name: "归档项目" }));
     expect(await screen.findByText("项目归档成功，只能查看历史数据。")).toBeInTheDocument();
@@ -271,7 +292,7 @@ describe("M10 人工补录和中文词典", () => {
     expect(screen.queryByText("PT-A")).not.toBeInTheDocument();
   });
 
-  it("完成补录、修订和作废，并传递明确操作者与理由", async () => {
+  it("完成补录、修订和作废，源操作员保留且动作身份不由客户端传递", async () => {
     let alarm = {
       project_id: project.project_id, batch_id: "batch-1", record_id: "record-1",
       event_time: "2026-08-26T10:00:00Z", site: project.site, area: project.unit_name, unit: null,
@@ -293,23 +314,21 @@ describe("M10 人工补录和中文词典", () => {
     await fireEvent.update(screen.getByLabelText(/发生时间/), "2026-08-26T10:00");
     await fireEvent.update(screen.getByLabelText(/位号/), "PT-001");
     await fireEvent.update(screen.getByLabelText(/报警描述/), "人工补录");
-    await fireEvent.update(screen.getByLabelText(/补录操作者/), "验收员");
+    await fireEvent.update(screen.getByLabelText(/源操作员/), "验收员");
     await fireEvent.click(screen.getByRole("button", { name: "保存补录" }));
     expect(await screen.findByText(/补录成功/)).toBeInTheDocument();
 
     await fireEvent.click(screen.getByRole("button", { name: "编辑该补录" }));
     await fireEvent.update(screen.getByLabelText(/报警描述/), "已修订");
-    await fireEvent.update(screen.getByLabelText(/修订操作者/), "复核员");
     await fireEvent.update(screen.getByLabelText(/修订理由/), "现场复核");
     await fireEvent.click(screen.getByRole("button", { name: "保存修订" }));
     expect(await screen.findByText(/修订已保存/)).toBeInTheDocument();
 
     await fireEvent.click(screen.getByRole("button", { name: "作废" }));
-    await fireEvent.update(screen.getByLabelText(/作废操作者/), "复核员");
     await fireEvent.update(screen.getByLabelText(/作废理由/), "重复补录");
     await fireEvent.click(screen.getByRole("button", { name: "确认作废" }));
     expect((await screen.findAllByText(/已作废/)).length).toBeGreaterThan(0);
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/invalidate"), expect.objectContaining({ body: JSON.stringify({ operator: "复核员", reason: "重复补录" }) }));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/invalidate"), expect.objectContaining({ body: JSON.stringify({ reason: "重复补录" }) }));
   });
 
   it("机器枚举、优先级和审计详情均转换为业务中文", () => {
@@ -335,7 +354,7 @@ describe("M10 人工补录和中文词典", () => {
         operator: "审核员", target_type: "ALARM_RECORD", target_id: "record-1", result: "SUCCESS", trace_id: "trace-1", details: { reason: "复核" },
       }],
     }), { status: 200, headers: { "Content-Type": "application/json" } })));
-    render(ReviewOperations);
+    render(ReviewOperations, { props: { projectId: project.project_id, canManage: true, systemAdmin: true } });
     await fireEvent.click(screen.getByTestId("audit-refresh"));
     const table = await screen.findByTestId("audit-table");
     expect(table).toHaveTextContent("人工修订分类");

@@ -20,3 +20,8 @@ src/*
 !src/algorithm/requirements.lock
 !src/algorithm/algorithm_service/
 !src/algorithm/algorithm_service/**
+!packaging/
+packaging/*
+!packaging/docker/
+packaging/docker/*
+!packaging/docker/backend-entrypoint.sh

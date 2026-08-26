@@ -18,6 +18,8 @@ record AuditEventView(
         @JsonProperty("target_id") UUID targetId,
         String result,
         @JsonProperty("trace_id") UUID traceId,
+        @JsonProperty("actor_user_id") UUID actorUserId,
+        @JsonProperty("project_id") UUID projectId,
         Map<String, Object> details) {
 }
 

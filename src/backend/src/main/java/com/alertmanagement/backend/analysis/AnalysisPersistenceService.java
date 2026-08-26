@@ -1,6 +1,7 @@
 package com.alertmanagement.backend.analysis;
 
 import com.alertmanagement.backend.audit.AuditService;
+import com.alertmanagement.backend.persistence.BusinessDataTransactionLock;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,14 +40,16 @@ class AnalysisPersistenceService {
     @Transactional
     public StartedAnalysis begin(UUID batchId, String contractVersion, String algorithmVersion,
             Map<String, Object> parameters) {
+        BusinessDataTransactionLock.acquire(jdbcTemplate);
         BatchState batchState;
         try {
             batchState = jdbcTemplate.queryForObject("""
-                    SELECT b.status, p.status AS project_status
+                    SELECT b.project_id, b.status, p.status AS project_status
                       FROM import_batch b JOIN business_project p ON p.project_id=b.project_id
                      WHERE b.batch_id = ? FOR UPDATE OF b
                     """, (resultSet, rowNumber) -> new BatchState(
-                    resultSet.getString("status"), resultSet.getString("project_status")), batchId);
+                    resultSet.getObject("project_id", UUID.class), resultSet.getString("status"),
+                    resultSet.getString("project_status")), batchId);
         } catch (EmptyResultDataAccessException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "导入批次不存在");
         }
@@ -98,7 +101,7 @@ class AnalysisPersistenceService {
         if (records.isEmpty()) {
             throw new IllegalStateException("导入批次没有可分析记录");
         }
-        auditService.record("ANALYSIS_STARTED", AuditService.DEMO_OPERATOR, "ANALYSIS_RUN", runId, "SUCCESS",
+        auditService.record("ANALYSIS_STARTED", "ANALYSIS_RUN", runId, batchState.projectId(), "SUCCESS",
                 Map.of("batch_id", batchId, "run_id", runId, "algorithm_version", algorithmVersion,
                         "contract_version", contractVersion, "input_count", records.size()));
         return new StartedAnalysis(new AnalysisRequest(
@@ -107,6 +110,7 @@ class AnalysisPersistenceService {
 
     @Transactional
     public void complete(StartedAnalysis started, ValidatedAnalysis analysis) {
+        BusinessDataTransactionLock.acquire(jdbcTemplate);
         UUID runId = started.request().analysisRunId();
         UUID batchId = started.request().records().getFirst().batchId();
         requireState(runId, batchId);
@@ -149,14 +153,14 @@ class AnalysisPersistenceService {
         if (runUpdated != 1 || batchUpdated != 1) {
             throw new IllegalStateException("分析完成状态更新失败");
         }
-        auditService.record("ANALYSIS_COMPLETED", AuditService.DEMO_OPERATOR,
-                "ANALYSIS_RUN", runId, "SUCCESS",
+        auditService.record("ANALYSIS_COMPLETED", "ANALYSIS_RUN", runId, projectId(batchId), "SUCCESS",
                 Map.of("run_id", runId, "input_count", started.request().records().size(),
                         "output_count", analysis.results().size(), "summary", analysis.summary()));
     }
 
     @Transactional
     public void fail(UUID runId, UUID batchId, String reason) {
+        BusinessDataTransactionLock.acquire(jdbcTemplate);
         jdbcTemplate.update("DELETE FROM event_chain_member WHERE run_id = ?", runId);
         jdbcTemplate.update("DELETE FROM event_chain WHERE run_id = ?", runId);
         jdbcTemplate.update("DELETE FROM analysis_result WHERE run_id = ?", runId);
@@ -170,7 +174,7 @@ class AnalysisPersistenceService {
         if (runUpdated != 1 || batchUpdated != 1) {
             throw new IllegalStateException("分析失败状态更新失败");
         }
-        auditService.record("ANALYSIS_FAILED", AuditService.DEMO_OPERATOR, "ANALYSIS_RUN", runId, "FAILURE",
+        auditService.record("ANALYSIS_FAILED", "ANALYSIS_RUN", runId, projectId(batchId), "FAILURE",
                 Map.of("run_id", runId, "failure_code", failureCode(reason),
                         "retryable", true, "reason", reason));
     }
@@ -330,6 +334,10 @@ class AnalysisPersistenceService {
             OffsetDateTime completedAt) {
     }
 
-    private record BatchState(String status, String projectStatus) {
+    private UUID projectId(UUID batchId) {
+        return jdbcTemplate.queryForObject("SELECT project_id FROM import_batch WHERE batch_id=?", UUID.class, batchId);
+    }
+
+    private record BatchState(UUID projectId, String status, String projectStatus) {
     }
 }

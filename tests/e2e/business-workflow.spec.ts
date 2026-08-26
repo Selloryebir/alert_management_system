@@ -63,7 +63,7 @@ async function importAndAnalyze(page: Page): Promise<{ batchId: string; runId: s
 
 test("浏览器完成导入、分析、详情、事件链和人工处置闭环", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "报警管理系统" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "报警管理系统", exact: true })).toBeVisible();
 
   const { runId } = await importAndAnalyze(page);
   const dashboardResponse = await page.request.get(`/api/v1/analyses/${runId}/dashboard`);
@@ -112,12 +112,11 @@ test("浏览器完成导入、分析、详情、事件链和人工处置闭环",
   await expect(page.getByTestId("detail-event-chains")).toContainText("不代表已确认根因");
   await expect(page.getByTestId("event-chain")).toContainText("222 → 223 → 224 → 225 → 226");
 
-  const operator = "SYNTHETIC_E2E_OPERATOR";
-  const assignee = "SYNTHETIC_E2E_ASSIGNEE";
+  const operator = "admin";
+  const assignee = "admin";
   const startedNote = "[SYNTHETIC] E2E 开始处置";
   const closedNote = "[SYNTHETIC] E2E 审核完成";
   await page.getByTestId("disposition-assignee").fill(assignee);
-  await page.getByTestId("disposition-operator").fill(operator);
   await page.getByTestId("disposition-note").fill(startedNote);
   await page.getByTestId("disposition-start").click();
   await expect(page.getByTestId("disposition-history")).toContainText("待处理 → 处理中");

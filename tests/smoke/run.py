@@ -5,10 +5,13 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.cookiejar
 import json
 import os
 import re
+import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -26,11 +29,26 @@ COMPOSE_FILE = ROOT / "compose.yaml"
 BASE_URL = "http://127.0.0.1:8080"
 EXPECTED_PATH = ROOT / "samples/expected/analysis-smoke-expected.json"
 SERVICES = ("postgres", "algorithm", "backend")
-HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+HTTP_OPENER = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}),
+    urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
+)
+CSRF_HEADER: str | None = None
+CSRF_TOKEN: str | None = None
+BOOTSTRAP_PASSWORD: str | None = None
 
 
 class VerificationError(RuntimeError):
     """G7 验收失败。"""
+
+
+def assert_host_port_free() -> None:
+    try:
+        with socket.create_connection(("127.0.0.1", 8080), timeout=1):
+            pass
+    except OSError:
+        return
+    raise VerificationError("验收端口 127.0.0.1:8080 已被其他进程占用，请先停止现有服务。")
 
 
 def run_command(
@@ -170,11 +188,14 @@ def http_request(
     timeout: int = 60,
     expect_json: bool = True,
 ) -> Any:
+    request_headers = dict(headers or {})
+    if method not in {"GET", "HEAD", "OPTIONS"} and CSRF_HEADER and CSRF_TOKEN:
+        request_headers[CSRF_HEADER] = CSRF_TOKEN
     request = urllib.request.Request(
         BASE_URL + path,
         data=body,
         method=method,
-        headers=headers or {},
+        headers=request_headers,
     )
     try:
         with HTTP_OPENER.open(request, timeout=timeout) as response:
@@ -199,6 +220,97 @@ def json_request(path: str, method: str, value: dict[str, Any]) -> Any:
         body=json.dumps(value, ensure_ascii=False).encode("utf-8"),
         headers={"Content-Type": "application/json", "Accept": "application/json"},
     )
+
+
+def prepare_compose_secrets() -> Path:
+    global BOOTSTRAP_PASSWORD
+    configured = os.environ.get("APP_SECRETS_DIR", "").strip()
+    secret_root = Path(configured) if configured else ROOT / ".runtime/compose-secrets"
+    secret_root.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        secret_root.chmod(0o700)
+    os.environ["APP_SECRETS_DIR"] = str(secret_root.resolve())
+    for name in ("database-password.txt", "bootstrap-admin-password.txt"):
+        path = secret_root / name
+        if path.exists() and (not path.is_file() or not path.read_text(encoding="utf-8").strip()):
+            raise VerificationError(f"Compose 密钥不是非空普通文件：{path}")
+        if not path.exists():
+            path.write_text(secrets.token_urlsafe(32), encoding="utf-8")
+        if os.name != "nt":
+            # Compose 的 Linux 绑定文件保留宿主 UID；目录 0700 限制宿主访问，
+            # 文件需允许镜像内的非 root 用户 10001 读取。
+            path.chmod(0o644)
+    protect_secret_permissions(secret_root)
+    BOOTSTRAP_PASSWORD = (secret_root / "bootstrap-admin-password.txt").read_text(
+        encoding="utf-8"
+    ).strip()
+    return secret_root
+
+
+def protect_secret_permissions(secret_root: Path) -> None:
+    powershell = shutil.which("powershell.exe") or shutil.which("powershell")
+    windows_root: str | None = None
+    if os.name == "nt":
+        windows_root = str(secret_root.resolve())
+    elif powershell and shutil.which("wslpath") and str(secret_root).startswith("/mnt/"):
+        windows_root = run_command(
+            ["wslpath", "-w", str(secret_root.resolve())], timeout=10
+        ).stdout.strip()
+    if windows_root is None:
+        return
+    if not powershell:
+        raise VerificationError("Windows 密钥目录需要 PowerShell 才能收敛 NTFS ACL。")
+    script_path = str(ROOT / "scripts/security/protect-windows-secrets.ps1")
+    if os.name != "nt":
+        script_path = run_command(
+            ["wslpath", "-w", script_path], timeout=10
+        ).stdout.strip()
+    run_command(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            script_path,
+            "-SecretRoot",
+            windows_root,
+        ],
+        timeout=30,
+    )
+
+
+def login_as_bootstrap_admin() -> dict[str, Any]:
+    global CSRF_HEADER, CSRF_TOKEN
+    if not BOOTSTRAP_PASSWORD:
+        raise VerificationError("尚未准备初始管理员密码")
+    csrf = http_request("/api/v1/auth/csrf")
+    CSRF_HEADER = csrf.get("header_name")
+    CSRF_TOKEN = csrf.get("token")
+    if not CSRF_HEADER or not CSRF_TOKEN:
+        raise VerificationError(f"CSRF 初始化响应不完整：{csrf}")
+    current = json_request(
+        "/api/v1/auth/login",
+        "POST",
+        {"username": "admin", "password": BOOTSTRAP_PASSWORD},
+    )
+    if current.get("username") != "admin" or current.get("global_role") != "SYSTEM_ADMIN":
+        raise VerificationError(f"初始管理员登录身份不正确：{current}")
+    if current.get("must_change_password"):
+        new_password = "M11-" + secrets.token_urlsafe(18)
+        changed = json_request(
+            "/api/v1/auth/password",
+            "POST",
+            {"current_password": BOOTSTRAP_PASSWORD, "new_password": new_password},
+        )
+        if changed.get("must_change_password"):
+            raise VerificationError(f"首次改密后仍被要求改密：{changed}")
+        current = json_request(
+            "/api/v1/auth/login",
+            "POST",
+            {"username": "admin", "password": new_password},
+        )
+    return current
 
 
 def assert_system_up() -> dict[str, Any]:
@@ -455,7 +567,7 @@ def verify_disposition(run_id: str) -> dict[str, int]:
         raise VerificationError(f"处置历史不完整：{history}")
     for row, (_, note) in zip(history, transitions, strict=True):
         if (
-            row.get("operator") != "SYNTHETIC_G7_REVIEWER"
+            row.get("operator") != "admin"
             or row.get("note") != note
             or not row.get("occurred_at")
         ):
@@ -463,7 +575,7 @@ def verify_disposition(run_id: str) -> dict[str, int]:
     final_disposition = detail.get("disposition", {})
     if (
         final_disposition.get("status") != "CLOSED"
-        or final_disposition.get("operator") != "SYNTHETIC_G7_REVIEWER"
+        or final_disposition.get("operator") != "admin"
         or final_disposition.get("note") != transitions[-1][1]
         or not final_disposition.get("updated_at")
         or not final_disposition.get("closed_at")
@@ -500,7 +612,7 @@ def verify_disposition(run_id: str) -> dict[str, int]:
             raise VerificationError(f"处置审计字段不完整：{row}")
         if (
             row["event_type"] != "DISPOSITION_CHANGED"
-            or row["operator"] != "SYNTHETIC_G7_REVIEWER"
+            or row["operator"] != "admin"
             or row["target_type"] != "ALARM_RECORD"
             or row["target_id"] != record_id
             or row["result"] != "SUCCESS"
@@ -543,6 +655,8 @@ def save_diagnostics(compose: Compose, output: Path) -> None:
 def verify_docker(fresh_volume: bool) -> dict[str, Any]:
     if not fresh_volume:
         raise VerificationError("G7 正式验收必须显式使用 --fresh-volume。")
+    assert_host_port_free()
+    secret_root = prepare_compose_secrets()
     docker = discover_docker()
     project = f"alert-management-g7-{os.getpid()}-{uuid.uuid4().hex[:8]}".lower()
     compose = Compose(docker, project)
@@ -557,6 +671,7 @@ def verify_docker(fresh_volume: bool) -> dict[str, Any]:
         "source_dirty": source_dirty,
         "compose_project": project,
         "fresh_volume": True,
+        "secret_root": str(secret_root),
     }
     primary_error: Exception | None = None
     diagnostic_error: Exception | None = None
@@ -576,6 +691,7 @@ def verify_docker(fresh_volume: bool) -> dict[str, Any]:
             raise VerificationError("项目启动后必须且只能有一个项目卷。")
         assert_system_up()
         assert_frontend()
+        login_as_bootstrap_admin()
 
         compose.run("stop", "algorithm", timeout=60)
         degraded = wait_for_health("DEGRADED", timeout=60)

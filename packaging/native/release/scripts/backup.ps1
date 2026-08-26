@@ -26,7 +26,7 @@ try {
     $temporaryArgument = Join-Path $postgresRoot (Join-Path "backups" $temporaryName)
 
     $oldPassword = [Environment]::GetEnvironmentVariable("PGPASSWORD", "Process")
-    [Environment]::SetEnvironmentVariable("PGPASSWORD", [string]$context.Config.database.password, "Process")
+    [Environment]::SetEnvironmentVariable("PGPASSWORD", (Get-SecretValue $context.DatabasePasswordFile), "Process")
     try {
         Invoke-BundledCommand (Get-PostgresExecutable $context "pg_isready" $postgresRoot) @(
             "-h", "127.0.0.1", "-p", [string]$context.Config.ports.postgres,

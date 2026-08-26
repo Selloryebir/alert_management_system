@@ -8,7 +8,10 @@ try {
     $releaseRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
     $configPath = Join-Path $releaseRoot "config\runtime.json"
     $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([int]$config.ports.postgres -ne 55432 -or [int]$config.ports.algorithm -ne 8001 -or
+    if ([int]$config.schema_version -ne 2 -or $config.deployment_mode -ne "LOCAL_NATIVE" -or
+            $config.PSObject.Properties.Name -contains "password" -or
+            $config.database.PSObject.Properties.Name -contains "password" -or
+            [int]$config.ports.postgres -ne 55432 -or [int]$config.ports.algorithm -ne 8001 -or
             [int]$config.ports.backend -ne 8080) {
         throw "runtime.json 固定端口不符合 M6 契约。"
     }
@@ -33,7 +36,8 @@ try {
     }
 
     $start = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "start.ps1"), [Text.Encoding]::UTF8)
-    foreach ($marker in @("initdb", "pg_ctl", "algorithm-service", "api/v1/health", "Save-RunningProcess")) {
+    foreach ($marker in @("initdb", "pg_ctl", "algorithm-service", "api/v1/health", "Save-RunningProcess",
+            "SERVER_ADDRESS", "APP_BOOTSTRAP_ADMIN_PASSWORD_FILE", "Initialize-InstanceSecrets")) {
         if ($start.IndexOf($marker, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
             throw "start.ps1 缺少必要运行标记：$marker"
         }
@@ -45,7 +49,9 @@ try {
         }
     }
     $reset = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "reset-demo.ps1"), [Text.Encoding]::UTF8)
-    if ($reset -notmatch '/api/v1/demo/reset' -or $reset -match '(?i)truncate|remove-item.+PgData') {
+    if ($reset -notmatch '/api/v1/demo/reset' -or $reset -notmatch '/api/v1/auth/login' -or
+            $reset -notmatch '/api/v1/auth/csrf' -or $reset -notmatch 'WebSession' -or
+            $reset -match '(?i)truncate|remove-item.+PgData') {
         throw "reset-demo.ps1 必须只调用复位 API，不能复制数据库清理逻辑。"
     }
 

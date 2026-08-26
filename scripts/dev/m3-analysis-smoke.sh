@@ -7,6 +7,7 @@ source "$(dirname "$0")/common.sh"
 M3_RUNTIME="$RUNTIME_DIR/m3"
 mkdir -p "$M3_RUNTIME"
 DEFAULT_PROJECT_ID="00000000-0000-0000-0000-000000000001"
+dev_admin_login "$M3_RUNTIME"
 
 monotonic_ms() {
   "$PYTHON_VENV/bin/python" -c 'import time; print(time.monotonic_ns() // 1_000_000)'
@@ -23,14 +24,14 @@ json_value() {
 import_file() {
   local file_path=$1
   local label=$2
-  curl --noproxy '*' --fail --silent --show-error \
+  curl "${DEV_AUTH_CURL_ARGS[@]}" "${DEV_AUTH_CSRF_ARGS[@]}" \
     --output "$M3_RUNTIME/$label-preview.json" \
     --form "project_id=$DEFAULT_PROJECT_ID" \
     --form "file=@$file_path" \
     http://127.0.0.1:8080/api/v1/imports/preview
   local batch_id
   batch_id=$(json_value "$M3_RUNTIME/$label-preview.json" batch_id)
-  curl --noproxy '*' --fail --silent --show-error \
+  curl "${DEV_AUTH_CURL_ARGS[@]}" "${DEV_AUTH_CSRF_ARGS[@]}" \
     --output "$M3_RUNTIME/$label-confirm.json" \
     --request POST "http://127.0.0.1:8080/api/v1/imports/$batch_id/confirm"
   [[ $(json_value "$M3_RUNTIME/$label-confirm.json" status) == "IMPORTED" ]]
@@ -40,7 +41,7 @@ import_file() {
 analyze_batch() {
   local batch_id=$1
   local output=$2
-  curl --noproxy '*' --fail --silent --show-error \
+  curl "${DEV_AUTH_CURL_ARGS[@]}" "${DEV_AUTH_CSRF_ARGS[@]}" \
     --output "$output" --request POST \
     "http://127.0.0.1:8080/api/v1/imports/$batch_id/analyses"
 }

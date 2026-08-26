@@ -7,6 +7,7 @@ source "$(dirname "$0")/common.sh"
 M2_RUNTIME="$RUNTIME_DIR/m2"
 mkdir -p "$M2_RUNTIME"
 DEFAULT_PROJECT_ID="00000000-0000-0000-0000-000000000001"
+dev_admin_login "$M2_RUNTIME"
 
 monotonic_ms() {
   "$PYTHON_VENV/bin/python" -c 'import time; print(time.monotonic_ns() // 1_000_000)'
@@ -18,7 +19,7 @@ preview_file() {
   local expected_rows=$3
   local invalid_name=${4:-}
   local response
-  response=$(curl --noproxy '*' --fail --silent --show-error \
+  response=$(curl "${DEV_AUTH_CURL_ARGS[@]}" "${DEV_AUTH_CSRF_ARGS[@]}" \
     --form "project_id=$DEFAULT_PROJECT_ID" \
     --form "file=@$file_path" http://127.0.0.1:8080/api/v1/imports/preview)
   PREVIEW_JSON="$response" EXPECTED_STATUS="$expected_status" \
@@ -55,7 +56,7 @@ confirm_batch() {
   local batch_id=$1
   local expected_rows=$2
   local response
-  response=$(curl --noproxy '*' --fail --silent --show-error \
+  response=$(curl "${DEV_AUTH_CURL_ARGS[@]}" "${DEV_AUTH_CSRF_ARGS[@]}" \
     --request POST "http://127.0.0.1:8080/api/v1/imports/$batch_id/confirm")
   CONFIRM_JSON="$response" EXPECTED_ROWS="$expected_rows" \
       "$PYTHON_VENV/bin/python" - <<'PY'
@@ -127,13 +128,13 @@ for file_name in \
 done
 echo "非法样例精确命中 1 个文件级错误和 36 个逐行错误；六批均无业务与暂存记录。"
 
-curl --noproxy '*' --fail --silent --show-error \
+curl "${DEV_AUTH_CURL_ARGS[@]}" \
   --output "$M2_RUNTIME/import-list.json" \
   "http://127.0.0.1:8080/api/v1/imports?project_id=$DEFAULT_PROJECT_ID&limit=20"
-curl --noproxy '*' --fail --silent --show-error \
+curl "${DEV_AUTH_CURL_ARGS[@]}" \
   --output "$M2_RUNTIME/records-first.json" \
   "http://127.0.0.1:8080/api/v1/imports/${smoke_batches[0]}/records?page=0&size=200"
-curl --noproxy '*' --fail --silent --show-error \
+curl "${DEV_AUTH_CURL_ARGS[@]}" \
   --output "$M2_RUNTIME/records-last.json" \
   "http://127.0.0.1:8080/api/v1/imports/${smoke_batches[0]}/records?page=1&size=200"
 EXPECTED_BATCH="${smoke_batches[0]}" "$PYTHON_VENV/bin/python" - \
@@ -158,7 +159,9 @@ assert first["items"][0]["raw_payload"]["source_row"] == "2", first["items"][0]
 PY
 echo "批次列表与 300 行分页原始记录追溯通过。"
 
-duplicate_status=$(curl --noproxy '*' --silent --output "$M2_RUNTIME/repeat-confirm.json" \
+duplicate_status=$(curl --noproxy '*' --silent --show-error \
+  --cookie "$DEV_AUTH_COOKIE_JAR" --cookie-jar "$DEV_AUTH_COOKIE_JAR" \
+  "${DEV_AUTH_CSRF_ARGS[@]}" --output "$M2_RUNTIME/repeat-confirm.json" \
   --write-out '%{http_code}' --request POST \
   "http://127.0.0.1:8080/api/v1/imports/${smoke_batches[0]}/confirm")
 [[ "$duplicate_status" == "409" ]]

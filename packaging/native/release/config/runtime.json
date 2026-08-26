@@ -1,5 +1,7 @@
 {
+  "schema_version": 2,
   "identity": "报警管理系统",
+  "deployment_mode": "LOCAL_NATIVE",
   "ports": {
     "postgres": 55432,
     "algorithm": 8001,
@@ -8,6 +10,10 @@
   "database": {
     "name": "alert_management",
     "user": "alert_management",
-    "password": "alert_management"
+    "password_file": "data/secrets/database-password.txt"
+  },
+  "bootstrap_admin": {
+    "username": "admin",
+    "password_file": "data/secrets/bootstrap-admin-password.txt"
   }
 }

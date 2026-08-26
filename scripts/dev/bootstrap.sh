@@ -47,7 +47,17 @@ if [[ ! -f "$frontend_stamp" ]] || [[ $(cat "$frontend_stamp") != "$frontend_loc
 fi
 
 java_bin=$(find_java)
-java_version=$("$java_bin" -version 2>&1 | head -n 1)
+if [[ "$java_bin" == *.exe ]]; then
+  java_release_file=$(dirname "$(dirname "$java_bin")")/release
+  if [[ ! -f "$java_release_file" ]]; then
+    echo "无法读取 Windows JDK 元数据：$java_release_file" >&2
+    exit 1
+  fi
+  java_release_version=$(sed -n 's/^JAVA_VERSION="\([^"]*\)"/\1/p' "$java_release_file" | tr -d '\r')
+  java_version="openjdk version \"$java_release_version\""
+else
+  java_version=$("$java_bin" -version 2>&1 | head -n 1)
+fi
 if [[ "$java_version" != *'21.'* ]]; then
   echo "需要 Java 21，当前为：$java_version" >&2
   exit 1

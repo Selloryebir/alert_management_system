@@ -30,6 +30,7 @@ RUN apt-get update \
     && useradd --system --uid 10001 --gid alertdemo --home-dir /app alertdemo
 WORKDIR /app
 COPY --from=backend-build /workspace/src/backend/target/alert-management-backend-0.1.0.jar /app/core-api.jar
+COPY --chmod=755 packaging/docker/backend-entrypoint.sh /app/backend-entrypoint.sh
 USER 10001:10001
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/core-api.jar"]
+ENTRYPOINT ["/app/backend-entrypoint.sh"]
