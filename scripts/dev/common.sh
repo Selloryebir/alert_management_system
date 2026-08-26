@@ -42,6 +42,10 @@ find_java() {
     command -v java
     return
   fi
+  if command -v java.exe >/dev/null 2>&1; then
+    command -v java.exe
+    return
+  fi
   if command -v cmd.exe >/dev/null 2>&1; then
     local windows_java
     windows_java=$(cmd.exe /d /c "where java" 2>/dev/null | tr -d '\r' | head -n 1)
