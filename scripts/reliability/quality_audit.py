@@ -92,23 +92,32 @@ def run_command(
     cwd: Path = REPOSITORY_ROOT,
     timeout: int,
     env: dict[str, str] | None = None,
+    retry_windows_bridge: bool = False,
 ) -> None:
     print(f"[质量审计] {label}")
-    try:
-        result = subprocess.run(
-            command,
-            cwd=cwd,
-            env=env,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            timeout=timeout,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise AuditFailure(f"{label}无法完成：{type(error).__name__}") from error
-    if result.returncode != 0:
+    attempts = 3 if retry_windows_bridge else 1
+    for attempt in range(1, attempts + 1):
+        try:
+            result = subprocess.run(
+                command,
+                cwd=cwd,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise AuditFailure(f"{label}无法完成：{type(error).__name__}") from error
         detail = command_output(result)
+        bridge_timeout = "UtilAcceptVsock" in detail and "failed 110" in detail
+        if result.returncode == 0:
+            break
+        if bridge_timeout and attempt < attempts:
+            print(f"[质量审计] WSL 到 Windows 通信超时，第 {attempt} 次有限重试")
+            time.sleep(2)
+            continue
         suffix = f"\n{detail}" if detail else ""
         raise AuditFailure(f"{label}失败（退出码 {result.returncode}）{suffix}")
     print(f"[质量审计] {label}通过")
@@ -204,6 +213,7 @@ def check_script_syntax(paths: Iterable[Path]) -> None:
             [powershell, "-NoProfile", "-Command", parser_command],
             timeout=30,
             env=environment,
+            retry_windows_bridge=windows_powershell,
         )
 
 

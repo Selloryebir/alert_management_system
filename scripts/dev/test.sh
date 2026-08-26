@@ -9,7 +9,17 @@ python3 "$REPOSITORY_ROOT/scripts/validate_automation.py"
 if command -v java >/dev/null 2>&1; then
   "$REPOSITORY_ROOT/mvnw" -f "$REPOSITORY_ROOT/src/backend/pom.xml" test
 else
-  cmd.exe /d /c "set DEBUG=false&& mvnw.cmd -f src\\backend\\pom.xml test" </dev/null
+  for attempt in 1 2 3; do
+    if cmd.exe /d /c "set DEBUG=false&& mvnw.cmd -f src\\backend\\pom.xml test" </dev/null; then
+      break
+    fi
+    if ((attempt == 3)); then
+      echo "Windows Maven 测试连续 3 次启动失败。" >&2
+      exit 1
+    fi
+    echo "WSL 到 Windows 的 Maven 启动失败，第 $attempt 次有限重试。" >&2
+    sleep 2
+  done
 fi
 
 (
