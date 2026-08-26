@@ -30,7 +30,7 @@ else
     --env POSTGRES_DB=alert_management \
     --env POSTGRES_USER=alert_management \
     --env POSTGRES_PASSWORD=alert_management \
-    --volume alert_management_m1_pgdata:/var/lib/postgresql/data \
+    --volume "$POSTGRES_VOLUME:/var/lib/postgresql/data" \
     "$POSTGRES_IMAGE" >/dev/null
 fi
 
