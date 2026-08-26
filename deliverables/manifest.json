@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "generator": "tools/deliverables/build.py",
+  "document_date": "2026-08-27",
+  "font": {
+    "path": "src/backend/src/main/resources/fonts/NotoSansSC-VF.ttf",
+    "sha256": "d68bafcb48a2707749396aa12bbbd833cb70401f3a9a689fd2902c7e0d295964",
+    "license_path": "src/backend/src/main/resources/fonts/OFL.txt",
+    "license_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+  },
+  "documents": [
+    {
+      "source": "docs/guides/business-user-manual.md",
+      "source_sha256": "ca32a19973e3c6faba9c2fa6074e8090580123f3fd20b26e746bb880cb83e267",
+      "title": "报警管理系统业务使用手册",
+      "outputs": {
+        "docx": {
+          "path": "deliverables/business-user-manual.docx",
+          "sha256": "b496736013fd07fbe2ad0963df91aaf06bff8b01e2e9a46404f4a9b967a7fe42",
+          "size": 892033
+        },
+        "pdf": {
+          "path": "deliverables/business-user-manual.pdf",
+          "sha256": "7458bacd3e8683e5dc7a261f534d5fe92dfdf6f28856b8a04d828eca3bd25893",
+          "size": 260817
+        }
+      }
+    },
+    {
+      "source": "docs/guides/windows-deployment-operations.md",
+      "source_sha256": "00b2534281c1a1e88e11cec847b4fd1c871f880758bb6274b38b97e3f1c3d661",
+      "title": "报警管理系统 Windows 部署与运维手册",
+      "outputs": {
+        "docx": {
+          "path": "deliverables/windows-deployment-operations.docx",
+          "sha256": "4558606c9ae9719218a01ba1920909d0bc6596160390ba29882a43f0d80a85b9",
+          "size": 917830
+        },
+        "pdf": {
+          "path": "deliverables/windows-deployment-operations.pdf",
+          "sha256": "fd5d5baf840e19c2567d460bbc73d09a100af2043adc04fc11c2d0a7e6f007cd",
+          "size": 266657
+        }
+      }
+    },
+    {
+      "source": "docs/deliverables/project-proposal.md",
+      "source_sha256": "7699cdf7387e29802c27b96c824d2dc53c23b875ac3198996d94d1a8e630ec14",
+      "title": "报警管理系统立项报告",
+      "outputs": {
+        "docx": {
+          "path": "deliverables/project-proposal.docx",
+          "sha256": "05c9fb6609b2c6afb55b17bf85872b63c2ef2817572cf69260b16767a6d9aa9c",
+          "size": 862988
+        },
+        "pdf": {
+          "path": "deliverables/project-proposal.pdf",
+          "sha256": "9850942a6199e228d4f4c7abf73301965d31617b8e24ea626bc360eca616805f",
+          "size": 208587
+        }
+      }
+    },
+    {
+      "source": "docs/deliverables/midterm-report.md",
+      "source_sha256": "beda5bb3adc71fbadf541eaf430d1f73ca475465e92ac4fda4848925c4fdde26",
+      "title": "报警管理系统中期报告",
+      "outputs": {
+        "docx": {
+          "path": "deliverables/midterm-report.docx",
+          "sha256": "36c5d4c68a40a0abf7315712d2f247a186af3f2582b1ef966d081e5602ea27a3",
+          "size": 859396
+        },
+        "pdf": {
+          "path": "deliverables/midterm-report.pdf",
+          "sha256": "5f911cf592039a1e755fc385dd1c865b72dcf182f7dc279e6cd07d0f595ab0f5",
+          "size": 175047
+        }
+      }
+    },
+    {
+      "source": "docs/deliverables/test-report.md",
+      "source_sha256": "35919652e90946fbfd006b00238f06461bd2b7488249b352e6a943f07275c2da",
+      "title": "报警管理系统测试报告",
+      "outputs": {
+        "docx": {
+          "path": "deliverables/test-report.docx",
+          "sha256": "f142d57e4a425f1deef9be70ab73295d268f53d8eae043f58b4de3743207766b",
+          "size": 874507
+        },
+        "pdf": {
+          "path": "deliverables/test-report.pdf",
+          "sha256": "50ef5ef2d5f14e20b2715ab5352ce6a2d9bd8613f5649b107624e782ad299eb1",
+          "size": 203816
+        }
+      }
+    },
+    {
+      "source": "docs/deliverables/closure-report.md",
+      "source_sha256": "4631fb0e3fb48efc7b8bd1335fc9f6673207defe1ba5de5df282230d707f9d76",
+      "title": "报警管理系统技术结项报告",
+      "outputs": {
+        "docx": {
+          "path": "deliverables/closure-report.docx",
+          "sha256": "b33b04997d863f0ad2f8fab1fda8a208a6ee0cecb20800a9ccdb1d9396cc7a81",
+          "size": 858309
+        },
+        "pdf": {
+          "path": "deliverables/closure-report.pdf",
+          "sha256": "5077aacdd5f10b400df4919f53645a90275b43bfadbb09d509aff76a8abab402",
+          "size": 181169
+        }
+      }
+    },
+    {
+      "source": "docs/deliverables/development-process.md",
+      "source_sha256": "c71b5dcf6f09100e1b673dc3718879a9a570ecb11529a49749518c908f4cff11",
+      "title": "报警管理系统开发过程记录",
+      "outputs": {
+        "docx": {
+          "path": "deliverables/development-process.docx",
+          "sha256": "73aff1e6dddf54ecebfd8fbfae4ed7c274906c6080f0b0d1edd329b540d9d41c",
+          "size": 872207
+        },
+        "pdf": {
+          "path": "deliverables/development-process.pdf",
+          "sha256": "93e9e361a341262db06406c463e46cb42816ce7642fe1a185152fc2124ed1ae5",
+          "size": 200018
+        }
+      }
+    },
+    {
+      "source": "docs/deliverables/source-gap-analysis.md",
+      "source_sha256": "034a9e1b13ec785c5de4c25fbafd763a99c22ab7cb2acc07827ec7b36c9eb6f0",
+      "title": "报警管理系统原始方案差距说明",
+      "outputs": {
+        "docx": {
+          "path": "deliverables/source-gap-analysis.docx",
+          "sha256": "efb5f8a066ce9c029d1b0309ea531d017278bf534fe1cbb7c1ad7c04f85d5c72",
+          "size": 914386
+        },
+        "pdf": {
+          "path": "deliverables/source-gap-analysis.pdf",
+          "sha256": "1cf1c9a564b9e617d58afb6d8b1811271b32e264570d407d81fb4f9cf2591ce2",
+          "size": 315297
+        }
+      }
+    }
+  ]
+}

@@ -16,6 +16,14 @@ FORMAL_FILES = (
     ".github/workflows/windows-native-check.yml",
     "docs/architecture/README.md",
     "docs/automation/git-workflow.md",
+    "docs/guides/business-user-manual.md",
+    "docs/guides/windows-deployment-operations.md",
+    "docs/deliverables/project-proposal.md",
+    "docs/deliverables/midterm-report.md",
+    "docs/deliverables/test-report.md",
+    "docs/deliverables/closure-report.md",
+    "docs/deliverables/development-process.md",
+    "docs/deliverables/source-gap-analysis.md",
     "docs/releases/versioning.md",
     "packaging/native/release/THIRD-PARTY-NOTICES.txt",
     "packaging/native/release/README.txt",
@@ -88,7 +96,7 @@ def validate_identity(errors: list[str]) -> None:
             errors.append(f"正式构件标识未覆盖：{relative}")
 
     readme = read("README.md", errors)
-    for marker in ("v0.1.0", "M8", "docs/releases/versioning.md"):
+    for marker in ("v0.8.0", "M14", "docs/releases/versioning.md", "docs/guides/"):
         if marker not in readme:
             errors.append(f"根说明缺少当前基线标记：{marker}")
 

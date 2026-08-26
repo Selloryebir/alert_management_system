@@ -320,7 +320,7 @@ async function changeDisposition(status: DispositionStatus) {
     return;
   }
   if (!assignee) {
-    businessError.value = "请填写责任人后再提交处置。";
+    businessError.value = "请填写项目成员的责任人账号后再提交处置。";
     return;
   }
   detailBusy.value = true;
@@ -531,7 +531,7 @@ function exportDashboardData() {
           <label>报警类型<select v-model="filters.noise_type" data-testid="filter-noise"><option value="">全部</option><option v-for="value in ['NORMAL','DUPLICATE','CHATTER','SHORT_LIVED','PERSISTENT']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
           <label>原因建议<select v-model="filters.cause_category" data-testid="filter-cause"><option value="">全部</option><option v-for="value in ['PROCESS_DISTURBANCE','EQUIPMENT_FAULT','INSTRUMENT_ISSUE','MAINTENANCE_TEST','UNKNOWN']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
           <label>处置状态<select v-model="filters.disposition_status"><option value="">全部</option><option v-for="value in ['OPEN','IN_PROGRESS','CLOSED']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
-          <label>负责人筛选<input v-model="filters.assignee" placeholder="输入精确姓名" /></label>
+          <label>责任人账号筛选<input v-model="filters.assignee" placeholder="输入精确项目成员账号" /></label>
           <div class="filter-actions"><button type="submit" :disabled="analysisBusy">应用筛选</button><button type="button" class="secondary-button" :disabled="analysisBusy" @click="resetFilters">清空筛选</button></div>
         </form>
 
@@ -609,7 +609,7 @@ function exportDashboardData() {
         <section class="disposition-editor">
           <h4>人工处置</h4>
           <div v-if="businessWritable" class="editor-grid">
-            <label>责任人（必填）<input v-model="dispositionAssignee" data-testid="disposition-assignee" :disabled="detailBusy" /></label>
+            <label>责任人账号（必填）<input v-model="dispositionAssignee" data-testid="disposition-assignee" placeholder="例如：admin" :disabled="detailBusy" /></label>
             <label>处置说明（必填）<textarea v-model="dispositionNote" rows="2" data-testid="disposition-note" :disabled="detailBusy" /></label>
           </div>
           <div v-if="businessWritable" class="disposition-actions">

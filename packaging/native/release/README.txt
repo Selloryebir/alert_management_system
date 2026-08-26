@@ -3,6 +3,8 @@
 
 本目录是自包含运行包。请完整解压后运行，不要只复制其中某个脚本或程序。
 无需预装 JDK、Python、Node.js、WSL 或 Docker。
+面向业务人员和部署人员的图文说明位于 manuals\：业务使用手册和 Windows 部署与运维手册
+均提供 DOCX 与 PDF。首次操作前请先阅读对应手册。
 
 首次启动
 --------
@@ -20,7 +22,6 @@
 - 备份状态：powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\backup-status.ps1
 - 隔离恢复验证：powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\restore-verify.ps1 -BackupPath backups\<备份文件>.dump
 - 演示复位：powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\reset-demo.ps1（会安全提示输入管理员凭据）
-- 自动化复位：scripts\reset-demo.ps1 -Force -Username admin -PasswordFile <受限访问的当前密码文件>
 
 备份恢复验证
 ------------
@@ -59,8 +60,9 @@ logs\scheduled-backup.log。重新配置只覆盖身份匹配的本实例任务�
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\cleanup-instance.ps1
 
 脚本要求输入当前实例 ID，停止并核对当前发布实例后，只清理当前解压目录内的 data、logs
-和 pids，默认保留 backups。确需同时删除备份时追加 -RemoveBackups；自动化验收可追加
--Force。脚本不会自删程序文件，完成后可手工删除当前解压目录。实例首次启动后不要移动
+和 pids，默认保留 backups。确需同时删除备份时追加 -RemoveBackups。脚本不会自删程序文件。
+“默认保留”只表示脚本不删除包内 backups；如需保留恢复点，必须先把成对文件复制到发布根之外
+的受控目录并保留状态检查成功记录，确认副本有效后才可手工删除当前解压目录。实例首次启动后不要移动
 整个解压目录；路径与实例身份不一致时，启停、备份和清理都会拒绝执行。
 默认保留的恢复点可在清理后重新启动生成新实例身份，再用 backup-status.ps1 和
 restore-verify.ps1 检查或恢复；自动保留策略不会删除这些旧来源恢复点。
