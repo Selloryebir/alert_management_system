@@ -200,6 +200,11 @@ try {
         APP_BOOTSTRAP_ADMIN_USERNAME = [string]$context.Config.bootstrap_admin.username
         APP_BOOTSTRAP_ADMIN_PASSWORD_FILE = $context.BootstrapAdminPasswordFile
         SESSION_COOKIE_SECURE = "false"
+        DEBUG = "false"
+        TRACE = "false"
+        LOGGING_LEVEL_ROOT = "INFO"
+        LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB = "INFO"
+        SPRING_MVC_LOG_REQUEST_DETAILS = "false"
         ALGORITHM_HEALTH_URL = "http://127.0.0.1:$($context.Config.ports.algorithm)/health"
         ALGORITHM_ANALYSIS_URL = "http://127.0.0.1:$($context.Config.ports.algorithm)/api/v2/analyze"
     }

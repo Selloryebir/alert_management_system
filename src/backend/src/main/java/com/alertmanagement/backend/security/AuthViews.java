@@ -9,6 +9,10 @@ record CsrfView(String token, @JsonProperty("header_name") String headerName,
 }
 
 record LoginRequest(String username, String password) {
+    @Override
+    public String toString() {
+        return "LoginRequest[username=" + username + ", password=[REDACTED]]";
+    }
 }
 
 record CurrentUserView(
@@ -26,6 +30,10 @@ record CurrentUserView(
 record PasswordChangeRequest(
         @JsonProperty("current_password") String currentPassword,
         @JsonProperty("new_password") String newPassword) {
+    @Override
+    public String toString() {
+        return "PasswordChangeRequest[currentPassword=[REDACTED], newPassword=[REDACTED]]";
+    }
 }
 
 record UserView(
@@ -44,6 +52,11 @@ record UserCreateRequest(
         @JsonProperty("display_name") String displayName,
         String password,
         @JsonProperty("global_role") String globalRole) {
+    @Override
+    public String toString() {
+        return "UserCreateRequest[username=" + username + ", displayName=" + displayName
+                + ", password=[REDACTED], globalRole=" + globalRole + "]";
+    }
 }
 
 record UserPatchRequest(
@@ -53,6 +66,10 @@ record UserPatchRequest(
 }
 
 record PasswordResetRequest(@JsonProperty("new_password") String newPassword) {
+    @Override
+    public String toString() {
+        return "PasswordResetRequest[newPassword=[REDACTED]]";
+    }
 }
 
 record ProjectMemberView(

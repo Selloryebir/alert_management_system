@@ -16,6 +16,7 @@ $powerShellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powe
 $originalPath = $env:PATH
 $originalPathExt = $env:PATHEXT
 $releaseRoots = New-Object System.Collections.ArrayList
+$observedSecrets = New-Object System.Collections.Generic.List[string]
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $runtimeRoot "verification"
@@ -300,6 +301,7 @@ function Initialize-AdminCredential {
     Assert-True (Test-Path -LiteralPath $passwordFile -PathType Leaf) "缺少初始管理员密码文件。"
     $currentPassword = [IO.File]::ReadAllText($passwordFile, [Text.Encoding]::UTF8).Trim()
     Assert-True (-not [string]::IsNullOrWhiteSpace($currentPassword)) "初始管理员密码为空。"
+    $observedSecrets.Add($currentPassword)
 
     $csrf = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/v1/auth/csrf" -Method Get `
         -TimeoutSec 15 -UseBasicParsing -SessionVariable adminSession
@@ -321,6 +323,7 @@ function Initialize-AdminCredential {
             $generator.Dispose()
         }
         $newPassword = "Native-M11-" + [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+        $observedSecrets.Add($newPassword)
         $changePayload = @{
             current_password = $currentPassword
             new_password = $newPassword
@@ -556,11 +559,18 @@ function Get-NormalizedRoundSummary {
 }
 
 function Assert-ServiceLogsClean {
-    param([string]$ReleaseRoot)
+    param([string]$ReleaseRoot, [string[]]$SecretValues)
     $logsRoot = Join-Path $ReleaseRoot "logs"
     $badLines = @()
     if (Test-Path -LiteralPath $logsRoot -PathType Container) {
         foreach ($log in @(Get-ChildItem -LiteralPath $logsRoot -File -Recurse)) {
+            $content = Get-Content -LiteralPath $log.FullName -Raw -ErrorAction SilentlyContinue
+            foreach ($secretValue in @($SecretValues | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+                if ($null -ne $content -and $content.IndexOf($secretValue, [StringComparison]::Ordinal) -ge 0) {
+                    $badLines += "$($log.Name)：发现实际密码值"
+                    break
+                }
+            }
             $matches = @(Select-String -LiteralPath $log.FullName `
                 -Pattern '(?i)(^\d{4}[-/].*\s(?:ERROR|FATAL|PANIC)(?:\s|:)|^(?:ERROR|FATAL|PANIC)(?:\s|:)|^Traceback \(|^Unhandled exception|^Exception in thread)' `
                 -ErrorAction SilentlyContinue)
@@ -571,6 +581,12 @@ function Assert-ServiceLogsClean {
                     continue
                 }
                 $badLines += "$($log.Name):$($match.LineNumber):$($match.Line)"
+            }
+            $unredactedPassword = @(Select-String -LiteralPath $log.FullName `
+                -Pattern '(?i)(?:password|currentPassword|newPassword)=((?!\[REDACTED\])[^,\]\s]+)' `
+                -ErrorAction SilentlyContinue | Select-Object -First 1)
+            if ($unredactedPassword.Count -gt 0) {
+                $badLines += "$($log.Name)：发现未脱敏的密码请求字段"
             }
         }
     }
@@ -779,7 +795,7 @@ try {
         if (-not [string]::IsNullOrWhiteSpace($postgresAlias)) {
             Assert-True (-not (Test-Path -LiteralPath $postgresAlias)) "stop.ps1 后 PostgreSQL 路径别名仍存在：$postgresAlias"
         }
-        Assert-ServiceLogsClean $releaseRoot
+        Assert-ServiceLogsClean $releaseRoot $observedSecrets.ToArray()
         $roundSummaries += ,$roundSummary
         Write-Host "第 $round 轮验收通过。"
     }

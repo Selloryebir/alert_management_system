@@ -1,5 +1,6 @@
 package com.alertmanagement.backend.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
@@ -9,6 +10,22 @@ import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 class SecurityBootstrapTest {
+
+    @Test
+    void passwordRequestsRedactSecretsInToString() {
+        assertThat(new LoginRequest("admin", "login-secret").toString())
+                .contains("password=[REDACTED]")
+                .doesNotContain("login-secret");
+        assertThat(new PasswordChangeRequest("current-secret", "new-secret").toString())
+                .contains("currentPassword=[REDACTED]", "newPassword=[REDACTED]")
+                .doesNotContain("current-secret", "new-secret");
+        assertThat(new UserCreateRequest("analyst", "分析人员", "create-secret", "USER").toString())
+                .contains("password=[REDACTED]")
+                .doesNotContain("create-secret");
+        assertThat(new PasswordResetRequest("reset-secret").toString())
+                .contains("newPassword=[REDACTED]")
+                .doesNotContain("reset-secret");
+    }
 
     @Test
     void networkModeWithoutTlsRejectsStartup() {
