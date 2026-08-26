@@ -1,62 +1,8 @@
 {
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
-  "current_stage": "M12",
-  "active_run": {
-    "stage": "M12",
-    "base_commit": "5f3cce80a0bb96476b621663902146b411dc011e",
-    "requirements": [
-      "PRD-002",
-      "PRD-003",
-      "PRD-005",
-      "PRD-019",
-      "PRD-022",
-      "PRD-024",
-      "PRD-034"
-    ],
-    "allowed_paths": [
-      ".github/workflows/",
-      ".gitignore",
-      "README.md",
-      "compose.yaml",
-      "compose.network.yaml",
-      "config/",
-      "src/backend/",
-      "src/frontend/",
-      "src/algorithm/",
-      "packaging/native/",
-      "packaging/docker/",
-      "scripts/dev/",
-      "scripts/native/",
-      "scripts/reliability/",
-      "tests/",
-      "docs/architecture/",
-      "docs/planning/",
-      "docs/product/",
-      "docs/verification/",
-      "automation/state.json"
-    ],
-    "checks": [
-      "scripts/dev/test.sh：PASS（固定候选 f210619；Java 51、算法 36、数据 5、契约 4、前端 35）",
-      "python3 tests/reliability/run.py：PASS（5x300 摘要一致；3x20000 为 7.559/7.524/7.218 秒；后端 Full GC 后活对象 22.228/22.377/22.529 MiB；日志、外联、清理通过）",
-      "scripts/native/verify-release.ps1：PASS（f210619 同一 ZIP 在 ASCII/中文空格双目录通过；两轮隔离恢复各对账 17 项事实）",
-      "固定候选远端：M1、M12、M6 Windows、M7 Docker 已 SUCCESS；证据提交 fd38be7 的仓库基础检查已 SUCCESS",
-      "独立对抗复审：PASS（实现、证据、状态与工作流 diff 无阻断项）"
-    ],
-    "failures": [
-      "已修复：隔离恢复的 PowerShell 字段别名、布尔文本、进程等待和恢复事实调用错误。",
-      "已修复：发布目录叠加隔离集群路径达到 Windows 260 字符边界；现使用有身份标记且清理边界明确的短 TEMP 路径。",
-      "已修复：五个 JVM 预热样本被误当泄漏趋势；现由三轮 20000 行重载判断持续增长并保留所有样本硬上限。",
-      "已修复：默认 JVM 堆随宿主内存扩张；开发、原生和 Docker 入口统一限制为 128-768 MiB。",
-      "已修复：PR #10 合入 dev 的 a4d4b15 因原始 RSS 655.113/741.578/832.949 MiB 触发旧趋势门槛；该检查点保留为失败，现以后端 Full GC 后活对象判断泄漏趋势并继续保留 RSS 硬上限。",
-      "已修复：PostgreSQL 官方镜像首次初始化的受控 fast shutdown 被误报；现只过滤具备精确前后文的一条 FATAL。",
-      "已修复：WSL/Windows 观测通道瞬断被误判为进程退出；现用显式 marker 和最多三次桥接重试，真实命令/进程失败仍立即阻断。",
-      "已修复：Windows/WSL 挂载盘上的 Vitest 线程 worker 超时；测试池改为单 worker forks，35 项发现范围与断言不变。"
-    ],
-    "decision": "以真实 PostgreSQL 自定义格式备份在隔离实例恢复并逐表对账；以当前发布实例身份约束安装、停止和清理；后端以内置 Full GC 后活对象判断持续泄漏趋势，原始 RSS 只承担硬上限，算法与 PostgreSQL 继续用 RSS；用有限且可复现的重复业务运行观测内存、进程、端口、外联、乱码和 20000 行退化，不把短测夸大为 7x24 小时工业承诺。质量门槛复用各语言锁定工具链，不引入第二套构建系统。",
-    "next_action": "更新 Draft PR #11 为可审后合入 dev 并建立新检查点；检查点成立前不解锁 M13。",
-    "resume_status": null
-  },
+  "current_stage": "M13",
+  "active_run": null,
   "stages": {
     "M0": {
       "status": "passed",
@@ -191,23 +137,23 @@
       "note": "固定候选经独立对抗复审和 PR #9 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、Windows 原生和 Docker 四条远端流水线全部成功。"
     },
     "M12": {
-      "status": "review",
+      "status": "passed",
       "attempt": 2,
       "evidence_files": [
         "docs/verification/evidence/M12.md"
       ],
-      "checkpoint_commit": null,
-      "remote_verified": false,
-      "next_action": "通过 Draft PR #11 合入 dev，并核验合并提交的发布级远端检查。",
-      "note": "第一次 dev 检查点因不稳定的 JVM 原始 RSS 趋势门槛失败且未解锁 M13；第二固定候选 f210619 的三条本机 G12、四条远端功能检查、证据提交仓库检查和独立复审均已通过，等待 dev 集成检查点。"
+      "checkpoint_commit": "08a777b4a247b31e7a6ba73126b1add609244f8e",
+      "remote_verified": true,
+      "next_action": "无；M12 已通过并解锁 M13。",
+      "note": "第二固定候选经独立对抗复审和 PR #11 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、可靠性、Windows 原生和 Docker 五条远端流水线全部成功。"
     },
     "M13": {
-      "status": "blocked",
+      "status": "ready",
       "attempt": 0,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "等待 M12 通过后生成正式说明书和项目过程文件。",
+      "next_action": "从最新 origin/dev 选择正式说明书与项目过程文件的最小实施增量。",
       "note": "文档必须从最终事实源生成，避免提前编写后漂移。"
     },
     "M14": {
