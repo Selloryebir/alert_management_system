@@ -2,7 +2,47 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M13",
-  "active_run": null,
+  "active_run": {
+    "stage": "M13",
+    "base_commit": "46bf2bac2f5cc6827b9eef8f941e600d46f3857c",
+    "requirements": [
+      "PRD-001",
+      "PRD-002",
+      "PRD-027",
+      "PRD-028",
+      "PRD-029",
+      "PRD-035"
+    ],
+    "allowed_paths": [
+      ".github/workflows/repository-check.yml",
+      "README.md",
+      "THIRD_PARTY_NOTICES.md",
+      "automation/state.json",
+      "deliverables/",
+      "docs/README.md",
+      "docs/deliverables/",
+      "docs/guides/",
+      "docs/planning/",
+      "docs/product/",
+      "docs/verification/",
+      "packaging/native/",
+      "scripts/native/",
+      "src/frontend/",
+      "tools/deliverables/"
+    ],
+    "checks": [
+      "阶段启动前：validate_automation.py、validate_repository.py、validate_formal_baseline.py 均 PASS",
+      "M13 三路只读预审：业务操作入口、历史声明边界、DOCX/PDF 生成方案均已完成"
+    ],
+    "failures": [
+      "待修复：README、产品入口和来源覆盖矩阵仍含 M10/M11 前的状态描述。",
+      "待实现：tools/deliverables/build.py、正式手册、六类过程文件及可重复 DOCX/PDF 尚不存在。",
+      "待闭合：责任人输入提示、正式手册随 Windows 包交付及 57 项来源能力逐项差距响应。"
+    ],
+    "decision": "以 Markdown 为唯一事实源，直接生成并验证中文 DOCX/PDF；正式材料只采用当前 Git、产品契约和固定提交证据，历史人员、预算、试点、准确率、合规及长稳陈述不继承。业务正文优先 Windows 原生包，Docker/HTTPS 放部署管理员说明；恢复仅表述为隔离恢复验证。",
+    "next_action": "并行编写业务与运维手册、项目过程文档和确定性交付物生成器，再由控制器修正共享事实源并完成打包集成。",
+    "resume_status": null
+  },
   "stages": {
     "M0": {
       "status": "passed",
@@ -148,12 +188,12 @@
       "note": "第二固定候选经独立对抗复审和 PR #11 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、可靠性、Windows 原生和 Docker 五条远端流水线全部成功。"
     },
     "M13": {
-      "status": "ready",
-      "attempt": 0,
+      "status": "in_progress",
+      "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "从最新 origin/dev 选择正式说明书与项目过程文件的最小实施增量。",
+      "next_action": "实现正式手册、项目过程文件和可重复 DOCX/PDF 生成链。",
       "note": "文档必须从最终事实源生成，避免提前编写后漂移。"
     },
     "M14": {
