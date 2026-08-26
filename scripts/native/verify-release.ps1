@@ -468,7 +468,10 @@ function Assert-ResetEmpty {
     param([Microsoft.PowerShell.Commands.WebRequestSession]$WebSession)
     $audit = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/v1/audit-events?page=0&size=1" `
         -Method Get -WebSession $WebSession -TimeoutSec 15 -UseBasicParsing
-    Assert-True ([int]$audit.total -eq 0) "复位后审计业务状态不为空。"
+    Assert-True ([int]$audit.total -eq 1 -and @($audit.items).Count -eq 1) `
+        "复位后应只保留一条复位审计。"
+    Assert-True ($audit.items[0].event_type -eq "DEMO_RESET" -and $audit.items[0].result -eq "SUCCESS") `
+        "复位后保留的唯一审计不是成功的 DEMO_RESET。"
 }
 
 function Invoke-E2e {

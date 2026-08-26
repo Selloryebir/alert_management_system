@@ -31,7 +31,7 @@ type AuditItem = {
   occurred_at: string;
   operator: string;
   target_type: string;
-  target_id: string;
+  target_id?: string;
   result: string;
   trace_id: string;
   details: Record<string, unknown>;
@@ -197,7 +197,11 @@ async function auditSnapshot(
     expect(item.occurred_at).toBeTruthy();
     expect(item.operator).toBeTruthy();
     expect(item.target_type).toBeTruthy();
-    expect(item.target_id).toBeTruthy();
+    if (item.target_type === "SYSTEM") {
+      expect(item.target_id).toBeUndefined();
+    } else {
+      expect(item.target_id).toBeTruthy();
+    }
     expect(item.result).toBeTruthy();
     expect(item.trace_id).toBeTruthy();
     expect(item.details).toBeTruthy();
@@ -250,7 +254,9 @@ async function resetDemo(page: Page, injectFailure: boolean): Promise<ResetRespo
   await expect(page.getByTestId("reset-message")).toContainText("已复位");
   await expect(page.getByTestId("empty-state").first()).toBeVisible();
   const audit = await responseJson<AuditPage>(await page.request.get("/api/v1/audit-events?page=0&size=1"));
-  expect(audit.total).toBe(0);
+  expect(audit.total).toBe(1);
+  expect(audit.items).toHaveLength(1);
+  expect(audit.items[0]).toMatchObject({ event_type: "DEMO_RESET", result: "SUCCESS" });
   return reset;
 }
 
