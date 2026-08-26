@@ -623,11 +623,14 @@ def main() -> int:
         "service_logs": {},
         "cleanup": "NOT_RUN",
     }
-    started = False
+    stack_attempted = False
+    cleanup_complete = False
+    owned_pids: dict[str, tuple[int, bool]] = {}
     monitor: ConnectionMonitor | None = None
     try:
         summary["source_commit"] = assert_clean_source()
         run_command([str(ROOT / "scripts/dev/bootstrap.sh")], timeout=900)
+        ensure_stopped()
         quality = run_command(
             [sys.executable, str(ROOT / "scripts/reliability/quality_audit.py")],
             timeout=1800,
@@ -645,12 +648,15 @@ def main() -> int:
             raise ReliabilityError(
                 f"质量与依赖审计失败，详见 {quality_log}（退出码 {quality.returncode}）。"
             )
-        ensure_stopped()
         log_baseline = {
             path.name: path.stat().st_mtime_ns for path in LOG_ROOT.glob("*.log")
         }
+        service_started_at = datetime.now(timezone.utc)
+        stack_attempted = True
         run_command([str(ROOT / "scripts/dev/start.sh")], timeout=900)
-        started = True
+        owned_pids = {
+            name: owned for name in ("backend", "algorithm") if (owned := read_pid(name))
+        }
         summary["environment"] = capture_environment()
         password_file = prepare_admin_password()
         smoke = load_smoke_module()
@@ -694,12 +700,11 @@ def main() -> int:
         summary["connections"] = monitor.stop()
         monitor = None
         assert_no_external_connections(summary["connections"])
-        summary["service_logs"] = assert_logs_clean(result_dir, log_baseline, started_at)
-        previous_pids = {
-            name: owned for name in ("backend", "algorithm") if (owned := read_pid(name))
-        }
-        assert_cleanup(previous_pids)
-        started = False
+        summary["service_logs"] = assert_logs_clean(
+            result_dir, log_baseline, service_started_at
+        )
+        assert_cleanup(owned_pids)
+        cleanup_complete = True
         summary["cleanup"] = "PASS"
         summary["status"] = "PASS"
         return 0
@@ -713,9 +718,13 @@ def main() -> int:
                 summary["connections"] = monitor.stop()
             except Exception as exc:
                 summary["connection_monitor_cleanup_failure"] = f"{type(exc).__name__}: {exc}"
-        if started:
-            cleanup = run_command([str(ROOT / "scripts/dev/stop.sh")], timeout=120, check=False)
-            summary["cleanup"] = "PASS_AFTER_FAILURE" if cleanup.returncode == 0 else "FAIL"
+        if stack_attempted and not cleanup_complete:
+            try:
+                assert_cleanup(owned_pids)
+                summary["cleanup"] = "PASS_AFTER_FAILURE"
+            except Exception as exc:
+                summary["cleanup"] = "FAIL"
+                summary["cleanup_failure"] = f"{type(exc).__name__}: {exc}"
         summary["finished_at"] = datetime.now(timezone.utc).isoformat()
         summary["duration_seconds"] = round(time.monotonic() - monotonic_started, 3)
         (result_dir / "summary.json").write_text(
