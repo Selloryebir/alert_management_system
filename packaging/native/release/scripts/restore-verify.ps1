@@ -61,39 +61,6 @@ function Get-FreeLoopbackPort {
     }
 }
 
-function Initialize-IsolatedCluster {
-    param(
-        [Parameter(Mandatory = $true)]$Context,
-        [Parameter(Mandatory = $true)][string]$WorkingRoot,
-        [Parameter(Mandatory = $true)][string]$ClusterArgument,
-        [Parameter(Mandatory = $true)][string]$PasswordArgument
-    )
-    $arguments = @(
-        "-D", $ClusterArgument,
-        "-U", [string]$Context.Config.database.user,
-        "--encoding=UTF8", "--locale=C", "--auth-local=trust",
-        "--auth-host=scram-sha-256", "--pwfile=$PasswordArgument")
-    for ($attempt = 1; $attempt -le 3; $attempt++) {
-        try {
-            Invoke-BundledCommand (Get-PostgresExecutable $Context "initdb" $WorkingRoot) `
-                $arguments $WorkingRoot | Out-Null
-            return
-        } catch {
-            $message = $_.Exception.Message
-            $retryable = $message -match 'pg_logical[\\/]replorigin_checkpoint\.tmp' -and
-                $message -match 'No such file or directory'
-            if (-not $retryable -or $attempt -eq 3) {
-                throw
-            }
-            Write-Warning "隔离恢复集群初始化遇到已知临时目录故障，第 $attempt 次有限重试。"
-            if (Test-Path -LiteralPath $ClusterArgument) {
-                Remove-Item -LiteralPath $ClusterArgument -Recurse -Force
-            }
-            Start-Sleep -Seconds 2
-        }
-    }
-}
-
 function Get-DatabaseFacts {
     param(
         [Parameter(Mandatory = $true)]$Context,
@@ -160,6 +127,8 @@ $context = $null
 $workingRoot = $null
 $verificationCase = $null
 $verificationClusterArgument = $null
+$temporaryVerificationBase = $null
+$temporaryVerificationCase = $null
 $temporaryStarted = $false
 $maintenanceLock = $null
 $oldPassword = [Environment]::GetEnvironmentVariable("PGPASSWORD", "Process")
@@ -201,18 +170,57 @@ try {
     [IO.File]::WriteAllText($markerPath, (($marker | ConvertTo-Json -Depth 3) + "`n"),
         (New-Object Text.UTF8Encoding($false)))
 
-    $verificationRelative = "data\restore-verification\$caseId"
-    $verificationClusterArgument = Join-Path $workingRoot ($verificationRelative + "\cluster")
+    $temporaryRoot = Normalize-DirectoryPath ([IO.Path]::GetTempPath())
+    if (-not (Test-AsciiPath $temporaryRoot)) {
+        throw "Windows TEMP 路径包含非 ASCII 字符，无法创建隔离恢复集群：$temporaryRoot"
+    }
+    $temporaryVerificationBase = Join-Path $temporaryRoot "alert-management-restore"
+    if (Test-Path -LiteralPath $temporaryVerificationBase) {
+        $baseItem = Get-Item -LiteralPath $temporaryVerificationBase -Force
+        if (-not $baseItem.PSIsContainer -or
+                ($baseItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw "隔离恢复临时根不是普通目录：$temporaryVerificationBase"
+        }
+    } else {
+        New-Item -ItemType Directory -Path $temporaryVerificationBase | Out-Null
+    }
+    $temporaryCaseName = ([string]$identity.instance_id).Substring(0, 12) + "-" + $caseId
+    $temporaryVerificationCase = Join-Path $temporaryVerificationBase $temporaryCaseName
+    if (Test-Path -LiteralPath $temporaryVerificationCase) {
+        throw "隔离恢复临时目录已存在，拒绝复用：$temporaryVerificationCase"
+    }
+    New-Item -ItemType Directory -Path $temporaryVerificationCase | Out-Null
+    $temporaryMarker = [ordered]@{
+        schema_version = 1
+        product = "alert-management-system-restore-verification-temp"
+        instance_id = [string]$identity.instance_id
+        case_id = $caseId
+        release_root = Normalize-DirectoryPath $context.Root
+    }
+    $temporaryMarkerPath = Join-Path $temporaryVerificationCase "case.json"
+    [IO.File]::WriteAllText($temporaryMarkerPath,
+        (($temporaryMarker | ConvertTo-Json -Depth 3) + "`n"),
+        (New-Object Text.UTF8Encoding($false)))
+    $verificationClusterArgument = Join-Path $temporaryVerificationCase "cluster"
+    $longestInitPath = Join-Path $verificationClusterArgument `
+        "pg_logical\replorigin_checkpoint.tmp"
+    if ($longestInitPath.Length -ge 248) {
+        throw "隔离恢复集群路径过长，无法可靠初始化 PostgreSQL：$verificationClusterArgument"
+    }
     $passwordArgument = Join-Path $workingRoot "data\secrets\database-password.txt"
     [Environment]::SetEnvironmentVariable("PGPASSWORD",
         (Get-SecretValue $context.DatabasePasswordFile), "Process")
-    Initialize-IsolatedCluster $context $workingRoot $verificationClusterArgument $passwordArgument
+    Invoke-BundledCommand (Get-PostgresExecutable $context "initdb" $workingRoot) @(
+        "-D", $verificationClusterArgument,
+        "-U", [string]$context.Config.database.user,
+        "--encoding=UTF8", "--locale=C", "--auth-local=trust",
+        "--auth-host=scram-sha-256", "--pwfile=$passwordArgument") $workingRoot | Out-Null
 
     $temporaryPort = Get-FreeLoopbackPort
     if ($temporaryPort -eq [int]$context.Config.ports.postgres) {
         throw "隔离恢复端口意外等于正式实例端口，拒绝启动。"
     }
-    $temporaryLog = Join-Path $workingRoot ($verificationRelative + "\postgresql.log")
+    $temporaryLog = Join-Path $temporaryVerificationCase "postgresql.log"
     Invoke-BundledCommandWithoutCapture (Get-PostgresExecutable $context "pg_ctl" $workingRoot) @(
         "-D", $verificationClusterArgument, "-l", $temporaryLog,
         "-o", "-p $temporaryPort -h 127.0.0.1", "-w", "-t", "30", "start") $workingRoot
@@ -266,6 +274,36 @@ try {
         if ($temporaryStarted -or $status.ExitCode -eq 0) {
             Invoke-BundledCommand $pgCtl @(
                 "-D", $verificationClusterArgument, "-m", "fast", "-w", "stop") $workingRoot | Out-Null
+        }
+    }
+    if ($null -ne $temporaryVerificationCase -and
+            (Test-Path -LiteralPath $temporaryVerificationCase)) {
+        $temporaryMarkerPath = Join-Path $temporaryVerificationCase "case.json"
+        if (-not (Test-Path -LiteralPath $temporaryMarkerPath -PathType Leaf)) {
+            throw "隔离恢复临时目录缺少身份标记，拒绝自动清理：$temporaryVerificationCase"
+        }
+        $temporaryMarker = Get-Content -LiteralPath $temporaryMarkerPath -Raw -Encoding UTF8 |
+            ConvertFrom-Json
+        $expectedTemporaryCase = Join-Path $temporaryVerificationBase `
+            (([string]$temporaryMarker.instance_id).Substring(0, 12) + "-" +
+                [string]$temporaryMarker.case_id)
+        $temporaryCaseItem = Get-Item -LiteralPath $temporaryVerificationCase -Force
+        if ($temporaryMarker.product -ne "alert-management-system-restore-verification-temp" -or
+                [string]$temporaryMarker.instance_id -ne [string]$identity.instance_id -or
+                [string]$temporaryMarker.case_id -ne $caseId -or
+                -not (Normalize-DirectoryPath $temporaryVerificationCase).Equals(
+                    (Normalize-DirectoryPath $expectedTemporaryCase),
+                    [StringComparison]::OrdinalIgnoreCase) -or
+                -not (Normalize-DirectoryPath ([string]$temporaryMarker.release_root)).Equals(
+                    (Normalize-DirectoryPath $context.Root),
+                    [StringComparison]::OrdinalIgnoreCase) -or
+                ($temporaryCaseItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw "隔离恢复临时目录身份不一致，拒绝自动清理：$temporaryVerificationCase"
+        }
+        Remove-Item -LiteralPath $temporaryVerificationCase -Recurse -Force
+        if ((Test-Path -LiteralPath $temporaryVerificationBase -PathType Container) -and
+                @(Get-ChildItem -LiteralPath $temporaryVerificationBase -Force).Count -eq 0) {
+            [IO.Directory]::Delete($temporaryVerificationBase, $false)
         }
     }
     if ($null -ne $verificationCase -and (Test-Path -LiteralPath $verificationCase)) {
