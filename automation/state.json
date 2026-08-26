@@ -1,53 +1,8 @@
 {
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
-  "current_stage": "M13",
-  "active_run": {
-    "stage": "M13",
-    "base_commit": "46bf2bac2f5cc6827b9eef8f941e600d46f3857c",
-    "requirements": [
-      "PRD-001",
-      "PRD-002",
-      "PRD-027",
-      "PRD-028",
-      "PRD-029",
-      "PRD-035"
-    ],
-    "allowed_paths": [
-      ".github/workflows/repository-check.yml",
-      "README.md",
-      "THIRD_PARTY_NOTICES.md",
-      "automation/state.json",
-      "deliverables/",
-      "docs/README.md",
-      "docs/deliverables/",
-      "docs/guides/",
-      "docs/planning/",
-      "docs/product/",
-      "docs/verification/",
-      "packaging/native/",
-      "scripts/validate_formal_baseline.py",
-      "scripts/validate_repository.py",
-      "scripts/native/",
-      "src/frontend/",
-      "tools/deliverables/"
-    ],
-    "checks": [
-      "阶段启动前：validate_automation.py、validate_repository.py、validate_formal_baseline.py 均 PASS",
-      "M13 三路只读预审：业务操作入口、历史声明边界、DOCX/PDF 生成方案均已完成",
-      "第一候选 922108cf：M13 三条本机门槛和 Windows 原生双目录全链通过，但独立复审及远端工作流解析发现阻断，未作为检查点",
-      "第二候选 ec9563b0：仓库远端作业恢复成功，但独立复审发现冒号限定词绕过及项目负责人删除入口越权展示，未作为检查点"
-    ],
-    "failures": [
-      "第一候选 922108cf：repository-check.yml 的 pip 命令未使用 YAML 块标量，远端工作流无法解析。",
-      "第一候选 922108cf：部署路径、备份外置、人工补录/项目生命周期说明和发布版本存在可达事实差距。",
-      "第一候选 922108cf：高风险声明与字面凭据守卫不足，交付环境路径会制造未忽略目录。",
-      "第二候选 ec9563b0：高风险声明可经冒号借用限定词；项目负责人页面展示后端仅系统管理员可执行的空项目删除入口。"
-    ],
-    "decision": "以 Markdown 为唯一事实源，直接生成并验证中文 DOCX/PDF；正式材料只采用当前 Git、产品契约和固定提交证据，历史人员、预算、试点、准确率、合规及长稳陈述不继承。业务正文优先 Windows 原生包，Docker/HTTPS 放部署管理员说明；恢复仅表述为隔离恢复验证。",
-    "next_action": "提交 M13 证据并通过 PR 合入 dev；随后在 dev 合并提交重跑阶段门槛和远端检查。",
-    "resume_status": null
-  },
+  "current_stage": "M14",
+  "active_run": null,
   "stages": {
     "M0": {
       "status": "passed",
@@ -193,23 +148,23 @@
       "note": "第二固定候选经独立对抗复审和 PR #11 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、可靠性、Windows 原生和 Docker 五条远端流水线全部成功。"
     },
     "M13": {
-      "status": "review",
+      "status": "passed",
       "attempt": 1,
       "evidence_files": [
         "docs/verification/evidence/M13.md"
       ],
-      "checkpoint_commit": null,
-      "remote_verified": false,
-      "next_action": "将固定候选通过 PR 合入 dev，并在合并提交重跑 G13 与远端检查。",
-      "note": "第三固定候选 0b0f630 已通过本机 G13、Windows 原生双目录全链、独立复审和五条远端检查；阶段尚未建立 dev 检查点。"
+      "checkpoint_commit": "4be7ea550f250001e58e403d72ab086ca4e85d90",
+      "remote_verified": true,
+      "next_action": "无；M13 已通过并解锁 M14。",
+      "note": "第三固定候选经独立复审和 PR #13 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、可靠性、Windows 原生和 Docker 五条远端流水线全部成功。"
     },
     "M14": {
-      "status": "blocked",
+      "status": "ready",
       "attempt": 0,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "等待 M13 通过后执行 Windows 11 业务用户终验。",
+      "next_action": "从 dev 创建 M14 短期分支，冻结发布候选验收和人工终验边界。",
       "note": "最终阶段通过后停在人工正式发布门禁。"
     }
   }
