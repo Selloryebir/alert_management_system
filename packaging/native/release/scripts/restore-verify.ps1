@@ -72,8 +72,8 @@ function Get-DatabaseFacts {
     foreach ($table in $criticalTables) {
         $queries += 'SELECT ''table:' + $table + '|'' || count(*)::text || ''|'' || COALESCE(' +
             'md5(string_agg(row_hash, '''' ORDER BY row_hash)), md5('''')) ' +
-            'FROM (SELECT md5(row_to_json(source_row)::text) AS row_hash ' +
-            'FROM public."' + $table + '" AS source_row) AS table_rows'
+            'FROM (SELECT md5(row_to_json(verification_row_ams)::text) AS row_hash ' +
+            'FROM public."' + $table + '" AS verification_row_ams) AS table_rows'
     }
     foreach ($sequence in $criticalSequences) {
         $queries += 'SELECT ''sequence:' + $sequence + '|'' || last_value::text || ''|'' || ' +
