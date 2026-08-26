@@ -811,35 +811,6 @@ function Assert-ServiceLogsClean {
 function Stop-ReleaseSafely {
     param([string]$ReleaseRoot)
     $failures = New-Object System.Collections.Generic.List[string]
-    $instanceIdentityPath = Join-Path $ReleaseRoot "data\instance.json"
-    $instanceIdentityExists = Test-Path -LiteralPath $instanceIdentityPath -PathType Leaf
-    $scheduleScript = Join-Path $ReleaseRoot "scripts\backup-schedule.ps1"
-    if ($instanceIdentityExists -and (Test-Path -LiteralPath $scheduleScript -PathType Leaf)) {
-        try {
-            $scheduleResult = Invoke-NativeProcess $powerShellExe @(
-                "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scheduleScript,
-                "-Action", "Remove") $ReleaseRoot
-            if ($scheduleResult.ExitCode -ne 0) {
-                [void]$failures.Add("移除每日备份任务退出 $($scheduleResult.ExitCode)：$($scheduleResult.Output -join ' | ')")
-            }
-        } catch {
-            [void]$failures.Add("移除每日备份任务异常：$($_.Exception.Message)")
-        }
-    }
-    $stopScript = Join-Path $ReleaseRoot "scripts\stop.ps1"
-    if ($instanceIdentityExists -and (Test-Path -LiteralPath $stopScript -PathType Leaf)) {
-        try {
-            $stopResult = Invoke-NativeProcess $powerShellExe @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $stopScript) $ReleaseRoot
-            foreach ($line in $stopResult.Output) {
-                Write-Host $line
-            }
-            if ($stopResult.ExitCode -ne 0) {
-                [void]$failures.Add("stop.ps1 退出 $($stopResult.ExitCode)：$($stopResult.Output -join ' | ')")
-            }
-        } catch {
-            [void]$failures.Add("stop.ps1 异常：$($_.Exception.Message)")
-        }
-    }
     $cleanupAlias = $null
     $postgresRecordPath = Join-Path $ReleaseRoot "pids\postgresql.json"
     if (Test-Path -LiteralPath $postgresRecordPath -PathType Leaf) {
@@ -868,6 +839,35 @@ function Stop-ReleaseSafely {
             }
         } catch {
             [void]$failures.Add("未能验证 PostgreSQL 清理 Junction：$($_.Exception.Message)")
+        }
+    }
+    $instanceIdentityPath = Join-Path $ReleaseRoot "data\instance.json"
+    $instanceIdentityExists = Test-Path -LiteralPath $instanceIdentityPath -PathType Leaf
+    $scheduleScript = Join-Path $ReleaseRoot "scripts\backup-schedule.ps1"
+    if ($instanceIdentityExists -and (Test-Path -LiteralPath $scheduleScript -PathType Leaf)) {
+        try {
+            $scheduleResult = Invoke-NativeProcess $powerShellExe @(
+                "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scheduleScript,
+                "-Action", "Remove") $ReleaseRoot
+            if ($scheduleResult.ExitCode -ne 0) {
+                [void]$failures.Add("移除每日备份任务退出 $($scheduleResult.ExitCode)：$($scheduleResult.Output -join ' | ')")
+            }
+        } catch {
+            [void]$failures.Add("移除每日备份任务异常：$($_.Exception.Message)")
+        }
+    }
+    $stopScript = Join-Path $ReleaseRoot "scripts\stop.ps1"
+    if ($instanceIdentityExists -and (Test-Path -LiteralPath $stopScript -PathType Leaf)) {
+        try {
+            $stopResult = Invoke-NativeProcess $powerShellExe @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $stopScript) $ReleaseRoot
+            foreach ($line in $stopResult.Output) {
+                Write-Host $line
+            }
+            if ($stopResult.ExitCode -ne 0) {
+                [void]$failures.Add("stop.ps1 退出 $($stopResult.ExitCode)：$($stopResult.Output -join ' | ')")
+            }
+        } catch {
+            [void]$failures.Add("stop.ps1 异常：$($_.Exception.Message)")
         }
     }
     foreach ($recordPath in @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "pids") -Filter "*.json" -File -ErrorAction SilentlyContinue)) {
