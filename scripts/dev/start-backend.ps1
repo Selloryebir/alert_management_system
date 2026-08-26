@@ -56,7 +56,7 @@ $env:SESSION_COOKIE_SECURE = "false"
 $env:ALGORITHM_HEALTH_URL = "http://127.0.0.1:8001/health"
 $env:DEBUG = "false"
 
-$backend = Start-Process -FilePath $java -ArgumentList @("-jar", $jar) `
+$backend = Start-Process -FilePath $java -ArgumentList @("-Xms128m", "-Xmx768m", "-jar", $jar) `
     -WorkingDirectory $RepositoryRoot `
     -RedirectStandardOutput (Join-Path $logDirectory "backend.log") `
     -RedirectStandardError (Join-Path $logDirectory "backend-error.log") `

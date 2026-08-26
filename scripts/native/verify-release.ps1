@@ -403,6 +403,12 @@ function Assert-ProcessInventory {
         Assert-True ([IO.Path]::GetFullPath([string]$record.release_root) -eq [IO.Path]::GetFullPath($ReleaseRoot)) "$($definition.Name) 记录的发布根不一致。"
         Assert-True (-not [string]::IsNullOrWhiteSpace([string]$record.started_at)) "$($definition.Name) 未记录启动时间。"
         Assert-True ($null -ne $record.logs) "$($definition.Name) 未记录日志路径。"
+        if ($definition.Name -eq "backend") {
+            Assert-True (([string]$record.command_line).Contains("-Xms128m")) `
+                "主程序命令行缺少最小堆限制。"
+            Assert-True (([string]$record.command_line).Contains("-Xmx768m")) `
+                "主程序命令行缺少最大堆限制。"
+        }
 
         if ($definition.Name -eq "postgresql") {
             $workingRoot = [IO.Path]::GetFullPath([string]$record.working_directory).TrimEnd('\')

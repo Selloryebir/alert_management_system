@@ -189,7 +189,7 @@ try {
     $backendError = Join-Path $context.Logs ("backend-" + $stamp + ".err.log")
     $databaseUrl = "jdbc:postgresql://127.0.0.1:" + [string]$context.Config.ports.postgres + "/" +
         [string]$context.Config.database.name
-    $jarArgument = '-jar "' + $backendJar + '"'
+    $jarArgument = '-Xms128m -Xmx768m -jar "' + $backendJar + '"'
     $backendProcess = Start-BundledProcess $backendJava $jarArgument $workingRoot $backendOut $backendError @{
         SERVER_PORT = [string]$context.Config.ports.backend
         SERVER_ADDRESS = "127.0.0.1"

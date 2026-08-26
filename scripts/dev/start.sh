@@ -91,7 +91,7 @@ if [[ "$windows_backend_started" != true ]]; then
       APP_BOOTSTRAP_ADMIN_PASSWORD_FILE="$DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE" \
       SESSION_COOKIE_SECURE=false \
       ALGORITHM_HEALTH_URL=http://127.0.0.1:8001/health \
-      "$java_bin" -jar "$jar_path" \
+      "$java_bin" -Xms128m -Xmx768m -jar "$jar_path" \
       </dev/null >"$LOG_DIR/backend.log" 2>&1 &
     echo $! > "$PID_DIR/backend.pid"
   )

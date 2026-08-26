@@ -30,4 +30,4 @@ if [ "${APP_DEPLOYMENT_MODE:-}" = "NETWORK" ]; then
     read_secret SERVER_SSL_KEY_STORE_PASSWORD SERVER_SSL_KEY_STORE_PASSWORD_FILE
 fi
 
-exec java -jar /app/core-api.jar
+exec java -Xms128m -Xmx768m -jar /app/core-api.jar
