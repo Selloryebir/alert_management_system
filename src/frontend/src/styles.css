@@ -106,7 +106,10 @@ h1 {
 .business-panel,
 .project-panel,
 .onboarding-panel,
-.manual-panel {
+.manual-panel,
+.login-panel,
+.account-panel,
+.access-panel {
   margin-top: 3rem;
   border: 1px solid #d8e0e7;
   border-radius: 1rem;
@@ -125,8 +128,67 @@ h1 {
 
 .project-panel,
 .onboarding-panel,
-.manual-panel {
+.manual-panel,
+.login-panel,
+.account-panel,
+.access-panel {
   margin-top: 1.5rem;
+}
+
+.login-panel {
+  max-width: 38rem;
+}
+
+.login-form,
+.password-form,
+.access-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.8rem;
+  margin-top: 1.2rem;
+}
+
+.login-form label,
+.password-form label,
+.access-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: #394d60;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.account-panel {
+  padding: 1rem 1.25rem;
+}
+
+.account-panel.forced {
+  border-color: #d26a33;
+}
+
+.account-summary,
+.account-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.account-summary span {
+  display: block;
+  margin-top: 0.25rem;
+  color: #536678;
+}
+
+.access-panel > summary {
+  cursor: pointer;
+}
+
+.access-panel section + section {
+  margin-top: 2rem;
+  border-top: 1px solid #d8e0e7;
+  padding-top: 1.5rem;
 }
 
 .project-form,

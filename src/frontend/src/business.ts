@@ -1,3 +1,5 @@
+import { apiFetch, apiJson } from "./api";
+
 export type AnalysisStatus = "ANALYZING" | "COMPLETED" | "FAILED";
 export type DispositionStatus = "OPEN" | "IN_PROGRESS" | "CLOSED";
 
@@ -167,21 +169,9 @@ export interface AlarmFilters {
   assignee: string;
 }
 
-async function apiResponse<T>(response: Response): Promise<T> {
-  if (response.ok) return (await response.json()) as T;
-  let message = `请求失败（HTTP ${response.status}）`;
-  try {
-    const payload = (await response.json()) as { message?: string; failure?: string };
-    message = payload.message || payload.failure || message;
-  } catch {
-    // 非 JSON 错误保留 HTTP 状态，便于操作者定位服务问题。
-  }
-  throw new Error(message);
-}
-
 export async function fetchAnalysisDefaults(): Promise<AnalysisParameters> {
-  return apiResponse<AnalysisParameters>(
-    await fetch("/api/v1/analysis-parameters/defaults", {
+  return apiJson<AnalysisParameters>(
+    await apiFetch("/api/v1/analysis-parameters/defaults", {
       headers: { Accept: "application/json" },
     }),
   );
@@ -191,8 +181,8 @@ export async function startAnalysis(
   batchId: string,
   parameters?: AnalysisParameters,
 ): Promise<AnalysisRun> {
-  return apiResponse<AnalysisRun>(
-    await fetch(`/api/v1/imports/${batchId}/analyses`, parameters
+  return apiJson<AnalysisRun>(
+    await apiFetch(`/api/v1/imports/${batchId}/analyses`, parameters
       ? {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -203,16 +193,16 @@ export async function startAnalysis(
 }
 
 export async function latestAnalysis(batchId: string): Promise<AnalysisRun> {
-  return apiResponse<AnalysisRun>(
-    await fetch(`/api/v1/imports/${batchId}/analyses/latest`, {
+  return apiJson<AnalysisRun>(
+    await apiFetch(`/api/v1/imports/${batchId}/analyses/latest`, {
       headers: { Accept: "application/json" },
     }),
   );
 }
 
 export async function fetchDashboard(runId: string): Promise<Dashboard> {
-  return apiResponse<Dashboard>(
-    await fetch(`/api/v1/analyses/${runId}/dashboard`, {
+  return apiJson<Dashboard>(
+    await apiFetch(`/api/v1/analyses/${runId}/dashboard`, {
       headers: { Accept: "application/json" },
     }),
   );
@@ -228,16 +218,16 @@ export async function listAlarms(
   for (const [key, value] of Object.entries(filters)) {
     if (value.trim()) query.set(key, value.trim());
   }
-  return apiResponse<AlarmPage>(
-    await fetch(`/api/v1/analyses/${runId}/alarms?${query}`, {
+  return apiJson<AlarmPage>(
+    await apiFetch(`/api/v1/analyses/${runId}/alarms?${query}`, {
       headers: { Accept: "application/json" },
     }),
   );
 }
 
 export async function fetchAlarmDetail(runId: string, recordId: string): Promise<AlarmDetail> {
-  return apiResponse<AlarmDetail>(
-    await fetch(`/api/v1/analyses/${runId}/alarms/${recordId}`, {
+  return apiJson<AlarmDetail>(
+    await apiFetch(`/api/v1/analyses/${runId}/alarms/${recordId}`, {
       headers: { Accept: "application/json" },
     }),
   );
@@ -247,15 +237,14 @@ export async function updateDisposition(
   runId: string,
   recordId: string,
   status: DispositionStatus,
-  operator: string,
   assignee: string,
   note: string,
 ): Promise<Disposition> {
-  return apiResponse<Disposition>(
-    await fetch(`/api/v1/analyses/${runId}/alarms/${recordId}/disposition`, {
+  return apiJson<Disposition>(
+    await apiFetch(`/api/v1/analyses/${runId}/alarms/${recordId}/disposition`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ status, operator, assignee, note }),
+      body: JSON.stringify({ status, assignee, note }),
     }),
   );
 }
@@ -264,14 +253,13 @@ export async function updateClassification(
   runId: string,
   recordId: string,
   classification: Classification,
-  operator: string,
   reason: string,
 ): Promise<AlarmDetail> {
-  return apiResponse<AlarmDetail>(
-    await fetch(`/api/v1/analyses/${runId}/alarms/${recordId}/classification`, {
+  return apiJson<AlarmDetail>(
+    await apiFetch(`/api/v1/analyses/${runId}/alarms/${recordId}/classification`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ ...classification, operator, reason }),
+      body: JSON.stringify({ ...classification, reason }),
     }),
   );
 }

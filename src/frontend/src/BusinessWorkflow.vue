@@ -28,7 +28,11 @@ import type { ImportBatch } from "./imports";
 const props = defineProps<{
   currentBatch?: ImportBatch;
   batches: ImportBatch[];
+  projectId: string;
   readOnly?: boolean;
+  canOperate?: boolean;
+  canManage?: boolean;
+  systemAdmin?: boolean;
 }>();
 const emit = defineEmits<{
   demoReset: [];
@@ -46,13 +50,11 @@ const analysis = ref<AnalysisRun>();
 const dashboard = ref<Dashboard>();
 const alarmPage = ref<AlarmPage>();
 const selectedAlarm = ref<AlarmDetail>();
-const dispositionOperator = ref("");
 const dispositionAssignee = ref("");
 const dispositionNote = ref("");
 const classificationNoise = ref<NoiseType>("NORMAL");
 const classificationClass = ref<AlarmClass>("STANDARD");
 const classificationCause = ref<CauseCategory>("UNKNOWN");
-const classificationOperator = ref("");
 const classificationReason = ref("");
 const analysisParameters = ref<AnalysisParameters>();
 const parameterBusy = ref(false);
@@ -104,6 +106,7 @@ const actionableBatches = computed(() => {
   }
   return [...byId.values()];
 });
+const businessWritable = computed(() => Boolean(props.canOperate && !props.readOnly));
 
 const lastPage = computed(() => {
   if (!alarmPage.value || alarmPage.value.total === 0) return 0;
@@ -128,7 +131,7 @@ function actionTestId(batch: ImportBatch): string {
 
 function actionDisabled(batch: ImportBatch): boolean {
   if (analysisBusy.value) return true;
-  return Boolean(props.readOnly && ["IMPORTED", "FAILED"].includes(batch.status));
+  return !props.canOperate || Boolean(props.readOnly && ["IMPORTED", "FAILED"].includes(batch.status));
 }
 
 function entries(values: Record<string, number> | undefined): [string, number][] {
@@ -238,13 +241,11 @@ async function selectAlarm(recordId: string) {
   clearBusinessState();
   try {
     selectedAlarm.value = await fetchAlarmDetail(analysis.value.run_id, recordId);
-    dispositionOperator.value = selectedAlarm.value.disposition.operator ?? "";
     dispositionAssignee.value = selectedAlarm.value.disposition.assignee ?? selectedAlarm.value.assignee ?? "";
     dispositionNote.value = "";
     classificationNoise.value = selectedAlarm.value.noise_type as NoiseType;
     classificationClass.value = selectedAlarm.value.alarm_class as AlarmClass;
     classificationCause.value = selectedAlarm.value.cause_category as CauseCategory;
-    classificationOperator.value = selectedAlarm.value.classification_override?.operator ?? "";
     classificationReason.value = "";
   } catch (error) {
     businessError.value = `报警详情加载失败：${error instanceof Error ? error.message : "未知错误"}。请重试。`;
@@ -255,10 +256,9 @@ async function selectAlarm(recordId: string) {
 
 async function saveClassification() {
   if (!analysis.value || !selectedAlarm.value) return;
-  const operator = classificationOperator.value.trim();
   const reason = classificationReason.value.trim();
-  if (!operator || !reason) {
-    businessError.value = "请填写分类修订操作者和修订理由后再保存。";
+  if (!reason) {
+    businessError.value = "请填写分类修订理由后再保存。";
     return;
   }
   detailBusy.value = true;
@@ -272,7 +272,6 @@ async function saveClassification() {
         alarm_class: classificationClass.value,
         cause_category: classificationCause.value,
       },
-      operator,
       reason,
     );
     classificationNoise.value = selectedAlarm.value.noise_type as NoiseType;
@@ -299,10 +298,8 @@ function handleDemoReset() {
   selectedAlarm.value = undefined;
   businessError.value = "";
   businessMessage.value = "";
-  dispositionOperator.value = "";
   dispositionAssignee.value = "";
   dispositionNote.value = "";
-  classificationOperator.value = "";
   classificationReason.value = "";
   filters.priority = "";
   filters.area = "";
@@ -316,13 +313,8 @@ function handleDemoReset() {
 
 async function changeDisposition(status: DispositionStatus) {
   if (!analysis.value || !selectedAlarm.value) return;
-  const operator = dispositionOperator.value.trim();
   const note = dispositionNote.value.trim();
   const assignee = dispositionAssignee.value.trim();
-  if (!operator) {
-    businessError.value = "请填写操作者后再提交处置。";
-    return;
-  }
   if (!note) {
     businessError.value = "请填写处置说明后再提交处置。";
     return;
@@ -338,7 +330,6 @@ async function changeDisposition(status: DispositionStatus) {
       analysis.value.run_id,
       selectedAlarm.value.record_id,
       status,
-      operator,
       assignee,
       note,
     );
@@ -606,24 +597,22 @@ function exportDashboardData() {
           <p v-if="selectedAlarm.classification_override" class="empty-copy">
             最近修订：{{ selectedAlarm.classification_override.operator }} · {{ selectedAlarm.classification_override.updated_at }} · {{ selectedAlarm.classification_override.reason }}
           </p>
-          <div class="classification-grid">
+          <div v-if="businessWritable" class="classification-grid">
             <label>报警类型<select v-model="classificationNoise" data-testid="classification-noise" :disabled="detailBusy"><option v-for="value in ['NORMAL','DUPLICATE','CHATTER','SHORT_LIVED','PERSISTENT']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
             <label>报警分类<select v-model="classificationClass" data-testid="classification-alarm-class" :disabled="detailBusy"><option v-for="value in ['NUISANCE','ACTIONABLE','STANDARD']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
             <label>原因建议<select v-model="classificationCause" data-testid="classification-cause" :disabled="detailBusy"><option v-for="value in ['PROCESS_DISTURBANCE','EQUIPMENT_FAULT','INSTRUMENT_ISSUE','MAINTENANCE_TEST','UNKNOWN']" :key="value" :value="value">{{ zh(value) }}</option></select></label>
-            <label>分类审核人（必填）<input v-model="classificationOperator" data-testid="classification-operator" :disabled="detailBusy" /></label>
             <label class="classification-reason">修订理由（必填）<textarea v-model="classificationReason" rows="2" data-testid="classification-reason" :disabled="detailBusy" /></label>
           </div>
-          <button type="button" data-testid="classification-save" :disabled="detailBusy" @click="saveClassification">保存分类修订</button>
+          <button v-if="businessWritable" type="button" data-testid="classification-save" :disabled="detailBusy" @click="saveClassification">保存分类修订</button>
         </section>
 
         <section class="disposition-editor">
           <h4>人工处置</h4>
-          <div class="editor-grid">
+          <div v-if="businessWritable" class="editor-grid">
             <label>责任人（必填）<input v-model="dispositionAssignee" data-testid="disposition-assignee" :disabled="detailBusy" /></label>
-            <label>处置操作者（必填）<input v-model="dispositionOperator" data-testid="disposition-operator" :disabled="detailBusy" /></label>
             <label>处置说明（必填）<textarea v-model="dispositionNote" rows="2" data-testid="disposition-note" :disabled="detailBusy" /></label>
           </div>
-          <div class="disposition-actions">
+          <div v-if="businessWritable" class="disposition-actions">
             <button v-if="selectedAlarm.disposition.status === 'OPEN'" type="button" data-testid="disposition-start" :disabled="detailBusy" @click="changeDisposition('IN_PROGRESS')">开始处理</button>
             <template v-if="selectedAlarm.disposition.status === 'IN_PROGRESS'">
               <button type="button" data-testid="disposition-close" :disabled="detailBusy" @click="changeDisposition('CLOSED')">关闭报警</button>
@@ -638,6 +627,6 @@ function exportDashboardData() {
       <p v-if="detailBusy" class="import-message" role="status">正在加载或更新报警详情…</p>
     </template>
 
-    <ReviewOperations v-if="!selectedAlarm || selectedAlarm.disposition.status !== 'OPEN'" :run-id="analysis?.status === 'COMPLETED' ? analysis.run_id : undefined" @report-downloaded="emit('reportDownloaded')" @demo-reset="handleDemoReset" />
+    <ReviewOperations v-if="!selectedAlarm || selectedAlarm.disposition.status !== 'OPEN'" :run-id="analysis?.status === 'COMPLETED' ? analysis.run_id : undefined" :project-id="projectId" :can-manage="canManage" :system-admin="systemAdmin" @report-downloaded="emit('reportDownloaded')" @demo-reset="handleDemoReset" />
   </section>
 </template>

@@ -1,3 +1,5 @@
+import { apiFetch, apiJson } from "./api";
+
 export type HealthStatus = "UP" | "DOWN" | "UNKNOWN";
 
 export interface ComponentHealth {
@@ -52,11 +54,8 @@ export function parseHealthResponse(value: unknown): HealthView {
 }
 
 export async function fetchHealth(): Promise<HealthView> {
-  const response = await fetch("/api/v1/health", {
+  const response = await apiFetch("/api/v1/health", {
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  return parseHealthResponse(await response.json());
+  return parseHealthResponse(await apiJson<unknown>(response));
 }
