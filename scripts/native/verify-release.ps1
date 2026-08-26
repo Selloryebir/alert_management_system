@@ -446,8 +446,28 @@ function Assert-ProcessInventory {
     return [pscustomobject]@{ Pids = $captured; PostgresAlias = $postgresAlias }
 }
 
+function New-ResetValidationSession {
+    param([string]$PasswordFile)
+    Assert-True (Test-Path -LiteralPath $PasswordFile -PathType Leaf) "复位核验缺少管理员密码文件。"
+    $password = [IO.File]::ReadAllText($PasswordFile, [Text.Encoding]::UTF8).Trim()
+    Assert-True (-not [string]::IsNullOrWhiteSpace($password)) "复位核验管理员密码为空。"
+    $csrf = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/v1/auth/csrf" -Method Get `
+        -TimeoutSec 15 -UseBasicParsing -SessionVariable resetAuditSession
+    $headers = @{}
+    $headers[[string]$csrf.header_name] = [string]$csrf.token
+    $payload = @{ username = "admin"; password = $password } | ConvertTo-Json -Compress
+    $current = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/v1/auth/login" -Method Post `
+        -ContentType "application/json" -Body ([Text.Encoding]::UTF8.GetBytes($payload)) `
+        -Headers $headers -WebSession $resetAuditSession -TimeoutSec 15 -UseBasicParsing
+    Assert-True ($current.global_role -eq "SYSTEM_ADMIN" -and -not [bool]$current.must_change_password) `
+        "复位核验未取得可用的系统管理员会话。"
+    return $resetAuditSession
+}
+
 function Assert-ResetEmpty {
-    $audit = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/v1/audit-events?page=0&size=1" -Method Get -TimeoutSec 15
+    param([Microsoft.PowerShell.Commands.WebRequestSession]$WebSession)
+    $audit = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/v1/audit-events?page=0&size=1" `
+        -Method Get -WebSession $WebSession -TimeoutSec 15 -UseBasicParsing
     Assert-True ([int]$audit.total -eq 0) "复位后审计业务状态不为空。"
 }
 
@@ -505,9 +525,10 @@ function Invoke-BackupCheck {
 
 function Invoke-ResetCheck {
     param([string]$ReleaseRoot, [string]$PasswordFile)
+    $validationSession = New-ResetValidationSession $PasswordFile
     Invoke-ReleaseScript $ReleaseRoot "reset-demo.ps1" @(
         "-Force", "-Username", "admin", "-PasswordFile", $PasswordFile) | Out-Null
-    Assert-ResetEmpty
+    Assert-ResetEmpty $validationSession
 }
 
 function Get-NormalizedRoundSummary {
