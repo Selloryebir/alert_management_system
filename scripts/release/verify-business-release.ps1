@@ -22,7 +22,8 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 }
 $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
 $artifactRoot = Join-Path $OutputRoot "artifacts"
-$verificationRoot = Join-Path $OutputRoot "verification"
+$verificationBase = Join-Path $OutputRoot "verification"
+$verificationRoot = $null
 $negativeRoot = Join-Path $OutputRoot ("negative-" + [Guid]::NewGuid().ToString("N"))
 $summaryPath = Join-Path $OutputRoot "business-release-summary.json"
 $sourceCommit = $null
@@ -83,6 +84,15 @@ try {
     $sourceCommit = (($commitResult.Output -join "`n").Trim())
     Assert-True ($commitResult.ExitCode -eq 0 -and $sourceCommit -match '^[0-9a-f]{40}$') "无法读取完整源提交。"
 
+    $artifactDirectory = [IO.Path]::GetFullPath((Join-Path $artifactRoot $sourceCommit))
+    $verificationRoot = [IO.Path]::GetFullPath((Join-Path $verificationBase $sourceCommit))
+    foreach ($generatedDirectory in @($artifactDirectory, $verificationRoot)) {
+        Assert-True ((Split-Path -Leaf $generatedDirectory) -eq $sourceCommit) `
+            "仅允许清理以当前完整提交命名的生成目录：$generatedDirectory"
+        if (Test-Path -LiteralPath $generatedDirectory) {
+            Remove-Item -LiteralPath $generatedDirectory -Recurse -Force
+        }
+    }
     New-Item -ItemType Directory -Path $artifactRoot, $verificationRoot, $negativeRoot -Force | Out-Null
     $build = Invoke-CapturedPowerShell $buildScript @(
         "-OutputRoot", $artifactRoot, "-ReleaseVersion", $ReleaseVersion)
