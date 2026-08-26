@@ -19,21 +19,24 @@ docker_bin=""
 compose_repository_root=""
 compose_file=""
 compose_network_file=""
+compose_network_secret_root=""
 
 resolve_compose() {
   docker_bin=$(find_docker)
   compose_repository_root="$REPOSITORY_ROOT"
   compose_file="$REPOSITORY_ROOT/compose.yaml"
   compose_network_file="$REPOSITORY_ROOT/compose.network.yaml"
+  compose_network_secret_root="$network_secret_root"
   if [[ "$docker_bin" == *.exe ]]; then
     compose_repository_root=$(wslpath -w "$REPOSITORY_ROOT")
     compose_file=$(wslpath -w "$REPOSITORY_ROOT/compose.yaml")
     compose_network_file=$(wslpath -w "$REPOSITORY_ROOT/compose.network.yaml")
+    compose_network_secret_root=$(wslpath -w "$network_secret_root")
   fi
 }
 
 network_compose() {
-  APP_SECRETS_DIR="$network_secret_root" "$docker_bin" compose \
+  APP_SECRETS_DIR="$compose_network_secret_root" "$docker_bin" compose \
     --file "$compose_file" \
     --file "$compose_network_file" \
     --project-name "$network_project" \
