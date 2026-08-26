@@ -310,18 +310,50 @@ def linux_rss_mib(pid: int) -> float | None:
 def windows_rss_mib(pid: int) -> float | None:
     if not shutil.which("powershell.exe"):
         return None
-    result = run_command(
-        [
-            "powershell.exe",
-            "-NoProfile",
-            "-Command",
-            f"$p=Get-Process -Id {pid} -ErrorAction SilentlyContinue; if ($p) {{ $p.WorkingSet64 }}",
-        ],
+    output = run_windows_observation(
+        (
+            f"$p=Get-Process -Id {pid} -ErrorAction SilentlyContinue;"
+            "if ($null -eq $p) {'MISSING'} else {'RSS:' + $p.WorkingSet64}"
+        ),
+        f"Windows 进程内存（PID={pid}）",
         timeout=20,
-        check=False,
     )
-    value = result.stdout.strip().replace("\r", "")
-    return round(int(value) / 1024 / 1024, 3) if value.isdigit() else None
+    if output == "MISSING":
+        return None
+    value = output.removeprefix("RSS:")
+    if output.startswith("RSS:") and value.isdigit():
+        return round(int(value) / 1024 / 1024, 3)
+    raise ReliabilityError(f"Windows 进程内存返回未知格式：{output!r}")
+
+
+def run_windows_observation(command: str, label: str, *, timeout: int) -> str:
+    """有限重试 WSL/Windows 观测通道；不重试被观测进程或命令本身的失败。"""
+    failures: list[str] = []
+    for attempt in range(1, 4):
+        try:
+            result = run_command(
+                ["powershell.exe", "-NoProfile", "-Command", command],
+                timeout=timeout,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            failures.append(f"第 {attempt} 次超时")
+        else:
+            output = result.stdout.strip().replace("\r", "")
+            combined = f"{result.stdout}\n{result.stderr}"
+            bridge_failure = "UtilAcceptVsock" in combined and "failed 110" in combined
+            if result.returncode == 0 and output:
+                return output
+            if result.returncode != 0 and not bridge_failure:
+                detail = result.stderr.strip().replace("\r", "")
+                raise ReliabilityError(
+                    f"无法读取{label}：PowerShell 退出码 {result.returncode}，{detail or '无错误输出'}"
+                )
+            reason = "WSL/Windows 桥接失败" if bridge_failure else "成功退出但输出为空"
+            failures.append(f"第 {attempt} 次{reason}")
+        if attempt < 3:
+            time.sleep(0.5)
+    raise ReliabilityError(f"无法读取{label}：{'；'.join(failures)}")
 
 
 def read_pid(name: str) -> tuple[int, bool] | None:
@@ -443,25 +475,23 @@ def parse_proc_tcp(
 
 def windows_remote_addresses(pid: int) -> set[str]:
     command = (
-        "try {@(Get-NetTCPConnection -ErrorAction Stop | Where-Object {"
+        f"$p=Get-Process -Id {pid} -ErrorAction SilentlyContinue;"
+        "if ($null -eq $p) {'MISSING'; exit 0};"
+        "try {'OK'; @(Get-NetTCPConnection -ErrorAction Stop | Where-Object {"
         f"$_.OwningProcess -eq {pid} -and $_.State -eq 'Established'"
         "}) | "
         "Select-Object -ExpandProperty RemoteAddress -Unique} "
         "catch {Write-Error $_; exit 1}"
     )
-    result = run_command(
-        [
-            "powershell.exe",
-            "-NoProfile",
-            "-Command",
-            command,
-        ],
-        timeout=5,
-        check=False,
+    output = run_windows_observation(
+        command, f"Windows 进程 TCP 连接（PID={pid}）", timeout=10
     )
-    if result.returncode != 0:
-        raise ReliabilityError(f"无法读取 Windows 进程 TCP 连接：PID={pid}")
-    return {line.strip().replace("\r", "") for line in result.stdout.splitlines() if line.strip()}
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    if lines == ["MISSING"]:
+        raise ReliabilityError(f"外联监视期间 Windows 进程已退出：PID={pid}")
+    if not lines or lines[0] != "OK":
+        raise ReliabilityError(f"Windows 进程 TCP 连接返回未知格式：{output!r}")
+    return set(lines[1:])
 
 
 def postgres_remote_addresses() -> set[str]:
