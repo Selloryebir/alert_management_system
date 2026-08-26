@@ -36,7 +36,11 @@ resolve_compose() {
 }
 
 network_compose() {
-  APP_SECRETS_DIR="$compose_network_secret_root" "$docker_bin" compose \
+  local compose_wslenv="${WSLENV:-}"
+  if [[ "$docker_bin" == *.exe ]]; then
+    compose_wslenv="${compose_wslenv:+$compose_wslenv:}APP_SECRETS_DIR"
+  fi
+  WSLENV="$compose_wslenv" APP_SECRETS_DIR="$compose_network_secret_root" "$docker_bin" compose \
     --file "$compose_file" \
     --file "$compose_network_file" \
     --project-name "$network_project" \
