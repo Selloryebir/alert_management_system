@@ -1,21 +1,18 @@
 {
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
-  "current_stage": "M11",
+  "current_stage": "M12",
   "active_run": {
-    "stage": "M11",
-    "base_commit": "9ea61eb36e4258770215c08118964abb7c1e581e",
+    "stage": "M12",
+    "base_commit": "5f3cce80a0bb96476b621663902146b411dc011e",
     "requirements": [
       "PRD-002",
       "PRD-003",
       "PRD-005",
-      "PRD-006",
-      "PRD-007",
-      "PRD-008",
-      "PRD-013",
-      "PRD-014",
-      "PRD-018",
-      "PRD-033"
+      "PRD-019",
+      "PRD-022",
+      "PRD-024",
+      "PRD-034"
     ],
     "allowed_paths": [
       ".github/workflows/",
@@ -26,24 +23,23 @@
       "config/",
       "src/backend/",
       "src/frontend/",
+      "src/algorithm/",
       "packaging/native/",
       "packaging/docker/",
       "scripts/dev/",
-      "scripts/security/",
       "scripts/native/",
+      "scripts/reliability/",
       "tests/",
       "docs/architecture/",
       "docs/planning/",
       "docs/product/",
-      "docs/security/",
       "docs/verification/",
-      "automation/state.json",
-      "automation/workflow.json"
+      "automation/state.json"
     ],
     "checks": [],
     "failures": [],
-    "decision": "采用同源有状态会话、CSRF、BCrypt 和三种最小职责：SYSTEM_ADMIN 为全局角色，MANAGER/ANALYST 为项目成员角色；Windows 本机仅回环 HTTP，网络模式仅 HTTPS；输入限制覆盖上传、结构、行列、单元格、查询和请求体，不引入 JWT、网关或通用权限平台。",
-    "next_action": "冻结 M11 身份授权、部署和输入边界契约，按后端、前端、部署验收三个互斥路径实现并集成 G11。",
+    "decision": "以真实 PostgreSQL 自定义格式备份在隔离实例恢复并逐表对账；以当前发布实例身份约束安装、停止和清理；用有限且可复现的重复业务运行观测内存、进程、端口、外联、乱码和 20000 行退化，不把短测夸大为 7x24 小时工业承诺。质量门槛复用各语言锁定工具链，不引入第二套构建系统。",
+    "next_action": "冻结 M12 恢复、质量和可靠性验收设计，补齐 tests/reliability/run.py，并只修复该门槛真实触发的发布缺陷。",
     "resume_status": null
   },
   "stages": {
@@ -169,22 +165,24 @@
       "note": "第六固定候选经 PR #6 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、Windows 原生和 Docker 四条流水线全部成功。"
     },
     "M11": {
+      "status": "passed",
+      "attempt": 1,
+      "evidence_files": [
+        "docs/verification/evidence/M11.md"
+      ],
+      "checkpoint_commit": "5f3cce80a0bb96476b621663902146b411dc011e",
+      "remote_verified": true,
+      "next_action": "无；M11 已通过并解锁 M12。",
+      "note": "固定候选经独立对抗复审和 PR #9 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、Windows 原生和 Docker 四条远端流水线全部成功。"
+    },
+    "M12": {
       "status": "in_progress",
       "attempt": 1,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "在 feat/m11-security-boundary 冻结最小身份、项目授权、HTTPS 部署和输入资源边界并实现 G11。",
-      "note": "M11 第一次增量已从 v0.5.0 发布证据后的 dev 提交启动。"
-    },
-    "M12": {
-      "status": "blocked",
-      "attempt": 0,
-      "evidence_files": [],
-      "checkpoint_commit": null,
-      "remote_verified": false,
-      "next_action": "等待 M11 通过后实现恢复、质量和运行可靠性门槛。",
-      "note": "依赖安全部署配置和最终业务结构。"
+      "next_action": "在 feat/m12-reliability-quality 实现隔离恢复对账、精确实例清理、静态质量和有限运行可靠性门槛。",
+      "note": "M12 第一次增量从已远端核验的 M11 dev 检查点启动。"
     },
     "M13": {
       "status": "blocked",
