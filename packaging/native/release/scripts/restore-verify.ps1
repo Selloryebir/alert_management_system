@@ -61,6 +61,39 @@ function Get-FreeLoopbackPort {
     }
 }
 
+function Initialize-IsolatedCluster {
+    param(
+        [Parameter(Mandatory = $true)]$Context,
+        [Parameter(Mandatory = $true)][string]$WorkingRoot,
+        [Parameter(Mandatory = $true)][string]$ClusterArgument,
+        [Parameter(Mandatory = $true)][string]$PasswordArgument
+    )
+    $arguments = @(
+        "-D", $ClusterArgument,
+        "-U", [string]$Context.Config.database.user,
+        "--encoding=UTF8", "--locale=C", "--auth-local=trust",
+        "--auth-host=scram-sha-256", "--pwfile=$PasswordArgument")
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            Invoke-BundledCommand (Get-PostgresExecutable $Context "initdb" $WorkingRoot) `
+                $arguments $WorkingRoot | Out-Null
+            return
+        } catch {
+            $message = $_.Exception.Message
+            $retryable = $message -match 'pg_logical[\\/]replorigin_checkpoint\.tmp' -and
+                $message -match 'No such file or directory'
+            if (-not $retryable -or $attempt -eq 3) {
+                throw
+            }
+            Write-Warning "隔离恢复集群初始化遇到已知临时目录故障，第 $attempt 次有限重试。"
+            if (Test-Path -LiteralPath $ClusterArgument) {
+                Remove-Item -LiteralPath $ClusterArgument -Recurse -Force
+            }
+            Start-Sleep -Seconds 2
+        }
+    }
+}
+
 function Get-DatabaseFacts {
     param(
         [Parameter(Mandatory = $true)]$Context,
@@ -173,11 +206,7 @@ try {
     $passwordArgument = Join-Path $workingRoot "data\secrets\database-password.txt"
     [Environment]::SetEnvironmentVariable("PGPASSWORD",
         (Get-SecretValue $context.DatabasePasswordFile), "Process")
-    Invoke-BundledCommand (Get-PostgresExecutable $context "initdb" $workingRoot) @(
-        "-D", $verificationClusterArgument,
-        "-U", [string]$context.Config.database.user,
-        "--encoding=UTF8", "--locale=C", "--auth-local=trust",
-        "--auth-host=scram-sha-256", "--pwfile=$passwordArgument") $workingRoot | Out-Null
+    Initialize-IsolatedCluster $context $workingRoot $verificationClusterArgument $passwordArgument
 
     $temporaryPort = Get-FreeLoopbackPort
     if ($temporaryPort -eq [int]$context.Config.ports.postgres) {
