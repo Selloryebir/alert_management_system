@@ -26,6 +26,8 @@
       "docs/product/",
       "docs/verification/",
       "packaging/native/",
+      "scripts/validate_formal_baseline.py",
+      "scripts/validate_repository.py",
       "scripts/native/",
       "src/frontend/",
       "tools/deliverables/"

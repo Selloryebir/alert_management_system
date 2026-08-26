@@ -1,8 +1,27 @@
 # 报警管理系统
 
-本仓库提供报警文件导入、规范化、可解释分析、统计看板、人工处置、审计和报告的一体化应用。当前 `v0.1.0` 已具备 Windows 11 x64 自包含运行包和 Docker Compose 启动方式；`dev` 正按 M8–M14 产品化路线增强算法、项目化业务、安全部署、恢复能力和正式文档。
+本仓库提供报警文件导入、规范化、可解释分析、统计看板、人工处置、审计、报告和备份恢复验证的一体化应用。`v0.8.0` 已通过 Windows 11 x64 自包含运行包、Docker Compose、身份权限、HTTPS 边界和有限可靠性验收；当前 `dev` 在编制正式说明书和项目过程文件，最终业务用户终验仍以 `automation/state.json` 为准。
 
 产品北极星是让业务人员仅按中文说明即可部署并完成“导入校验 → 分析 → 查看 → 处置 → 报告 → 备份恢复”。实现与验收以稳定、可解释、可复现为优先，不把历史材料中未经验证的指标直接作为承诺。仓库内置数据均为合成示例数据。
+
+## Windows 11 快速开始
+
+首选交付物是由部署负责人提供的 Windows x64 自包含 ZIP 及同名 `.sha256`。目标电脑无需预装 JDK、Python、Node.js、WSL 或 Docker。首次使用按以下顺序执行：
+
+1. 在 PowerShell 中用 `Get-FileHash -Algorithm SHA256` 核对 ZIP 与 `.sha256` 的首个字段一致。
+2. 把 ZIP 完整解压到当前用户可写的固定目录；不要覆盖另一版本，也不要在首次启动后移动目录。
+3. 在发布根目录运行预检和启动：
+
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\preflight.ps1
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\start.ps1
+   ```
+
+4. 浏览器打开 `http://127.0.0.1:8080`，使用账号 `admin` 和 `data\secrets\bootstrap-admin-password.txt` 中的临时密码登录并立即改密。
+5. 选择默认演示项目，上传 `samples\smoke\synthetic_smoke_utf8.csv`，依次完成字段预览、确认导入、分析、详情、处置和 PDF/XLSX 报告。
+6. 完成后运行 `scripts\stop.ps1`。备份、隔离恢复验证和精确清理请严格按部署运维手册执行。
+
+详细操作见[业务使用手册](docs/guides/business-user-manual.md)和[Windows 部署与运维手册](docs/guides/windows-deployment-operations.md)。系统不提供覆盖当前业务库的一键恢复、原生 `status.ps1`、MSI、Windows 服务或自动更新；不要从说明文字推断不存在的入口。
 
 ## 仓库入口
 
@@ -12,6 +31,8 @@
 - [`docs/product/`](docs/product/)：经筛选的产品事实、范围和数据契约。
 - [`docs/architecture/`](docs/architecture/)：系统边界与已接受的技术决策。
 - [`docs/planning/`](docs/planning/)：阶段规划、范围和验收入口。
+- [`docs/guides/`](docs/guides/)：正式业务使用和 Windows 部署运维说明。
+- [`docs/deliverables/`](docs/deliverables/)：正式项目过程文档的 Markdown 单一事实源。
 - [`automation/`](automation/)：可恢复的阶段状态、机器可读工作流和 Codex 提示链。
 - [`src/`](src/)：Java 后端、Python 算法服务和 Vue 前端源码。
 - [`tools/document-extraction/`](tools/document-extraction/)：可重复的历史材料提取工具。
@@ -122,4 +143,4 @@ Compose 只向本机发布 Java 的 8080 端口；PostgreSQL 与算法服务仅�
 
 ## 版本与当前状态
 
-`v0.5.0` 已通过 PR、Windows 原生包、应用全链、Docker Compose 和仓库检查，包含 M0 至 M10 的项目化中文工作台。当前正实施 M11 身份权限与安全部署边界。后续标签和发布门槛见 [`docs/releases/versioning.md`](docs/releases/versioning.md)，实时状态以 `automation/state.json` 和提交绑定的验收证据为准。
+`v0.8.0` 精确指向 `main` 的安全部署与可靠性发布提交，包含 M0–M12。M13 正在生成正式说明书和过程文件；M14 将按最终说明在 Windows 11 上执行业务用户终验。版本标签和发布门槛见 [`docs/releases/versioning.md`](docs/releases/versioning.md)，实时状态以 `automation/state.json` 和提交绑定的验收证据为准。
