@@ -93,6 +93,29 @@ describe("M12 数据与备份管理界面", () => {
     expect(screen.queryByText("scripts\\backup-status.ps1")).not.toBeInTheDocument();
   });
 
+  it("源码本机模式由部署环境管理备份时不显示发布包脚本", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response({
+      database_size_bytes: 1024,
+      deployment_mode: "LOCAL_NATIVE",
+      backup_management: "DEPLOYMENT_MANAGED",
+      recovery_point_count: 0,
+      recovery_points: [],
+      latest_success_at: null,
+      total_backup_bytes: 0,
+      all_hashes_valid: null,
+      operator_instructions: ["请使用当前部署方式对应的备份流程。"],
+    })));
+    render(DataBackupPanel, { props: { user: admin } });
+
+    await fireEvent.click(screen.getByText("数据与备份"));
+
+    expect(await screen.findByText("Windows 本机原生部署")).toBeInTheDocument();
+    expect(screen.getByText("由部署环境管理")).toBeInTheDocument();
+    expect(screen.getByText(/待由部署管理员执行完整校验/)).toBeInTheDocument();
+    expect(screen.getByText("当前环境的备份与恢复由部署管理员按对应部署说明管理。")).toBeInTheDocument();
+    expect(screen.queryByText("scripts\\backup-status.ps1")).not.toBeInTheDocument();
+  });
+
   it("非系统管理员不显示区块且不会请求管理接口", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

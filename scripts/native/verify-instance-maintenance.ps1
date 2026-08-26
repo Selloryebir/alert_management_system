@@ -175,6 +175,8 @@ Invoke-RecoveryPointRetention $context $RetentionCount
         Assert-True (-not (Test-Path -LiteralPath (Join-Path $validRoot $directory))) `
             "合法实例清理后仍存在 $directory。"
     }
+    Assert-True (-not (Test-Path -LiteralPath $lockPath)) `
+        "合法实例清理后仍存在维护锁文件。"
     Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $validRoot "backups") -Filter "*.dump" -File).Count -eq 2) `
         "默认清理错误删除了备份。"
     Assert-True ($null -eq (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) `

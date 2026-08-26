@@ -902,6 +902,9 @@ try {
             Assert-True (-not (Test-Path -LiteralPath (Join-Path $releaseRoot $mutableDirectory))) `
                 "cleanup-instance.ps1 未清理当前实例的 $mutableDirectory 目录。"
         }
+        Assert-True (@(Get-ChildItem -LiteralPath $releaseRoot `
+                    -Filter ".instance-maintenance-*.lock" -File -ErrorAction SilentlyContinue).Count -eq 0) `
+            "cleanup-instance.ps1 未清理当前实例维护锁文件。"
         Assert-True (Test-Path -LiteralPath $backupPath -PathType Leaf) `
             "cleanup-instance.ps1 默认不应删除备份。"
         $roundSummaries += ,$roundSummary

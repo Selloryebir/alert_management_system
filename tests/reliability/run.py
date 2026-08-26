@@ -31,6 +31,7 @@ PID_ROOT = RUNTIME / "pids"
 PORTS = (55432, 8001, 8080)
 DEFAULT_PROJECT_ID = "00000000-0000-0000-0000-000000000001"
 MEMORY_LIMIT_MIB = {"backend": 1536.0, "algorithm": 1024.0, "postgres": 1536.0}
+MOJIBAKE_PATTERN = re.compile(r"\ufffd|锟斤拷|Ã|Â")
 
 
 class ReliabilityError(RuntimeError):
@@ -74,6 +75,20 @@ def discover_docker() -> str | None:
         if result.returncode == 0 and result.stdout.strip():
             return candidate
     return None
+
+
+def required_command_output(command: list[str], label: str, *, timeout: int = 30) -> str:
+    """读取验收环境事实；命令失败或空输出都不能记作有效证据。"""
+    last_result: subprocess.CompletedProcess[str] | None = None
+    for _ in range(2):
+        last_result = run_command(command, timeout=timeout, check=False)
+        output = last_result.stdout.strip().replace("\r", "")
+        if last_result.returncode == 0 and output:
+            return output
+    assert last_result is not None
+    raise ReliabilityError(
+        f"无法读取{label}：退出码 {last_result.returncode}，输出为空或命令失败。"
+    )
 
 
 def load_smoke_module() -> Any:
@@ -129,6 +144,8 @@ def capture_environment() -> dict[str, Any]:
     powershell = shutil.which("powershell.exe")
     if powershell:
         command = (
+            "$utf8=New-Object System.Text.UTF8Encoding($false);"
+            "[Console]::OutputEncoding=$utf8;$OutputEncoding=$utf8;"
             "$os=Get-CimInstance Win32_OperatingSystem;"
             "$cpu=Get-CimInstance Win32_Processor|Select-Object -First 1;"
             "[ordered]@{os=$os.Caption;version=$os.Version;"
@@ -136,32 +153,29 @@ def capture_environment() -> dict[str, Any]:
             "cpu=$cpu.Name;logical_cpu_count=$cpu.NumberOfLogicalProcessors}"
             "|ConvertTo-Json -Compress"
         )
-        result = run_command([powershell, "-NoProfile", "-Command", command], timeout=30, check=False)
-        if result.returncode == 0 and result.stdout.strip():
-            environment["windows"] = json.loads(result.stdout.strip().replace("\r", ""))
+        windows_output = required_command_output(
+            [powershell, "-NoProfile", "-Command", command], "Windows 环境"
+        )
+        environment["windows"] = json.loads(windows_output)
     java = shutil.which("java") or shutil.which("java.exe")
     if java:
         result = run_command([java, "-version"], timeout=30, check=False)
         lines = (result.stdout + result.stderr).splitlines()
         environment["java"] = lines[0] if lines else "unknown"
     docker = discover_docker()
-    if docker:
-        version = run_command(
-            [docker, "version", "--format", "{{.Server.Version}}"], timeout=30, check=False
-        )
-        image = run_command(
-            [docker, "inspect", "alert-management-m1-postgres", "--format", "{{.Image}}"],
-            timeout=30,
-            check=False,
-        )
-        postgres = run_command(
-            [docker, "exec", "alert-management-m1-postgres", "postgres", "--version"],
-            timeout=30,
-            check=False,
-        )
-        environment["docker_server"] = version.stdout.strip()
-        environment["postgres_image_id"] = image.stdout.strip()
-        environment["postgres"] = postgres.stdout.strip()
+    if not docker:
+        raise ReliabilityError("无法读取 Docker 环境：未找到能够连接 Engine 的客户端。")
+    environment["docker_server"] = required_command_output(
+        [docker, "version", "--format", "{{.Server.Version}}"], "Docker Server 版本"
+    )
+    environment["postgres_image_id"] = required_command_output(
+        [docker, "inspect", "alert-management-m1-postgres", "--format", "{{.Image}}"],
+        "PostgreSQL 镜像身份",
+    )
+    environment["postgres"] = required_command_output(
+        [docker, "exec", "alert-management-m1-postgres", "postgres", "--version"],
+        "PostgreSQL 版本",
+    )
     return environment
 
 
@@ -624,6 +638,21 @@ def digest_json(value: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def assert_summary_text_clean(value: Any, path: str = "summary") -> None:
+    """阻止环境或指标中的乱码被写成 PASS；扫描规则文本自身除外。"""
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key != "scan_rule":
+                assert_summary_text_clean(child, f"{path}.{key}")
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            assert_summary_text_clean(child, f"{path}[{index}]")
+        return
+    if isinstance(value, str) and MOJIBAKE_PATTERN.search(value):
+        raise ReliabilityError(f"可靠性摘要出现乱码：{path}")
+
+
 def main() -> int:
     monotonic_started = time.monotonic()
     started_at = datetime.now(timezone.utc)
@@ -725,6 +754,7 @@ def main() -> int:
         assert_cleanup(owned_pids)
         cleanup_complete = True
         summary["cleanup"] = "PASS"
+        assert_summary_text_clean(summary)
         summary["status"] = "PASS"
         return 0
     except Exception as exc:

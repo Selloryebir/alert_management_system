@@ -105,10 +105,14 @@ class DataBackupService {
             String originInstanceId = metadata.path("origin_instance_id").asText();
             String expectedMetadata = backupFile + ".meta.json";
             if (!"alert-management-system-recovery-point".equals(metadata.path("product").asText())
+                    || metadata.path("schema_version").asInt(-1) != 1
                     || backupFile.isBlank()
                     || !metadataName.equals(expectedMetadata)
                     || !Path.of(backupFile).getFileName().toString().equals(backupFile)
                     || !originInstanceId.matches("[0-9a-f]{32}")
+                    || !metadata.path("origin_source_commit").asText().matches("[0-9a-f]{40}")
+                    || !"alert_management".equals(metadata.path("database").asText())
+                    || !metadata.path("pg_restore_list_verified").asBoolean(false)
                     || !metadata.path("sha256").asText().matches("[0-9a-f]{64}")) {
                 throw new IOException("恢复点元数据身份无效");
             }

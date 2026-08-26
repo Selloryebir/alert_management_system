@@ -10,10 +10,9 @@ const status = ref<DataBackupStatus>();
 const loading = ref(false);
 const errorMessage = ref("");
 const systemAdmin = computed(() => props.user.global_role === "SYSTEM_ADMIN");
-const nativeBackupOperations = computed(() => Boolean(status.value && (
-  status.value.deployment_mode === "LOCAL_NATIVE"
-  || status.value.backup_management === "WINDOWS_NATIVE_SCRIPTS"
-)));
+const nativeBackupOperations = computed(() => (
+  status.value?.backup_management === "WINDOWS_NATIVE_SCRIPTS"
+));
 
 const hashLabel = computed(() => {
   if (status.value?.all_hashes_valid === true) return "完整校验通过";

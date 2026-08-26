@@ -76,6 +76,17 @@ try {
         }
     }
 
+    $maintenanceLockPath = [string]$maintenanceLock.Path
+    Exit-InstanceMaintenanceLock $maintenanceLock
+    $maintenanceLock = $null
+    Assert-NoReleasePathReparseBoundary $context $maintenanceLockPath
+    if (Test-Path -LiteralPath $maintenanceLockPath -PathType Leaf) {
+        Remove-Item -LiteralPath $maintenanceLockPath -Force
+    }
+    if (Test-Path -LiteralPath $maintenanceLockPath) {
+        throw "实例维护锁文件未能清理：$maintenanceLockPath"
+    }
+
     Write-Host "当前发布实例已清理。程序文件未删除，可手工删除当前解压目录。"
     if (-not $RemoveBackups) {
         Write-Host "备份已保留：$($context.Backups)"

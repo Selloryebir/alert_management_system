@@ -277,6 +277,8 @@ function Get-RecoveryPoint {
             $metadata.product -ne "alert-management-system-recovery-point" -or
             [string]$metadata.origin_instance_id -notmatch '^[0-9a-f]{32}$' -or
             [string]$metadata.origin_source_commit -notmatch '^[0-9a-f]{40}$' -or
+            [string]$metadata.database -ne [string]$Context.Config.database.name -or
+            $metadata.pg_restore_list_verified -ne $true -or
             [string]$metadata.sha256 -notmatch '^[0-9a-f]{64}$' -or
             [Int64]$metadata.size_bytes -le 0) {
         throw "恢复点元数据格式或来源字段无效：$($metadataItem.FullName)"
