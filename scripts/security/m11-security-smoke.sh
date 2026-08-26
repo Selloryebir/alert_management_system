@@ -133,6 +133,16 @@ if ! grep -Eqi 'tls-keystore|tls_keystore|secret|秘密|密钥|file' "$evidence_
   echo "缺少 TLS 的失败日志没有指向密钥文件。" >&2
   exit 1
 fi
+for missing_tls_path in \
+  "$network_secret_root/tls-keystore.p12" \
+  "$network_secret_root/tls-keystore-password.txt"; do
+  if [[ -d "$missing_tls_path" ]]; then
+    rmdir "$missing_tls_path"
+  elif [[ -e "$missing_tls_path" ]]; then
+    echo "缺少 TLS 的负向验收产生了非目录残留：$missing_tls_path" >&2
+    exit 1
+  fi
+done
 
 openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
   -subj /CN=localhost \
