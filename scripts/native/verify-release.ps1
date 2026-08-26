@@ -1073,7 +1073,7 @@ try {
         $backupPath = [string]$backupCheck.BackupPath
         if ($BusinessRelease) {
             Invoke-E2e $e2eRoot $npm $releaseRoot "release-backup" $smokeDataset 300 `
-                "test:release-backup-status" $roundResultRoot "" "" 2
+                "test:release-backup-status" $roundResultRoot "" "" (1 + $round)
             if ($round -eq 1) {
                 $externalBackup = Join-Path $externalBackupRoot ([IO.Path]::GetFileName($backupPath))
                 $externalMetadata = $externalBackup + ".meta.json"
