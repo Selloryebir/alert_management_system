@@ -13,6 +13,7 @@
 7. [自动化开发蓝图](automation/README.md)：仅在需要自动持续开发时，按状态机和提示链推进当前阶段。
 8. `guides/`：面向业务人员和部署管理员的正式操作说明。
 9. `deliverables/`：立项、中期、测试、结项、过程与原始方案差距的 Markdown 单一事实源。
+10. 仓库根目录 [`../deliverables/`](../deliverables/)：从上述事实源确定生成的 DOCX/PDF 正式交付文件。
 
 ## 责任分层
 
@@ -28,5 +29,7 @@
 | [`automation/`](automation/) | 自动化状态机、Git 生命周期和开发审计引导 | 是 |
 | `guides/` | 正式业务使用与部署运维说明 | 是 |
 | `deliverables/` | 可重复生成 DOCX/PDF 的正式项目过程文档源 | 是 |
+
+生成物不在 `docs/` 内维护；更新事实源后按 [`../tools/deliverables/README.md`](../tools/deliverables/README.md)重新生成并执行只读一致性检查。
 
 原始或提取材料中的“已完成”“已通过”“达到指标”等均是历史陈述。当前重建项目只有在对应代码、测试和验收证据绑定同一 Git 提交后，才能声明完成。

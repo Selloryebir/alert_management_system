@@ -23,6 +23,8 @@
 
 详细操作见[业务使用手册](docs/guides/business-user-manual.md)和[Windows 部署与运维手册](docs/guides/windows-deployment-operations.md)。系统不提供覆盖当前业务库的一键恢复、原生 `status.ps1`、MSI、Windows 服务或自动更新；不要从说明文字推断不存在的入口。
 
+不便阅读 Markdown 时，可直接使用仓库内已生成的[业务手册 PDF](deliverables/business-user-manual.pdf)、[业务手册 DOCX](deliverables/business-user-manual.docx)、[部署手册 PDF](deliverables/windows-deployment-operations.pdf)或[部署手册 DOCX](deliverables/windows-deployment-operations.docx)。Windows 自包含 ZIP 也会在 `manuals\` 内携带这四份文件。
+
 ## 仓库入口
 
 - [`docs/`](docs/)：文档总入口及推荐阅读顺序。
@@ -33,6 +35,8 @@
 - [`docs/planning/`](docs/planning/)：阶段规划、范围和验收入口。
 - [`docs/guides/`](docs/guides/)：正式业务使用和 Windows 部署运维说明。
 - [`docs/deliverables/`](docs/deliverables/)：正式项目过程文档的 Markdown 单一事实源。
+- [`deliverables/`](deliverables/)：由 Markdown 确定生成的正式 DOCX/PDF 说明书与项目过程文件。
+- [`tools/deliverables/`](tools/deliverables/)：正式交付物生成和一致性验证工具。
 - [`automation/`](automation/)：可恢复的阶段状态、机器可读工作流和 Codex 提示链。
 - [`src/`](src/)：Java 后端、Python 算法服务和 Vue 前端源码。
 - [`tools/document-extraction/`](tools/document-extraction/)：可重复的历史材料提取工具。
@@ -60,6 +64,12 @@ python3 scripts/validate_automation.py
 ```
 
 这些命令只验证仓库基础结构、文档链接和自动化状态定义；业务能力以对应阶段验收和证据为准。
+
+正式 DOCX/PDF 的生成环境、更新方法和只读一致性检查见 [`tools/deliverables/README.md`](tools/deliverables/README.md)。验收已提交交付物时执行：
+
+```bash
+python3 tools/deliverables/build.py --check
+```
 
 ## 开发启动与阶段验证
 

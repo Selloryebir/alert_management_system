@@ -22,6 +22,12 @@ $lockPath = Join-Path $repositoryRoot "packaging\native\runtime-lock.json"
 $templateRoot = Join-Path $repositoryRoot "packaging\native\release"
 $algorithmSpec = Join-Path $repositoryRoot "packaging\native\algorithm-service.spec"
 $pyinstallerLock = Join-Path $repositoryRoot "packaging\native\pyinstaller.lock"
+$manualSources = @(
+    "business-user-manual.docx",
+    "business-user-manual.pdf",
+    "windows-deployment-operations.docx",
+    "windows-deployment-operations.pdf"
+)
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $nativeRuntime "artifacts"
@@ -235,6 +241,12 @@ foreach ($required in @($lockPath, $algorithmSpec, $pyinstallerLock)) {
         throw "缺少构建输入：$required"
     }
 }
+foreach ($manualName in $manualSources) {
+    $manualPath = Join-Path $repositoryRoot "deliverables\$manualName"
+    if (-not (Test-Path -LiteralPath $manualPath -PathType Leaf)) {
+        throw "缺少正式发布手册：$manualPath。请先运行 python3 tools/deliverables/build.py。"
+    }
+}
 if (-not (Test-Path -LiteralPath $templateRoot -PathType Container)) {
     throw "缺少发布模板目录：$templateRoot"
 }
@@ -349,6 +361,11 @@ try {
     Copy-Item -LiteralPath (Join-Path $templateRoot "README.txt") -Destination $releaseRoot
     Copy-Item -LiteralPath (Join-Path $templateRoot "THIRD-PARTY-NOTICES.txt") -Destination $releaseRoot
     Copy-Item -LiteralPath (Join-Path $templateRoot "config") -Destination $releaseRoot -Recurse
+    $manualTarget = New-Item -ItemType Directory -Path (Join-Path $releaseRoot "manuals") -Force
+    foreach ($manualName in $manualSources) {
+        Copy-Item -LiteralPath (Join-Path $repositoryRoot "deliverables\$manualName") `
+            -Destination $manualTarget.FullName
+    }
     $releaseScripts = Join-Path $releaseRoot "scripts"
     New-Item -ItemType Directory -Path $releaseScripts -Force | Out-Null
     foreach ($scriptName in @("common.ps1", "preflight.ps1", "start.ps1", "stop.ps1", "backup.ps1",

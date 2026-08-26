@@ -280,6 +280,13 @@ function Assert-ReleaseManifest {
         $actualHash = (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256).Hash.ToLowerInvariant()
         Assert-True ($actualHash -eq ([string]$entry.sha256).ToLowerInvariant()) "manifest 文件哈希不符：$relative"
     }
+    foreach ($requiredManual in @(
+            "manuals/business-user-manual.docx",
+            "manuals/business-user-manual.pdf",
+            "manuals/windows-deployment-operations.docx",
+            "manuals/windows-deployment-operations.pdf")) {
+        Assert-True ($seen.ContainsKey($requiredManual)) "发布包缺少正式使用手册：$requiredManual"
+    }
     $actualFiles = @(
         Get-ChildItem -LiteralPath $ReleaseRoot -File -Recurse |
             Where-Object { $_.FullName -ne $manifestPath }
