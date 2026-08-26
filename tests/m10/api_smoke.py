@@ -235,8 +235,8 @@ def correction_flow(api: Api, project_id: str, dataset: Path) -> tuple[str, str]
     if rejected.get("status") != "REJECTED" or rejected.get("valid_rows") != 1:
         fail("非法小样首次预览未进入 REJECTED", rejected)
     source_rows = rejected.get("source_rows")
-    if not isinstance(source_rows, list) or [row.get("source_row") for row in source_rows] != [2, 3]:
-        fail("非法小样未按文件原值返回 source_rows", rejected)
+    if not isinstance(source_rows, list) or [row.get("source_row") for row in source_rows] != [2]:
+        fail("非法小样未按可修正错误行返回 source_rows", rejected)
     source_2 = source_rows[0].get("values", {})
     if source_2.get("priority") != "p9" or source_2.get("value") != "bad":
         fail("source_rows 未保留待修正行的原始文本", source_2)

@@ -64,7 +64,10 @@ class ImportService {
         Map<Integer, Map<String, String>> corrections = parseCorrections(correctionsJson, table);
         ValidatedImport validated = normalizer.applyProjectRules(
                 normalizer.normalize(table, mapping, corrections), rules);
+        Set<Integer> actionableRows = new LinkedHashSet<>(corrections.keySet());
+        validated.errors().stream().map(ImportError::sourceRow).forEach(actionableRows::add);
         List<ImportSourceRow> sourceRows = table.rows().stream()
+                .filter(row -> actionableRows.contains(row.sourceRow()))
                 .map(row -> new ImportSourceRow(row.sourceRow(), Map.copyOf(row.values())))
                 .toList();
         return persistence.savePreview(projectId, fileName, validated, corrections, sourceRows);

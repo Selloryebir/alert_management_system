@@ -6,6 +6,7 @@ source "$(dirname "$0")/common.sh"
 
 M3_RUNTIME="$RUNTIME_DIR/m3"
 mkdir -p "$M3_RUNTIME"
+DEFAULT_PROJECT_ID="00000000-0000-0000-0000-000000000001"
 
 monotonic_ms() {
   "$PYTHON_VENV/bin/python" -c 'import time; print(time.monotonic_ns() // 1_000_000)'
@@ -24,6 +25,7 @@ import_file() {
   local label=$2
   curl --noproxy '*' --fail --silent --show-error \
     --output "$M3_RUNTIME/$label-preview.json" \
+    --form "project_id=$DEFAULT_PROJECT_ID" \
     --form "file=@$file_path" \
     http://127.0.0.1:8080/api/v1/imports/preview
   local batch_id

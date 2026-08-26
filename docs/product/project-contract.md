@@ -23,7 +23,7 @@
 
 ## 项目作用域接口
 
-- `POST /api/v1/imports/preview` multipart 增加必填 `project_id`，可选 `corrections` 使用“源行号 → 目标字段 → 修正文本”的 JSON 对象；响应增加 `project_id` 和本次原始 `source_rows`，便于页面内修正后连同原文件重新校验。`mapping` 仍是兼容的已识别映射响应字段。
+- `POST /api/v1/imports/preview` multipart 增加必填 `project_id`，可选 `corrections` 使用“源行号 → 目标字段 → 修正文本”的 JSON 对象；响应增加 `project_id` 和可修正错误行/本次已修正行的原始 `source_rows`，便于页面内修正后连同原文件重新校验。成功且无需修正的行不重复返回原始文本，避免大批次响应无界增长。`mapping` 仍是兼容的已识别映射响应字段。
 - `GET /api/v1/imports` 增加必填 `project_id`，只返回该项目批次。
 - `GET/POST /api/v1/imports/{batchId}/...` 通过批次确定项目；不存在跨项目枚举入口。
 - 报告从分析运行反查项目，使用项目报告抬头和 `report_fields`。允许字段固定为 `summary`、`priority`、`area`、`unit`、`noise`、`cause`、`disposition`、`chains`；不提供任意模板语言。

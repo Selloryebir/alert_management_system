@@ -43,7 +43,7 @@ try {
     if ($result.business_state -ne "EMPTY" -or $null -eq $result.deleted_counts) {
         throw "复位 API 未返回 EMPTY 业务状态。"
     }
-    $imports = Invoke-RestMethod -Uri ($baseUri + "/api/v1/imports?limit=1") -Method Get -TimeoutSec 15 `
+    $imports = Invoke-RestMethod -Uri ($baseUri + "/api/v1/imports?project_id=00000000-0000-0000-0000-000000000001&limit=1") -Method Get -TimeoutSec 15 `
         -UseBasicParsing
     if (@($imports).Count -ne 0) {
         throw "复位后仍存在导入批次，业务状态并非空。"

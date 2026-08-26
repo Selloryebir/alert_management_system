@@ -95,6 +95,7 @@ class ImportIntegrationTest {
                 .containsOnly(ImportBatchStatus.READY);
         assertThat(List.of(csv.totalRows(), txt.totalRows(), xlsx.totalRows())).containsOnly(300);
         assertThat(List.of(csv.validRows(), txt.validRows(), xlsx.validRows())).containsOnly(300);
+        assertThat(List.of(csv.sourceRows(), txt.sourceRows(), xlsx.sourceRows())).allMatch(List::isEmpty);
         assertThat(normalizedPreview(csv)).isEqualTo(normalizedPreview(txt)).isEqualTo(normalizedPreview(xlsx));
 
         importService.confirm(csv.batchId());

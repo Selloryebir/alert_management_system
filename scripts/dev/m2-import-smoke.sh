@@ -6,6 +6,7 @@ source "$(dirname "$0")/common.sh"
 
 M2_RUNTIME="$RUNTIME_DIR/m2"
 mkdir -p "$M2_RUNTIME"
+DEFAULT_PROJECT_ID="00000000-0000-0000-0000-000000000001"
 
 monotonic_ms() {
   "$PYTHON_VENV/bin/python" -c 'import time; print(time.monotonic_ns() // 1_000_000)'
@@ -18,6 +19,7 @@ preview_file() {
   local invalid_name=${4:-}
   local response
   response=$(curl --noproxy '*' --fail --silent --show-error \
+    --form "project_id=$DEFAULT_PROJECT_ID" \
     --form "file=@$file_path" http://127.0.0.1:8080/api/v1/imports/preview)
   PREVIEW_JSON="$response" EXPECTED_STATUS="$expected_status" \
       EXPECTED_ROWS="$expected_rows" INVALID_NAME="$invalid_name" \
@@ -127,7 +129,7 @@ echo "非法样例精确命中 1 个文件级错误和 36 个逐行错误；六�
 
 curl --noproxy '*' --fail --silent --show-error \
   --output "$M2_RUNTIME/import-list.json" \
-  "http://127.0.0.1:8080/api/v1/imports?limit=20"
+  "http://127.0.0.1:8080/api/v1/imports?project_id=$DEFAULT_PROJECT_ID&limit=20"
 curl --noproxy '*' --fail --silent --show-error \
   --output "$M2_RUNTIME/records-first.json" \
   "http://127.0.0.1:8080/api/v1/imports/${smoke_batches[0]}/records?page=0&size=200"
