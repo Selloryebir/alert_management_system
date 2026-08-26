@@ -327,14 +327,22 @@ def windows_rss_mib(pid: int) -> float | None:
 
 
 def run_windows_observation(command: str, label: str, *, timeout: int) -> str:
+    return run_windows_command_observation(
+        ["powershell.exe", "-NoProfile", "-Command", command],
+        label,
+        timeout=timeout,
+    )
+
+
+def run_windows_command_observation(
+    command: list[str], label: str, *, timeout: int
+) -> str:
     """有限重试 WSL/Windows 观测通道；不重试被观测进程或命令本身的失败。"""
     failures: list[str] = []
     for attempt in range(1, 4):
         try:
             result = run_command(
-                ["powershell.exe", "-NoProfile", "-Command", command],
-                timeout=timeout,
-                check=False,
+                command, timeout=timeout, check=False
             )
         except subprocess.TimeoutExpired:
             failures.append(f"第 {attempt} 次超时")
@@ -347,13 +355,39 @@ def run_windows_observation(command: str, label: str, *, timeout: int) -> str:
             if result.returncode != 0 and not bridge_failure:
                 detail = result.stderr.strip().replace("\r", "")
                 raise ReliabilityError(
-                    f"无法读取{label}：PowerShell 退出码 {result.returncode}，{detail or '无错误输出'}"
+                    f"无法读取{label}：Windows 命令退出码 {result.returncode}，{detail or '无错误输出'}"
                 )
             reason = "WSL/Windows 桥接失败" if bridge_failure else "成功退出但输出为空"
             failures.append(f"第 {attempt} 次{reason}")
         if attempt < 3:
             time.sleep(0.5)
     raise ReliabilityError(f"无法读取{label}：{'；'.join(failures)}")
+
+
+def parse_class_histogram_mib(output: str) -> float:
+    match = re.search(r"^\s*Total\s+\d+\s+(\d+)\s*$", output, re.MULTILINE)
+    if not match:
+        raise ReliabilityError(f"无法解析后端存活对象总字节：{output[-500:]!r}")
+    return round(int(match.group(1)) / 1024 / 1024, 3)
+
+
+def backend_live_heap_mib(pid: int, *, is_windows: bool) -> float:
+    """读取 full-GC 后存活对象总字节，避免把 JVM 已提交堆误判为泄漏。"""
+    jcmd_name = "jcmd.exe" if is_windows else "jcmd"
+    jcmd = shutil.which(jcmd_name)
+    if not jcmd:
+        raise ReliabilityError(f"无法读取后端存活堆：缺少 {jcmd_name}。")
+    if is_windows:
+        output = run_windows_command_observation(
+            [jcmd, str(pid), "GC.class_histogram", "-all=false"],
+            f"Windows 后端存活对象（PID={pid}）",
+            timeout=30,
+        )
+    else:
+        output = run_command(
+            [jcmd, str(pid), "GC.class_histogram", "-all=false"], timeout=30
+        ).stdout.strip()
+    return parse_class_histogram_mib(output)
 
 
 def read_pid(name: str) -> tuple[int, bool] | None:
@@ -391,7 +425,9 @@ def postgres_memory_mib() -> float | None:
     return parse_memory(result.stdout.split("/")[0])
 
 
-def memory_sample(phase: str) -> dict[str, Any]:
+def memory_sample(
+    phase: str, *, collect_backend_live_heap: bool = False
+) -> dict[str, Any]:
     sample: dict[str, Any] = {"phase": phase}
     for name in ("backend", "algorithm"):
         owned = read_pid(name)
@@ -402,6 +438,10 @@ def memory_sample(phase: str) -> dict[str, Any]:
         if value is None:
             raise ReliabilityError(f"无法读取受管进程内存：{name} PID={pid}")
         sample[name] = value
+        if name == "backend" and collect_backend_live_heap:
+            sample["backend_live_heap_mib"] = backend_live_heap_mib(
+                pid, is_windows=is_windows
+            )
     postgres = postgres_memory_mib()
     if postgres is None:
         raise ReliabilityError("无法读取开发 PostgreSQL 容器内存。")
@@ -422,8 +462,15 @@ def assert_heavy_memory(samples: list[dict[str, Any]]) -> None:
     heavy = [sample for sample in samples if str(sample["phase"]).startswith("demo-20000-")]
     if len(heavy) != 3:
         raise ReliabilityError("缺少三轮 20,000 行重载后的独立资源样本。")
-    for component in MEMORY_LIMIT_MIB:
-        values = [float(sample[component]) for sample in heavy]
+    trend_fields = {
+        "backend 存活对象": "backend_live_heap_mib",
+        "algorithm RSS": "algorithm",
+        "postgres RSS": "postgres",
+    }
+    for component, field in trend_fields.items():
+        if any(field not in sample for sample in heavy):
+            raise ReliabilityError(f"缺少三轮 20,000 行后的{component}样本。")
+        values = [float(sample[field]) for sample in heavy]
         deltas = [right - left for left, right in zip(values, values[1:])]
         if all(delta > 32 for delta in deltas) and values[-1] - values[0] > 64:
             raise ReliabilityError(f"{component} 在三轮 20,000 行后持续显著增长：{values}")
@@ -785,7 +832,11 @@ def main() -> int:
         for iteration in (1, 2, 3):
             summary["demo_20000"].append(verify_demo_20k(smoke, result_dir, iteration))
             time.sleep(2)
-            summary["memory_mib"].append(memory_sample(f"demo-20000-{iteration}"))
+            summary["memory_mib"].append(
+                memory_sample(
+                    f"demo-20000-{iteration}", collect_backend_live_heap=True
+                )
+            )
         assert_demo_performance(summary["demo_20000"])
         assert_memory(summary["memory_mib"])
         assert_heavy_memory(summary["memory_mib"])
