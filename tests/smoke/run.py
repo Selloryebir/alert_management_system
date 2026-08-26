@@ -11,6 +11,7 @@ import os
 import re
 import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -39,6 +40,15 @@ BOOTSTRAP_PASSWORD: str | None = None
 
 class VerificationError(RuntimeError):
     """G7 验收失败。"""
+
+
+def assert_host_port_free() -> None:
+    try:
+        with socket.create_connection(("127.0.0.1", 8080), timeout=1):
+            pass
+    except OSError:
+        return
+    raise VerificationError("验收端口 127.0.0.1:8080 已被其他进程占用，请先停止现有服务。")
 
 
 def run_command(
@@ -217,6 +227,8 @@ def prepare_compose_secrets() -> Path:
     configured = os.environ.get("APP_SECRETS_DIR", "").strip()
     secret_root = Path(configured) if configured else ROOT / ".runtime/compose-secrets"
     secret_root.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        secret_root.chmod(0o700)
     os.environ["APP_SECRETS_DIR"] = str(secret_root.resolve())
     for name in ("database-password.txt", "bootstrap-admin-password.txt"):
         path = secret_root / name
@@ -225,7 +237,9 @@ def prepare_compose_secrets() -> Path:
         if not path.exists():
             path.write_text(secrets.token_urlsafe(32), encoding="utf-8")
         if os.name != "nt":
-            path.chmod(0o600)
+            # Compose 的 Linux 绑定文件保留宿主 UID；目录 0700 限制宿主访问，
+            # 文件需允许镜像内的非 root 用户 10001 读取。
+            path.chmod(0o644)
     BOOTSTRAP_PASSWORD = (secret_root / "bootstrap-admin-password.txt").read_text(
         encoding="utf-8"
     ).strip()
@@ -607,6 +621,7 @@ def save_diagnostics(compose: Compose, output: Path) -> None:
 def verify_docker(fresh_volume: bool) -> dict[str, Any]:
     if not fresh_volume:
         raise VerificationError("G7 正式验收必须显式使用 --fresh-volume。")
+    assert_host_port_free()
     secret_root = prepare_compose_secrets()
     docker = discover_docker()
     project = f"alert-management-g7-{os.getpid()}-{uuid.uuid4().hex[:8]}".lower()

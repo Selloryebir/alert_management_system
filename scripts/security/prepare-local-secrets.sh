@@ -18,7 +18,7 @@ generate_secret() {
       echo "已有密钥路径不是非空普通文件，拒绝覆盖：$target" >&2
       exit 1
     fi
-    chmod 600 "$target"
+    chmod 644 "$target"
     return
   fi
   local value
@@ -28,6 +28,7 @@ generate_secret() {
     exit 1
   fi
   (umask 077; printf '%s' "$value" > "$target")
+  chmod 644 "$target"
 }
 
 generate_secret "$secret_root/database-password.txt"

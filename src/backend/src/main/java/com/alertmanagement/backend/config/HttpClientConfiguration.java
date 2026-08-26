@@ -10,6 +10,7 @@ public class HttpClientConfiguration {
     @Bean
     HttpClient algorithmHttpClient(AppProperties properties) {
         return HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(properties.algorithm().connectTimeout())
                 .build();
     }
