@@ -327,14 +327,22 @@ def windows_rss_mib(pid: int) -> float | None:
 
 
 def run_windows_observation(command: str, label: str, *, timeout: int) -> str:
+    return run_windows_command_observation(
+        ["powershell.exe", "-NoProfile", "-Command", command],
+        label,
+        timeout=timeout,
+    )
+
+
+def run_windows_command_observation(
+    command: list[str], label: str, *, timeout: int
+) -> str:
     """有限重试 WSL/Windows 观测通道；不重试被观测进程或命令本身的失败。"""
     failures: list[str] = []
     for attempt in range(1, 4):
         try:
             result = run_command(
-                ["powershell.exe", "-NoProfile", "-Command", command],
-                timeout=timeout,
-                check=False,
+                command, timeout=timeout, check=False
             )
         except subprocess.TimeoutExpired:
             failures.append(f"第 {attempt} 次超时")
@@ -370,17 +378,10 @@ def backend_live_heap_mib(pid: int, *, is_windows: bool) -> float:
     if not jcmd:
         raise ReliabilityError(f"无法读取后端存活堆：缺少 {jcmd_name}。")
     if is_windows:
-        windows_jcmd = required_command_output(
-            ["wslpath", "-w", jcmd], "Windows jcmd 路径", timeout=10
-        ).replace("'", "''")
-        command = (
-            f"$jcmd='{windows_jcmd}';"
-            f"$info=@(& $jcmd {pid} GC.class_histogram -all=false 2>&1);"
-            "if ($LASTEXITCODE -ne 0) {Write-Error ($info -join \"`n\"); exit $LASTEXITCODE};"
-            "$info"
-        )
-        output = run_windows_observation(
-            command, f"Windows 后端存活对象（PID={pid}）", timeout=30
+        output = run_windows_command_observation(
+            [jcmd, str(pid), "GC.class_histogram", "-all=false"],
+            f"Windows 后端存活对象（PID={pid}）",
+            timeout=30,
         )
     else:
         output = run_command(
