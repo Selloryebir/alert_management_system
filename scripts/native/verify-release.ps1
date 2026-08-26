@@ -848,6 +848,7 @@ try {
 
         Invoke-ResetCheck $releaseRoot $adminPasswordFile
         $roundResultRoot = Join-Path $runRoot "round-$round-results"
+        New-Item -ItemType Directory -Path $roundResultRoot | Out-Null
         $smokeDataset = Join-Path $releaseRoot "samples\smoke\synthetic_smoke_utf8.csv"
         $demoDataset = Join-Path $releaseRoot "samples\demo\synthetic_demo_20000.csv"
         Assert-True (Test-Path -LiteralPath $smokeDataset -PathType Leaf) "发布包缺少 300 行样例。"
