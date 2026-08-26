@@ -20,6 +20,7 @@
       "src/frontend/",
       "tests/",
       "scripts/dev/",
+      "scripts/native/verify-release.ps1",
       "packaging/native/release/scripts/reset-demo.ps1",
       "docs/product/",
       "docs/verification/",
@@ -39,7 +40,7 @@
       "git diff --check: PASS"
     ],
     "failures": [
-      "固定候选 d5f730e 的远端 M1、Docker 与 Windows 流水线返回 HTTP 400：M2/M3/Docker 黑盒和原生复位后的空批次查询未传 M10 新增的必填 project_id；修复过程中还发现成功预览无条件返回全部 source_rows 会放大大批次响应。第二候选 85f60e0 修复上述问题后，Docker/仓库远端已通过，但本机原生验收发现既有 Playwright 未等待项目就绪、未填写新增必填责任人且仍断言英文处置状态；需更新真实浏览器契约后固定第三候选。"
+      "固定候选 d5f730e 的远端 M1、Docker 与 Windows 流水线返回 HTTP 400：M2/M3/Docker 黑盒和原生复位后的空批次查询未传 M10 新增的必填 project_id；修复过程中还发现成功预览无条件返回全部 source_rows 会放大大批次响应。第二候选 85f60e0 修复上述问题后，Docker/仓库远端已通过，但本机原生验收发现既有 Playwright 未等待项目就绪、未填写新增必填责任人且仍断言英文处置状态。第三候选 23de3d2 已对齐测试契约，但 Windows PowerShell 5 在直接启动器已退出而后台服务继续运行时返回了不可靠的 Process.ExitCode；第四候选仅在捕获到 start.ps1 最终成功标记时归一化该值，后续健康、PID、端口和业务门槛保持不变。"
     ],
     "decision": "以项目作为导入、分析、处置和报告的统一业务作用域；在现有单体架构内补齐最小项目生命周期、图形化字段映射、全中文界面和首次使用引导，不引入通用工作流或任意模板引擎。",
     "next_action": "提交并推送固定候选，由独立审查者在该提交上复跑 G10、检查实际差异和阻断/严重问题。",
@@ -158,12 +159,12 @@
     },
     "M10": {
       "status": "review",
-      "attempt": 3,
+      "attempt": 4,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "固定第三候选，串行执行 Windows 原生验收、独立 G10 复审和四条远端流水线。",
-      "note": "第二候选的产品实现有效；旧 M4/M5 验收已显式选择默认项目、填写责任人并按中文 UI/项目化报告名断言，两个浏览器门槛均通过，待第三固定提交恢复性复核。"
+      "next_action": "修复 Windows PowerShell 5 启动退出码判定后固定第四候选，串行重跑 Windows 原生验收、独立 G10 复审和四条远端流水线。",
+      "note": "第三候选的业务与浏览器契约有效；原生验收在实际启动阶段暴露了 Process.ExitCode 读取不可靠，当前按最终成功标记归一化并保留其后的全部强校验。"
     },
     "M11": {
       "status": "blocked",

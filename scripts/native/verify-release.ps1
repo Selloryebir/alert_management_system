@@ -136,8 +136,13 @@ function Invoke-ReleaseScript {
         Write-Host $line
     }
     $exitCode = $result.ExitCode
-    if ($processOnly -and $null -eq $exitCode) {
-        $exitCode = if (($result.Output -join "`n") -match 'http://127\.0\.0\.1:8080') { 0 } else { 1 }
+    if ($processOnly) {
+        $reportedReady = ($result.Output -join "`n") -match 'http://127\.0\.0\.1:8080'
+        if ($reportedReady) {
+            $exitCode = 0
+        } elseif ($null -eq $exitCode) {
+            $exitCode = 1
+        }
     }
     if ($ExpectFailure) {
         Assert-True ($exitCode -ne 0) "$Name 本应失败，却返回成功。"
