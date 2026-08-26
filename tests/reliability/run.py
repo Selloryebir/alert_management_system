@@ -355,7 +355,7 @@ def run_windows_command_observation(
             if result.returncode != 0 and not bridge_failure:
                 detail = result.stderr.strip().replace("\r", "")
                 raise ReliabilityError(
-                    f"无法读取{label}：PowerShell 退出码 {result.returncode}，{detail or '无错误输出'}"
+                    f"无法读取{label}：Windows 命令退出码 {result.returncode}，{detail or '无错误输出'}"
                 )
             reason = "WSL/Windows 桥接失败" if bridge_failure else "成功退出但输出为空"
             failures.append(f"第 {attempt} 次{reason}")
