@@ -53,8 +53,8 @@ function Invoke-CapturedProcess {
             -WorkingDirectory $repositoryRoot -Wait -PassThru -NoNewWindow `
             -RedirectStandardOutput $stdout -RedirectStandardError $stderr
         $output = @()
-        if (Test-Path -LiteralPath $stdout) { $output += @(Get-Content -LiteralPath $stdout) }
-        if (Test-Path -LiteralPath $stderr) { $output += @(Get-Content -LiteralPath $stderr) }
+        if (Test-Path -LiteralPath $stdout) { $output += @(Get-Content -LiteralPath $stdout -Encoding UTF8) }
+        if (Test-Path -LiteralPath $stderr) { $output += @(Get-Content -LiteralPath $stderr -Encoding UTF8) }
         return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $output }
     } finally {
         Remove-Item -LiteralPath $captureRoot -Recurse -Force -ErrorAction SilentlyContinue

@@ -52,8 +52,11 @@ function Quote-NativeArgument {
 
 try {
     New-Item -ItemType Directory -Path $captureRoot, $temporaryRoot -Force | Out-Null
-    & (Join-Path $env:SystemRoot "System32\icacls.exe") $repositoryRoot /save $repositoryAclBackup /Q | Out-Null
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $repositoryAclBackup -PathType Leaf)) {
+    $aclSave = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\icacls.exe") `
+        -ArgumentList ((Quote-NativeArgument $repositoryRoot) + " /save " +
+            (Quote-NativeArgument $repositoryAclBackup) + " /Q") `
+        -Wait -PassThru -WindowStyle Hidden
+    if ($aclSave.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $repositoryAclBackup -PathType Leaf)) {
         throw "无法保存仓库目录原始 ACL，拒绝创建临时标准用户。"
     }
     New-LocalUser -Name $userName -Password $securePassword -AccountNeverExpires `
@@ -95,7 +98,7 @@ try {
 
     foreach ($capture in @($stdout, $stderr)) {
         if (Test-Path -LiteralPath $capture -PathType Leaf) {
-            Get-Content -LiteralPath $capture | ForEach-Object { Write-Host $_ }
+            Get-Content -LiteralPath $capture -Encoding UTF8 | ForEach-Object { Write-Host $_ }
         }
     }
     if ($process.ExitCode -ne 0) {

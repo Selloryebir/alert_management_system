@@ -62,6 +62,10 @@ GENERATED_PARTS = {
     "venv",
 }
 NATIVE_RELEASE_TEMPLATE_PARTS = ("packaging", "native", "release")
+TRACKED_RELEASE_SOURCE_PREFIXES = {
+    ("scripts", "release"),
+    ("tests", "release"),
+}
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 MARKDOWN_FENCE = re.compile(r"^\s*(```|~~~)")
 
@@ -155,6 +159,8 @@ def validate_tracked_files(errors: list[str]) -> None:
         parts_to_check = relative_path.parts
         if parts_to_check[:3] == NATIVE_RELEASE_TEMPLATE_PARTS:
             parts_to_check = parts_to_check[3:]
+        elif parts_to_check[:2] in TRACKED_RELEASE_SOURCE_PREFIXES:
+            parts_to_check = parts_to_check[2:]
         if any(part in GENERATED_PARTS for part in parts_to_check):
             errors.append(f"已跟踪文件位于生成或依赖目录：{relative_path.as_posix()}")
 
