@@ -18,13 +18,19 @@ import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.sql.Connection;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,12 +41,15 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
+@WithMockUser(username = "test-admin", roles = "SYSTEM_ADMIN")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AnalysisIntegrationTest {
 
@@ -59,11 +68,18 @@ class AnalysisIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private DataSource dataSource;
+
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", () -> POSTGRES.getJdbcUrl("postgres", "postgres"));
         registry.add("spring.datasource.username", () -> "postgres");
         registry.add("spring.datasource.password", () -> "");
+        registry.add("app.deployment-mode", () -> "LOCAL_NATIVE");
+        registry.add("app.bootstrap-admin-username", () -> "test-admin");
+        registry.add("app.bootstrap-admin-password-file",
+                () -> Path.of("src/test/resources/bootstrap-password.txt").toAbsolutePath().toString());
         registry.add("app.algorithm.analysis-url",
                 () -> "http://127.0.0.1:" + ALGORITHM.getAddress().getPort() + "/api/v2/analyze");
         registry.add("app.algorithm.analysis-timeout", () -> "2s");
@@ -190,6 +206,41 @@ class AnalysisIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM analysis_run WHERE batch_id = ?", Integer.class, batchId)).isEqualTo(2);
         assertZeroResults(failedRunId);
+    }
+
+    @Test
+    void completionAndFailureWaitForTheDemoResetTransactionGate() throws Exception {
+        for (boolean fail : List.of(false, true)) {
+            UUID batchId = importedBatch();
+            CountDownLatch algorithmEntered = new CountDownLatch(1);
+            CountDownLatch releaseAlgorithm = new CountDownLatch(1);
+            RESPONDER.set(request -> {
+                algorithmEntered.countDown();
+                await(releaseAlgorithm);
+                return fail ? new StubResponse(503, "unavailable") : successResponse(request);
+            });
+
+            try (Connection blocker = dataSource.getConnection();
+                    var executor = new DelegatingSecurityContextExecutorService(
+                            Executors.newSingleThreadExecutor())) {
+                var result = executor.submit(() -> mockMvc.perform(
+                        post("/api/v1/imports/{batchId}/analyses", batchId)).andReturn());
+                assertThat(algorithmEntered.await(10, TimeUnit.SECONDS)).isTrue();
+
+                blocker.setAutoCommit(false);
+                blocker.createStatement().execute(
+                        "SELECT pg_advisory_xact_lock(1095517522, 1297040468)");
+                releaseAlgorithm.countDown();
+
+                awaitAdvisoryWaiter();
+                assertThat(result).isNotDone();
+                blocker.commit();
+
+                JsonNode response = objectMapper.readTree(
+                        result.get(15, TimeUnit.SECONDS).getResponse().getContentAsString());
+                assertThat(response.path("status").asText()).isEqualTo(fail ? "FAILED" : "COMPLETED");
+            }
+        }
     }
 
     @Test
@@ -434,17 +485,13 @@ class AnalysisIntegrationTest {
         mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/disposition", firstRun, firstRecord)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"IN_PROGRESS\",\"operator\":\"\",\"note\":\"接单\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("ANALYSIS_REQUEST_INVALID"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.operator").value("test-admin"));
         mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/disposition", firstRun, firstRecord)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"PENDING\",\"operator\":\"审核员\",\"note\":\"非法状态\"}"))
                 .andExpect(status().isBadRequest());
 
-        patchDisposition(firstRun, firstRecord, "IN_PROGRESS", "值班员", "开始核查")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
-                .andExpect(jsonPath("$.closed_at").doesNotExist());
         patchDisposition(firstRun, firstRecord, "CLOSED", "班长", "确认并关闭")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CLOSED"))
@@ -617,6 +664,30 @@ class AnalysisIntegrationTest {
             return EmbeddedPostgres.start();
         } catch (IOException exception) {
             throw new ExceptionInInitializerError(exception);
+        }
+    }
+
+    private void awaitAdvisoryWaiter() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            Integer waiters = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM pg_locks WHERE locktype='advisory' AND NOT granted", Integer.class);
+            if (waiters != null && waiters > 0) {
+                return;
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("分析状态事务未等待共享 advisory lock");
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("算法测试屏障等待超时");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("算法测试屏障被中断", exception);
         }
     }
 

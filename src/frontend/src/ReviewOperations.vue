@@ -3,7 +3,6 @@ import { computed, ref } from "vue";
 
 import {
   AUDIT_EVENT_TYPES,
-  DEMO_OPERATOR,
   exportReport,
   fetchAuditEvents,
   resetDemo,
@@ -11,11 +10,15 @@ import {
 } from "./operations";
 import { auditDetails, zh } from "./labels";
 
-const props = defineProps<{ runId?: string }>();
+const props = defineProps<{
+  runId?: string;
+  projectId: string;
+  canManage?: boolean;
+  systemAdmin?: boolean;
+}>();
 const emit = defineEmits<{ demoReset: []; reportDownloaded: [] }>();
 
 const AUDIT_PAGE_SIZE = 50;
-const reportOperator = ref("");
 const reportBusy = ref(false);
 const reportMessage = ref("");
 const reportError = ref("");
@@ -36,18 +39,13 @@ const auditLastPage = computed(() => {
 async function downloadReport(format: "pdf" | "xlsx") {
   reportError.value = "";
   reportMessage.value = "";
-  const operator = reportOperator.value.trim();
-  if (!operator) {
-    reportError.value = "请填写报告导出操作者后再下载。";
-    return;
-  }
   if (!props.runId) {
     reportError.value = "请先完成并加载一次分析，再导出整次分析报告。";
     return;
   }
   reportBusy.value = true;
   try {
-    const report = await exportReport(props.runId, format, operator);
+    const report = await exportReport(props.runId, format);
     const url = URL.createObjectURL(report.blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -69,7 +67,7 @@ async function loadAudit(page = 0) {
   auditBusy.value = true;
   auditError.value = "";
   try {
-    auditPage.value = await fetchAuditEvents(page, AUDIT_PAGE_SIZE, auditFilter.value);
+    auditPage.value = await fetchAuditEvents(page, AUDIT_PAGE_SIZE, auditFilter.value, props.projectId);
   } catch (error) {
     auditError.value = `审计记录加载失败：${error instanceof Error ? error.message : "未知错误"}。请检查主系统后点击“刷新审计”。`;
   } finally {
@@ -110,17 +108,13 @@ async function handleReset() {
         <p class="eyebrow">报告与追溯</p>
         <h3 id="review-operations-title">报告、审计与演示数据维护</h3>
       </div>
-      <p class="demo-operator">本地演示身份 <strong>{{ DEMO_OPERATOR }}</strong></p>
+      <p class="demo-operator">操作身份取自当前登录账号</p>
     </div>
 
     <div class="operations-grid">
       <section class="operation-card" aria-labelledby="report-title">
         <h4 id="report-title">整次分析报告</h4>
         <p class="empty-copy">导出完整已完成分析；使用示例数据时，报告会明确标注合成数据声明。</p>
-        <label>
-          报告操作者（必填）
-          <input v-model="reportOperator" data-testid="report-operator" :disabled="reportBusy" />
-        </label>
         <div class="operation-actions">
           <button type="button" data-testid="report-pdf" :disabled="reportBusy || !runId" @click="downloadReport('pdf')">
             {{ reportBusy ? "生成中…" : "下载 PDF" }}
@@ -134,7 +128,7 @@ async function handleReset() {
         <p v-if="reportMessage" class="import-message" role="status" data-testid="report-message">{{ reportMessage }}</p>
       </section>
 
-      <section class="operation-card" aria-labelledby="audit-title">
+      <section v-if="canManage" class="operation-card" aria-labelledby="audit-title">
         <h4 id="audit-title">只读审计记录</h4>
         <div class="audit-controls">
           <label>
@@ -172,14 +166,10 @@ async function handleReset() {
       </section>
     </div>
 
-    <section class="danger-zone" aria-labelledby="reset-title">
+    <section v-if="systemAdmin" class="danger-zone" aria-labelledby="reset-title">
       <h4 id="reset-title">危险操作：复位演示数据</h4>
       <p>这会清空系统内全部演示项目的导入、分析、处置和审计数据，而不只是当前项目。失败时页面不会伪装成功或清除当前状态。</p>
       <div class="reset-grid">
-        <label>
-          操作者
-          <input :value="DEMO_OPERATOR" data-testid="reset-operator" readonly />
-        </label>
         <label>
           输入 RESET_DEMO 精确确认
           <input v-model="resetConfirmation" data-testid="reset-confirmation" :disabled="resetBusy" autocomplete="off" />

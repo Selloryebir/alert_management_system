@@ -13,11 +13,13 @@ trap cleanup_m4 EXIT
 prepare_e2e_browser_runtime
 
 "$REPOSITORY_ROOT/scripts/dev/start.sh"
+dev_admin_login "$M4_RUNTIME"
 
 smoke_started=$(monotonic_ms)
 env \
   E2E_BASE_URL=http://127.0.0.1:8080 \
   E2E_MODE=smoke \
+  E2E_ADMIN_PASSWORD_FILE="$DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE" \
   E2E_DATASET="$REPOSITORY_ROOT/samples/smoke/synthetic_smoke_utf8.csv" \
   E2E_EXPECTED_TOTAL=300 \
   npm --prefix "$E2E_DIR" run test:smoke
@@ -30,6 +32,7 @@ demo_started=$(monotonic_ms)
 env \
   E2E_BASE_URL=http://127.0.0.1:8080 \
   E2E_MODE=demo \
+  E2E_ADMIN_PASSWORD_FILE="$DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE" \
   E2E_DATASET="$demo_file" \
   E2E_EXPECTED_TOTAL=20000 \
   npm --prefix "$E2E_DIR" run test:smoke

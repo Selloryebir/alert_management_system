@@ -16,6 +16,7 @@ cleanup_on_error() {
 trap cleanup_on_error EXIT
 
 "$REPOSITORY_ROOT/scripts/dev/bootstrap.sh"
+APP_SECRETS_DIR="$DEV_SECRET_ROOT" "$REPOSITORY_ROOT/scripts/security/prepare-local-secrets.sh" >/dev/null
 
 if docker_run container inspect "$POSTGRES_CONTAINER" >/dev/null 2>&1; then
   if [[ $(docker_run inspect --format '{{.State.Running}}' "$POSTGRES_CONTAINER") != "true" ]]; then
@@ -25,11 +26,12 @@ else
   docker_run run --detach \
     --name "$POSTGRES_CONTAINER" \
     --label alert-management-demo=m1 \
+    --label "alert-management-runtime-scope=$POSTGRES_RUNTIME_SCOPE" \
     --publish "127.0.0.1:${POSTGRES_PORT}:5432" \
     --env POSTGRES_DB=alert_management \
     --env POSTGRES_USER=alert_management \
     --env POSTGRES_PASSWORD=alert_management \
-    --volume alert_management_m1_pgdata:/var/lib/postgresql/data \
+    --volume "$POSTGRES_VOLUME:/var/lib/postgresql/data" \
     "$POSTGRES_IMAGE" >/dev/null
 fi
 
@@ -50,45 +52,58 @@ stop_windows_pid_file "$PID_DIR/algorithm.winpid" "Python 算法服务" "wsl.exe
 
 npm --prefix "$REPOSITORY_ROOT/src/frontend" run build
 
-if command -v java >/dev/null 2>&1; then
+java_bin=$(find_java)
+windows_backend_started=false
+if [[ "$java_bin" == *.exe ]] && command -v powershell.exe >/dev/null 2>&1; then
+  rm -f "$PID_DIR/backend.winpid"
+  powershell.exe -NoProfile -ExecutionPolicy Bypass \
+    -File "$(wslpath -w "$REPOSITORY_ROOT/scripts/dev/start-backend.ps1")" \
+    -RepositoryRoot "$(wslpath -w "$REPOSITORY_ROOT")" \
+    -BootstrapAdminPasswordFile "$(wslpath -w "$DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE")" \
+    -PidFile "$(wslpath -w "$PID_DIR/backend.winpid")" \
+    -PostgresPort "$POSTGRES_PORT" -Build </dev/null
+  for _ in $(seq 1 20); do
+    [[ -s "$PID_DIR/backend.winpid" ]] && break
+    sleep 0.25
+  done
+  if [[ ! -s "$PID_DIR/backend.winpid" ]]; then
+    echo "Windows 后端启动器未写入 PID。" >&2
+    exit 1
+  fi
+  windows_backend_started=true
+else
   "$REPOSITORY_ROOT/mvnw" -f "$REPOSITORY_ROOT/src/backend/pom.xml" \
     package -DskipTests
-else
-  cmd.exe /d /c "mvnw.cmd -f src\\backend\\pom.xml package -DskipTests" </dev/null
 fi
 
-jar_path="$REPOSITORY_ROOT/src/backend/target/alert-management-backend-0.1.0.jar"
-
-if command -v powershell.exe >/dev/null 2>&1 && command -v wslpath >/dev/null 2>&1; then
-  windows_root=$(wslpath -w "$REPOSITORY_ROOT")
-  read -r algorithm_pid backend_pid < <(
-    powershell.exe -NoProfile -ExecutionPolicy Bypass \
-      -File "$(wslpath -w "$REPOSITORY_ROOT/scripts/dev/start-processes.ps1")" \
-      -RepositoryRoot "$windows_root" \
-      -WslRepositoryRoot "$REPOSITORY_ROOT" \
-      -PostgresPort "$POSTGRES_PORT" | tr -d '\r'
-  )
-  printf '%s\n' "$algorithm_pid" > "$PID_DIR/algorithm.winpid"
-  printf '%s\n' "$backend_pid" > "$PID_DIR/backend.winpid"
-else
+if [[ "$windows_backend_started" != true ]]; then
+  jar_path="$REPOSITORY_ROOT/src/backend/target/alert-management-backend-0.1.0.jar"
   (
-    cd "$REPOSITORY_ROOT/src/algorithm"
-    nohup env ALGORITHM_HOST=127.0.0.1 ALGORITHM_PORT=8001 \
-      "$PYTHON_VENV/bin/python" -m algorithm_service \
-      </dev/null >"$LOG_DIR/algorithm.log" 2>&1 &
-    echo $! > "$PID_DIR/algorithm.pid"
+    cd "$REPOSITORY_ROOT"
+    nohup env \
+      SERVER_PORT=8080 \
+      SERVER_ADDRESS=127.0.0.1 \
+      DB_URL="jdbc:postgresql://127.0.0.1:${POSTGRES_PORT}/alert_management" \
+      DB_USERNAME=alert_management \
+      DB_PASSWORD=alert_management \
+      APP_DEPLOYMENT_MODE=LOCAL_NATIVE \
+      APP_BOOTSTRAP_ADMIN_USERNAME=admin \
+      APP_BOOTSTRAP_ADMIN_PASSWORD_FILE="$DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE" \
+      SESSION_COOKIE_SECURE=false \
+      ALGORITHM_HEALTH_URL=http://127.0.0.1:8001/health \
+      "$java_bin" -Xms128m -Xmx768m -jar "$jar_path" \
+      </dev/null >"$LOG_DIR/backend.log" 2>&1 &
+    echo $! > "$PID_DIR/backend.pid"
   )
-  java_bin=$(find_java)
-  nohup env \
-    SERVER_PORT=8080 \
-    DB_URL="jdbc:postgresql://127.0.0.1:${POSTGRES_PORT}/alert_management" \
-    DB_USERNAME=alert_management \
-    DB_PASSWORD=alert_management \
-    ALGORITHM_HEALTH_URL=http://127.0.0.1:8001/health \
-    "$java_bin" -jar "$jar_path" \
-    </dev/null >"$LOG_DIR/backend.log" 2>&1 &
-  echo $! > "$PID_DIR/backend.pid"
 fi
+
+(
+  cd "$REPOSITORY_ROOT/src/algorithm"
+  nohup env ALGORITHM_HOST=127.0.0.1 ALGORITHM_PORT=8001 \
+    "$PYTHON_VENV/bin/python" -m algorithm_service \
+    </dev/null >"$LOG_DIR/algorithm.log" 2>"$LOG_DIR/algorithm-error.log" &
+  echo $! > "$PID_DIR/algorithm.pid"
+)
 
 wait_for_url "http://127.0.0.1:8001/health" "Python 算法服务"
 wait_for_url "http://127.0.0.1:8080/api/v1/health" "Java 后端"
@@ -96,4 +111,5 @@ wait_for_url "http://127.0.0.1:8080/api/v1/health" "Java 后端"
 
 trap - EXIT
 echo "M1 四组件已启动：http://127.0.0.1:8080"
+echo "开发管理员：admin；首次密码文件：$DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE"
 echo "日志目录：$LOG_DIR"

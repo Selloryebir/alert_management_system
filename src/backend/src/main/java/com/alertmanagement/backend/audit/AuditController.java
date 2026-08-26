@@ -22,7 +22,8 @@ class AuditController {
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(name = "event_type", required = false) String eventType,
             @RequestParam(name = "target_type", required = false) String targetType,
-            @RequestParam(name = "target_id", required = false) UUID targetId) {
-        return auditService.list(page, size, eventType, targetType, targetId);
+            @RequestParam(name = "target_id", required = false) UUID targetId,
+            @RequestParam(name = "project_id", required = false) UUID projectId) {
+        return auditService.list(page, size, eventType, targetType, targetId, projectId);
     }
 }

@@ -12,6 +12,22 @@ import App from "../src/App.vue";
 import BusinessWorkflow from "../src/BusinessWorkflow.vue";
 import ReviewOperations from "../src/ReviewOperations.vue";
 
+const authenticatedUser = vi.hoisted(() => ({
+  user_id: "00000000-0000-0000-0000-000000000099",
+  username: "test-admin",
+  display_name: "测试管理员",
+  global_role: "SYSTEM_ADMIN" as const,
+  must_change_password: false,
+}));
+
+vi.mock("../src/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/auth")>()),
+  initializeCsrf: async () => ({ token: "test-csrf", header_name: "X-CSRF-TOKEN", parameter_name: "_csrf" }),
+  currentUser: async () => ({ ...authenticatedUser }),
+  logout: async () => undefined,
+  changePassword: async () => ({ ...authenticatedUser }),
+}));
+
 vi.mock("../src/projects", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/projects")>();
   const project = {
@@ -25,6 +41,7 @@ vi.mock("../src/projects", async (importOriginal) => {
     report_title: "报警分析报告",
     report_fields: ["summary", "priority", "area", "unit", "noise", "cause", "disposition", "chains"],
     validation_rules: { required_fields: [] },
+    project_role: "SYSTEM_ADMIN" as const,
     created_at: "2026-08-25T00:00:00+08:00",
     updated_at: "2026-08-25T00:00:00+08:00",
   };
@@ -72,9 +89,9 @@ describe("M1 状态页", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "所有基础服务正常" })).toBeInTheDocument();
     });
-    expect(fetchMock).toHaveBeenCalledWith("/api/v1/health", {
-      headers: { Accept: "application/json" },
-    });
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/health", expect.objectContaining({
+      credentials: "same-origin",
+    }));
     for (const label of ["主系统", "PostgreSQL", "算法服务"]) {
       const card = screen.getByRole("heading", { name: label }).closest("article");
       expect(card).not.toBeNull();
@@ -377,16 +394,16 @@ describe("M4 浏览器业务闭环", () => {
         return { ok: true, json: async () => ({ items: [{ ...alarmItem, disposition_status: disposition }], total: 1, page: 0, size: 20 }) } as Response;
       }
       if (url.endsWith(`/${recordId}/disposition`)) {
-        const body = JSON.parse(String(init?.body)) as { status: string; operator: string; note: string };
+        const body = JSON.parse(String(init?.body)) as { status: string; note: string };
         history.push({
           from_status: disposition,
           to_status: body.status,
-          operator: body.operator,
+          operator: "测试管理员",
           note: body.note,
           occurred_at: `2026-08-25T10:02:0${history.length}+08:00`,
         });
         disposition = body.status;
-        return { ok: true, json: async () => ({ status: disposition, operator: body.operator, note: body.note }) } as Response;
+        return { ok: true, json: async () => ({ status: disposition, operator: "测试管理员", note: body.note }) } as Response;
       }
       if (url.endsWith(`/${recordId}/classification`)) {
         const body = JSON.parse(String(init?.body)) as Record<string, string>;
@@ -397,7 +414,7 @@ describe("M4 浏览器业务闭环", () => {
   };
 
         classificationOverride = {
-          operator: body.operator,
+          operator: "测试管理员",
           reason: body.reason,
           updated_at: "2026-08-25T10:03:00+08:00",
         };
@@ -452,17 +469,15 @@ describe("M4 浏览器业务闭环", () => {
     expect(screen.getByTestId("classification-original")).toHaveTextContent("一般报警 / 标准报警 / 设备故障");
     await fireEvent.update(screen.getByTestId("classification-noise"), "CHATTER");
     await fireEvent.click(screen.getByTestId("classification-save"));
-    expect(await screen.findByTestId("service-error")).toHaveTextContent("操作者和修订理由");
+    expect(await screen.findByTestId("service-error")).toHaveTextContent("修订理由");
     expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/classification"))).toHaveLength(0);
     await fireEvent.update(screen.getByTestId("classification-alarm-class"), "NUISANCE");
     await fireEvent.update(screen.getByTestId("classification-cause"), "INSTRUMENT_ISSUE");
-    await fireEvent.update(screen.getByTestId("classification-operator"), "审核员A");
     await fireEvent.update(screen.getByTestId("classification-reason"), "依据合成事件序列复核");
     await fireEvent.click(screen.getByTestId("classification-save"));
     await waitFor(() => expect(screen.getByTestId("classification-effective")).toHaveTextContent("抖动报警 / 干扰报警 / 仪表问题"));
     expect(screen.getByTestId("classification-original")).toHaveTextContent("一般报警 / 标准报警 / 设备故障");
 
-    await fireEvent.update(screen.getByTestId("disposition-operator"), "审核员A");
     await fireEvent.update(screen.getByTestId("disposition-assignee"), "甲班值长");
     await fireEvent.click(screen.getByTestId("disposition-start"));
     expect(await screen.findByTestId("service-error")).toHaveTextContent("请填写处置说明");
@@ -534,7 +549,7 @@ describe("M4 浏览器业务闭环", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(BusinessWorkflow, {
-      props: { currentBatch: { ...readyBatch, status: "IMPORTED" }, batches: [] },
+      props: { currentBatch: { ...readyBatch, status: "IMPORTED" }, batches: [], projectId: "project-1", canOperate: true, canManage: true, systemAdmin: true },
     });
     await fireEvent.click(screen.getByRole("button", { name: "加载并调整参数" }));
     await fireEvent.update(await screen.findByLabelText("最小提升度（倍）"), "2.5");
@@ -609,7 +624,7 @@ describe("M4 浏览器业务闭环", () => {
     );
 
     render(App);
-    await fireEvent.click(screen.getByRole("button", { name: "刷新批次" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "刷新批次" }));
     await fireEvent.click(await screen.findByRole("button", { name: "查看分析" }));
 
     expect(await screen.findByTestId("dashboard-total")).toHaveTextContent("0");
@@ -619,13 +634,12 @@ describe("M4 浏览器业务闭环", () => {
 });
 
 describe("M5 报告、审计与演示复位", () => {
-  it("显示固定本地身份并在复位确认值不精确时不发送请求", async () => {
+  it("显示真实登录身份说明并在复位确认值不精确时不发送请求", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    render(ReviewOperations);
+    render(ReviewOperations, { props: { projectId: "project-1", canManage: true, systemAdmin: true } });
 
-    expect(screen.getByText(/本地演示身份/)).toHaveTextContent("demo-reviewer");
-    expect(screen.getByTestId("reset-operator")).toHaveValue("demo-reviewer");
+    expect(screen.getByText(/操作身份取自当前登录账号/)).toBeInTheDocument();
     await fireEvent.update(screen.getByTestId("reset-confirmation"), "reset_demo");
     await fireEvent.click(screen.getByTestId("reset-button"));
 
@@ -654,12 +668,8 @@ describe("M5 报告、审计与演示复位", () => {
       });
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(ReviewOperations, { props: { runId: "run-1" } });
+    render(ReviewOperations, { props: { runId: "run-1", projectId: "project-1", canManage: true, systemAdmin: true } });
 
-    await fireEvent.click(screen.getByTestId("report-pdf"));
-    expect(screen.getByTestId("report-message")).toHaveTextContent("请填写报告导出操作者");
-    expect(fetchMock).not.toHaveBeenCalled();
-    await fireEvent.update(screen.getByTestId("report-operator"), "审核员A");
     await fireEvent.click(screen.getByTestId("report-pdf"));
     expect(await screen.findByTestId("report-message")).toHaveTextContent("报告生成暂不可用");
     expect(clickSpy).not.toHaveBeenCalled();
@@ -703,7 +713,7 @@ describe("M5 报告、审计与演示复位", () => {
       }), { status: 200, headers: { "Content-Type": "application/json" } });
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(ReviewOperations);
+    render(ReviewOperations, { props: { projectId: "project-1", canManage: true, systemAdmin: true } });
 
     await fireEvent.click(screen.getByTestId("audit-refresh"));
     expect(await screen.findByRole("alert")).toHaveTextContent("数据库暂不可用");
@@ -735,7 +745,7 @@ describe("M5 报告、审计与演示复位", () => {
       }), { status: 200, headers: { "Content-Type": "application/json" } });
     });
     vi.stubGlobal("fetch", fetchMock);
-    const view = render(ReviewOperations, { props: { runId: "run-1" } });
+    const view = render(ReviewOperations, { props: { runId: "run-1", projectId: "project-1", canManage: true, systemAdmin: true } });
 
     await fireEvent.update(screen.getByTestId("reset-confirmation"), "RESET_DEMO");
     await fireEvent.click(screen.getByTestId("reset-button"));
@@ -747,7 +757,7 @@ describe("M5 报告、审计与演示复位", () => {
     await waitFor(() => expect(view.emitted().demoReset).toHaveLength(1));
     expect(screen.getByTestId("reset-message")).toHaveTextContent("演示数据已复位");
     expect(fetchMock).toHaveBeenLastCalledWith("/api/v1/demo/reset", expect.objectContaining({
-      body: JSON.stringify({ operator: "demo-reviewer", confirmation: "RESET_DEMO" }),
+      body: JSON.stringify({ confirmation: "RESET_DEMO" }),
     }));
   });
 });

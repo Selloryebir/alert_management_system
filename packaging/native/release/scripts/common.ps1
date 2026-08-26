@@ -14,6 +14,22 @@ function Join-ReleasePath {
     return [IO.Path]::GetFullPath((Join-Path $Root $native))
 }
 
+function Resolve-ReleaseChildPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][string]$RelativePath
+    )
+    if ([IO.Path]::IsPathRooted($RelativePath)) {
+        throw "运行配置中的路径必须是发布目录内的相对路径：$RelativePath"
+    }
+    $resolved = Join-ReleasePath $Root $RelativePath
+    $rootPrefix = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if (-not $resolved.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "运行配置中的路径越出发布目录：$RelativePath"
+    }
+    return $resolved
+}
+
 function Get-RuntimeContext {
     $root = Get-ReleaseRoot
     $configPath = Join-ReleasePath $root "config/runtime.json"
@@ -31,6 +47,11 @@ function Get-RuntimeContext {
         PgBin = Join-ReleasePath $root "runtime/postgresql/bin"
         PgData = Join-ReleasePath $root "data/postgresql"
         PgDataArgument = "data\postgresql"
+        InstanceIdentity = Join-ReleasePath $root "data/instance.json"
+        RestoreVerificationRoot = Join-ReleasePath $root "data/restore-verification"
+        Secrets = Join-ReleasePath $root "data/secrets"
+        DatabasePasswordFile = Resolve-ReleaseChildPath $root ([string]$config.database.password_file)
+        BootstrapAdminPasswordFile = Resolve-ReleaseChildPath $root ([string]$config.bootstrap_admin.password_file)
         Logs = Join-ReleasePath $root "logs"
         Pids = Join-ReleasePath $root "pids"
         Backups = Join-ReleasePath $root "backups"
@@ -39,7 +60,8 @@ function Get-RuntimeContext {
 
 function Initialize-ReleaseDirectories {
     param([Parameter(Mandatory = $true)]$Context)
-    foreach ($path in @($Context.Logs, $Context.Pids, $Context.Backups, (Split-Path $Context.PgData -Parent))) {
+    foreach ($path in @($Context.Logs, $Context.Pids, $Context.Backups, $Context.Secrets,
+            (Split-Path $Context.PgData -Parent))) {
         if (-not (Test-Path -LiteralPath $path)) {
             New-Item -ItemType Directory -Path $path | Out-Null
         }
@@ -49,7 +71,8 @@ function Initialize-ReleaseDirectories {
 function Assert-FixedRuntimeConfig {
     param([Parameter(Mandatory = $true)]$Context)
     $config = $Context.Config
-    if ($config.identity -ne "报警管理系统") {
+    if ([int]$config.schema_version -ne 2 -or $config.identity -ne "报警管理系统" -or
+            $config.deployment_mode -ne "LOCAL_NATIVE") {
         throw "config/runtime.json 的 identity 与发布契约不一致。"
     }
     if ([int]$config.ports.postgres -ne 55432 -or [int]$config.ports.algorithm -ne 8001 -or
@@ -61,9 +84,336 @@ function Assert-FixedRuntimeConfig {
             throw "数据库名称和用户必须是安全的 PostgreSQL 标识符。"
         }
     }
-    if ([string]::IsNullOrWhiteSpace([string]$config.database.password)) {
-        throw "数据库密码不能为空。"
+    if ($config.PSObject.Properties.Name -contains "password") {
+        throw "config/runtime.json 不得包含数据库明文密码。"
     }
+    if ([string]$config.database.password_file -ne "data/secrets/database-password.txt" -or
+            [string]$config.bootstrap_admin.password_file -ne "data/secrets/bootstrap-admin-password.txt" -or
+            [string]$config.bootstrap_admin.username -notmatch '^[a-z0-9._-]{3,50}$') {
+        throw "密钥文件或初始管理员配置与发布契约不一致。"
+    }
+}
+
+function Get-ReleaseManifest {
+    param([Parameter(Mandatory = $true)]$Context)
+    if (-not (Test-Path -LiteralPath $Context.Manifest -PathType Leaf)) {
+        throw "发布清单不存在：$($Context.Manifest)"
+    }
+    $manifest = Get-Content -LiteralPath $Context.Manifest -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([int]$manifest.schema_version -ne 1 -or $manifest.product -ne "alert-management-system" -or
+            $manifest.target -ne "windows-x64" -or
+            [string]$manifest.source_commit -notmatch '^[0-9A-Fa-f]{40}$') {
+        throw "release-manifest.json 不能唯一标识当前 Windows 发布包。"
+    }
+    return $manifest
+}
+
+function Assert-InstanceIdentity {
+    param([Parameter(Mandatory = $true)]$Context)
+    if (-not (Test-Path -LiteralPath $Context.InstanceIdentity -PathType Leaf)) {
+        throw "当前发布实例缺少身份文件：$($Context.InstanceIdentity)"
+    }
+    $identity = Get-Content -LiteralPath $Context.InstanceIdentity -Raw -Encoding UTF8 | ConvertFrom-Json
+    $manifest = Get-ReleaseManifest $Context
+    if ([int]$identity.schema_version -ne 1 -or $identity.product -ne "alert-management-system" -or
+            [string]$identity.instance_id -notmatch '^[0-9a-f]{32}$' -or
+            -not (Normalize-DirectoryPath ([string]$identity.release_root)).Equals(
+                (Normalize-DirectoryPath $Context.Root), [StringComparison]::OrdinalIgnoreCase) -or
+            -not ([string]$identity.source_commit).Equals(
+                [string]$manifest.source_commit, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "实例身份与当前发布目录或发布清单不一致，拒绝操作。"
+    }
+    return $identity
+}
+
+function Initialize-InstanceIdentity {
+    param([Parameter(Mandatory = $true)]$Context)
+    if (Test-Path -LiteralPath $Context.InstanceIdentity) {
+        [void](Assert-InstanceIdentity $Context)
+        return
+    }
+    if (Test-Path -LiteralPath (Join-Path $Context.PgData "PG_VERSION") -PathType Leaf) {
+        throw "已有 PostgreSQL 数据但缺少实例身份，拒绝自动认领。"
+    }
+    $manifest = Get-ReleaseManifest $Context
+    $identity = [ordered]@{
+        schema_version = 1
+        product = "alert-management-system"
+        instance_id = [Guid]::NewGuid().ToString("N")
+        release_root = Normalize-DirectoryPath $Context.Root
+        source_commit = [string]$manifest.source_commit
+        created_at = [DateTimeOffset]::UtcNow.ToString("o")
+    }
+    $parent = Split-Path $Context.InstanceIdentity -Parent
+    if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+        New-Item -ItemType Directory -Path $parent | Out-Null
+    }
+    $temporary = $Context.InstanceIdentity + ".tmp-" + [Guid]::NewGuid().ToString("N")
+    try {
+        [IO.File]::WriteAllText($temporary, (($identity | ConvertTo-Json -Depth 4) + "`n"),
+            (New-Object Text.UTF8Encoding($false)))
+        [IO.File]::Move($temporary, $Context.InstanceIdentity)
+    } finally {
+        if (Test-Path -LiteralPath $temporary) {
+            Remove-Item -LiteralPath $temporary -Force
+        }
+    }
+}
+
+function Assert-OwnedMutableDirectory {
+    param(
+        [Parameter(Mandatory = $true)]$Context,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$ExpectedPath
+    )
+    $actual = Normalize-DirectoryPath $Path
+    $expected = Normalize-DirectoryPath $ExpectedPath
+    $root = Normalize-DirectoryPath $Context.Root
+    if (-not $actual.Equals($expected, [StringComparison]::OrdinalIgnoreCase) -or
+            $actual.Equals($root, [StringComparison]::OrdinalIgnoreCase) -or
+            -not $actual.StartsWith(($root + [IO.Path]::DirectorySeparatorChar),
+                [StringComparison]::OrdinalIgnoreCase)) {
+        throw "清理路径不是当前发布实例的精确受控目录：$actual"
+    }
+    if (Test-Path -LiteralPath $actual) {
+        $item = Get-Item -LiteralPath $actual -Force
+        if (-not $item.PSIsContainer -or
+                (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+            throw "清理路径不是普通目录，拒绝递归删除：$actual"
+        }
+    }
+    return $actual
+}
+
+function Assert-NoReleasePathReparseBoundary {
+    param(
+        [Parameter(Mandatory = $true)]$Context,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+    $root = Normalize-DirectoryPath $Context.Root
+    $target = Normalize-DirectoryPath $Path
+    if (-not ($target.Equals($root, [StringComparison]::OrdinalIgnoreCase) -or
+            $target.StartsWith(($root + [IO.Path]::DirectorySeparatorChar),
+                [StringComparison]::OrdinalIgnoreCase))) {
+        throw "路径越出当前发布实例：$target"
+    }
+    $current = $root
+    foreach ($segment in @($target.Substring($root.Length).TrimStart('\', '/').Split(
+            @([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar),
+            [StringSplitOptions]::RemoveEmptyEntries))) {
+        if (Test-Path -LiteralPath $current) {
+            $item = Get-Item -LiteralPath $current -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "发布实例路径边界包含 Junction 或符号链接：$current"
+            }
+        }
+        $current = Join-Path $current $segment
+    }
+    if (Test-Path -LiteralPath $current) {
+        $item = Get-Item -LiteralPath $current -Force
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "发布实例路径边界包含 Junction 或符号链接：$current"
+        }
+    }
+}
+
+function Enter-InstanceMaintenanceLock {
+    param([Parameter(Mandatory = $true)]$Context)
+    $identity = Assert-InstanceIdentity $Context
+    $lockPath = Join-ReleasePath $Context.Root (".instance-maintenance-" +
+        [string]$identity.instance_id + ".lock")
+    Assert-NoReleasePathReparseBoundary $Context $lockPath
+    try {
+        $stream = [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate,
+            [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    } catch {
+        throw "当前实例正在执行备份、恢复或清理，无法取得维护互斥锁。"
+    }
+    return [PSCustomObject]@{ Path = $lockPath; Stream = $stream }
+}
+
+function Exit-InstanceMaintenanceLock {
+    param($Lock)
+    if ($null -ne $Lock -and $null -ne $Lock.Stream) {
+        $Lock.Stream.Dispose()
+    }
+}
+
+function Assert-OwnedBackupFile {
+    param(
+        [Parameter(Mandatory = $true)]$Context,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+    Assert-NoReleasePathReparseBoundary $Context $Context.Backups
+    $resolved = [IO.Path]::GetFullPath($Path)
+    if (-not (Normalize-DirectoryPath (Split-Path $resolved -Parent)).Equals(
+            (Normalize-DirectoryPath $Context.Backups), [StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $resolved -PathType Leaf)) {
+        throw "文件不属于当前发布实例的 backups 目录：$resolved"
+    }
+    $item = Get-Item -LiteralPath $resolved -Force
+    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "恢复点文件不能是 Junction 或符号链接：$resolved"
+    }
+    return $item
+}
+
+function Get-RecoveryPoint {
+    param(
+        [Parameter(Mandatory = $true)]$Context,
+        [Parameter(Mandatory = $true)][string]$MetadataPath,
+        [switch]$VerifyHash,
+        [switch]$RequireCurrentOrigin
+    )
+    $metadataItem = Assert-OwnedBackupFile $Context $MetadataPath
+    if (-not $metadataItem.Name.EndsWith(".dump.meta.json", [StringComparison]::OrdinalIgnoreCase)) {
+        throw "恢复点元数据名称无效：$($metadataItem.Name)"
+    }
+    $metadata = Get-Content -LiteralPath $metadataItem.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+    $backupFile = [string]$metadata.backup_file
+    if ([IO.Path]::GetFileName($backupFile) -ne $backupFile -or
+            $metadataItem.Name -ne ($backupFile + ".meta.json") -or
+            [int]$metadata.schema_version -ne 1 -or
+            $metadata.product -ne "alert-management-system-recovery-point" -or
+            [string]$metadata.origin_instance_id -notmatch '^[0-9a-f]{32}$' -or
+            [string]$metadata.origin_source_commit -notmatch '^[0-9a-f]{40}$' -or
+            [string]$metadata.database -ne [string]$Context.Config.database.name -or
+            $metadata.pg_restore_list_verified -ne $true -or
+            [string]$metadata.sha256 -notmatch '^[0-9a-f]{64}$' -or
+            [Int64]$metadata.size_bytes -le 0) {
+        throw "恢复点元数据格式或来源字段无效：$($metadataItem.FullName)"
+    }
+    $createdAt = [DateTimeOffset]::MinValue
+    if (-not [DateTimeOffset]::TryParse([string]$metadata.created_at, [ref]$createdAt)) {
+        throw "恢复点创建时间无效：$($metadataItem.FullName)"
+    }
+    if ($RequireCurrentOrigin) {
+        $identity = Assert-InstanceIdentity $Context
+        $manifest = Get-ReleaseManifest $Context
+        if ([string]$metadata.origin_instance_id -ne [string]$identity.instance_id -or
+                [string]$metadata.origin_source_commit -ne [string]$manifest.source_commit) {
+            throw "恢复点来源不是当前实例，保留策略不会自动删除：$($metadataItem.FullName)"
+        }
+    }
+    $dumpItem = Assert-OwnedBackupFile $Context (Join-Path $Context.Backups $backupFile)
+    if ([Int64]$dumpItem.Length -ne [Int64]$metadata.size_bytes) {
+        throw "恢复点大小与元数据不一致：$($dumpItem.FullName)"
+    }
+    $hashStatus = "NOT_CHECKED"
+    if ($VerifyHash) {
+        $actualHash = (Get-FileHash -LiteralPath $dumpItem.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualHash -ne [string]$metadata.sha256) {
+            throw "恢复点 SHA-256 与元数据不一致：$($dumpItem.FullName)"
+        }
+        $hashStatus = "OK"
+    }
+    return [PSCustomObject]@{
+        BackupPath = $dumpItem.FullName
+        MetadataPath = $metadataItem.FullName
+        Metadata = $metadata
+        CreatedAt = $createdAt
+        SizeBytes = [Int64]$dumpItem.Length
+        HashStatus = $hashStatus
+    }
+}
+
+function Invoke-RecoveryPointRetention {
+    param(
+        [Parameter(Mandatory = $true)]$Context,
+        [Parameter(Mandatory = $true)][ValidateRange(1, 365)][int]$RetentionCount
+    )
+    $validPoints = @()
+    foreach ($metadataFile in @(Get-ChildItem -LiteralPath $Context.Backups `
+            -Filter "*.dump.meta.json" -File -ErrorAction SilentlyContinue)) {
+        try {
+            $validPoints += Get-RecoveryPoint $Context $metadataFile.FullName `
+                -VerifyHash -RequireCurrentOrigin
+        } catch {
+            Write-Warning "保留策略跳过异常恢复点：$($metadataFile.Name)：$($_.Exception.Message)"
+        }
+    }
+    $ordered = @($validPoints | Sort-Object CreatedAt -Descending)
+    if ($ordered.Count -le $RetentionCount) {
+        return
+    }
+    foreach ($point in @($ordered | Select-Object -Skip $RetentionCount)) {
+        [void](Assert-OwnedBackupFile $Context $point.BackupPath)
+        [void](Assert-OwnedBackupFile $Context $point.MetadataPath)
+        Remove-Item -LiteralPath $point.BackupPath -Force
+        Remove-Item -LiteralPath $point.MetadataPath -Force
+        Write-Host "已按保留策略移除旧恢复点：$([IO.Path]::GetFileName($point.BackupPath))"
+    }
+}
+
+function Get-InstanceBackupTaskName {
+    param([Parameter(Mandatory = $true)]$Identity)
+    return "AlertManagementSystem-Backup-" + [string]$Identity.instance_id
+}
+
+
+function Protect-SecretFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $security = New-Object Security.AccessControl.FileSecurity
+    $security.SetAccessRuleProtection($true, $false)
+    $rule = New-Object Security.AccessControl.FileSystemAccessRule(
+        $identity, [Security.AccessControl.FileSystemRights]::FullControl,
+        [Security.AccessControl.AccessControlType]::Allow)
+    [void]$security.AddAccessRule($rule)
+    [IO.File]::SetAccessControl($Path, $security)
+}
+
+function New-RandomSecret {
+    $bytes = New-Object byte[] 32
+    $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $generator.GetBytes($bytes)
+    } finally {
+        $generator.Dispose()
+    }
+    return [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+}
+
+function Initialize-SecretFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (Test-Path -LiteralPath $Path) {
+        if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+            throw "密钥路径不是普通文件：$Path"
+        }
+        if ([string]::IsNullOrWhiteSpace([IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8))) {
+            throw "密钥文件为空，拒绝覆盖：$Path"
+        }
+        Protect-SecretFile $Path
+        return
+    }
+    $temporary = $Path + ".tmp-" + [Guid]::NewGuid().ToString("N")
+    try {
+        [IO.File]::WriteAllText($temporary, (New-RandomSecret), (New-Object Text.UTF8Encoding($false)))
+        Protect-SecretFile $temporary
+        [IO.File]::Move($temporary, $Path)
+    } finally {
+        if (Test-Path -LiteralPath $temporary) {
+            Remove-Item -LiteralPath $temporary -Force
+        }
+    }
+}
+
+function Initialize-InstanceSecrets {
+    param([Parameter(Mandatory = $true)]$Context)
+    Initialize-SecretFile $Context.DatabasePasswordFile
+    Initialize-SecretFile $Context.BootstrapAdminPasswordFile
+}
+
+function Get-SecretValue {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "密钥文件不存在：$Path"
+    }
+    $value = [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8).Trim()
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        throw "密钥文件为空：$Path"
+    }
+    return $value
 }
 
 function Test-PortAvailable {
@@ -140,6 +490,35 @@ function Invoke-BundledCommand {
         throw "包内程序执行失败（退出码 $($result.ExitCode)）：$FilePath $($Arguments -join ' ')`n$($result.Output)"
     }
     return $result.Output
+}
+
+function Invoke-BundledCommandWithoutCapture {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$Arguments = @(),
+        [string]$WorkingDirectory
+    )
+    $process = New-Object Diagnostics.Process
+    try {
+        $startInfo = New-Object Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $FilePath
+        $startInfo.Arguments = ConvertTo-NativeArgumentLine $Arguments
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+            $startInfo.WorkingDirectory = $WorkingDirectory
+        }
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) {
+            throw "无法启动包内程序：$FilePath"
+        }
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0) {
+            throw "包内程序执行失败（退出码 $($process.ExitCode)）：$FilePath $($Arguments -join ' ')"
+        }
+    } finally {
+        $process.Dispose()
+    }
 }
 
 function Normalize-DirectoryPath {
@@ -323,7 +702,7 @@ function Assert-OwnedProcess {
     if (-not (Test-Path -LiteralPath $recordPath -PathType Leaf)) {
         throw "$Name 的 PID 身份记录不存在，请先执行 scripts\start.ps1。"
     }
-    $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $record = Get-OwnedPidRecord $Context $Name
     $processId = [int]$record.pid
     $process = Get-CimProcess $processId
     if ($null -eq $process) {
@@ -336,11 +715,52 @@ function Assert-OwnedProcess {
     if (-not $expectedMatch) {
         throw "$Name 的 PID 已被复用，实际可执行文件不属于当前发布包。"
     }
+    if (-not (Test-PidRecordProcessMatch $record $process)) {
+        throw "$Name 的实际进程与当前发布实例记录不一致。"
+    }
     if (-not [string]::IsNullOrWhiteSpace($RequiredCommandText) -and
             ([string]$process.CommandLine).IndexOf($RequiredCommandText, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
         throw "$Name 的命令行身份与当前发布包不一致。"
     }
     return $process
+}
+
+function Get-OwnedPidRecord {
+    param(
+        [Parameter(Mandatory = $true)]$Context,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+    $recordPath = Join-Path $Context.Pids ($Name + ".json")
+    if (-not (Test-Path -LiteralPath $recordPath -PathType Leaf)) {
+        throw "$Name 的 PID 身份记录不存在，请先执行 scripts\start.ps1。"
+    }
+    $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (-not (Normalize-DirectoryPath ([string]$record.release_root)).Equals(
+            (Normalize-DirectoryPath $Context.Root), [StringComparison]::OrdinalIgnoreCase)) {
+        throw "$Name 的 PID 身份记录不属于当前发布实例。"
+    }
+    $processId = 0
+    if (-not [int]::TryParse([string]$record.pid, [ref]$processId) -or $processId -le 0 -or
+            [string]::IsNullOrWhiteSpace([string]$record.executable_path) -or
+            [string]::IsNullOrWhiteSpace([string]$record.command_line)) {
+        throw "$Name 的 PID 身份记录字段无效，拒绝操作。"
+    }
+    return $record
+}
+
+function Test-PidRecordProcessMatch {
+    param(
+        [Parameter(Mandatory = $true)]$Record,
+        [Parameter(Mandatory = $true)]$Process
+    )
+    if ($null -eq $Process -or [string]::IsNullOrWhiteSpace([string]$Process.ExecutablePath)) {
+        return $false
+    }
+    return ([IO.Path]::GetFullPath([string]$Process.ExecutablePath)).Equals(
+            [IO.Path]::GetFullPath([string]$Record.executable_path),
+            [StringComparison]::OrdinalIgnoreCase) -and
+        ([string]$Process.CommandLine).Trim().Equals(
+            ([string]$Record.command_line).Trim(), [StringComparison]::Ordinal)
 }
 
 function Remove-PidRecord {

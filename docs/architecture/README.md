@@ -77,6 +77,7 @@ PostgreSQL 是唯一业务事实源，保存项目、导入批次、规范化报
 - 浏览器只访问 Java；Python 默认仅监听 `127.0.0.1` 的独立本机端口。
 - 浏览器业务 API 使用兼容的 `/api/v1` 结构；Java—Python 使用[报警数据与算法接口契约](../product/data-contract.md)中冻结的算法 v2，以 `analysis_run_id` 保证重复请求可识别。
 - 项目作用域、生命周期和项目设置遵循[项目化业务契约](../product/project-contract.md)。项目归档是只读生命周期状态，不等同删除；有业务事实的项目不得物理删除。
+- 登录、项目授权、真实审计主体、部署模式和输入上限遵循[身份、授权与安全部署契约](../product/security-contract.md)。浏览器只使用 Java 同源会话；Python 不接收用户凭据。
 - Java 在保存算法结果前检查契约版本、运行标识、记录归属和汇总计数。检查失败则整次运行失败，不写部分结果。
 - 数据库事务只覆盖 Java 自身数据库操作，不尝试分布式事务。算法计算失败可以明确重试，同一成功运行不得生成重复业务结果。
 - P0 业务 API 使用统一错误结构：`code`、`message`、`trace_id`、可选 `field_errors`。界面展示可行动的中文信息，不展示堆栈。
@@ -92,8 +93,9 @@ alert-management-system/
   runtime/postgresql/   # 锁定版本的 Windows PostgreSQL 运行时
   config/               # 本机演示配置
   samples/              # smoke、demo、invalid
-  scripts/              # preflight/start/stop/reset-demo/backup
+  scripts/              # 预检、启停、复位、备份、计划任务、隔离恢复和精确清理
   data/                  # 首次启动创建，含数据库和上传文件
+  backups/               # 恢复点及来源/大小/SHA-256 元数据
   logs/                  # 统一日志
 ```
 
@@ -103,11 +105,14 @@ alert-management-system/
 - `preflight` 检查端口、磁盘空间、目录可写性及运行时完整性；检查失败必须给出具体修复建议。
 - `start` 按 PostgreSQL → Python → Java 顺序启动并等待健康；任何步骤失败即返回非零并保留日志。
 - `stop` 只停止本发布包记录的进程；`reset-demo` 仅复位明确的本地演示实例并要求交互确认或显式 `-Force`。
+- 备份、恢复和清理使用同一实例维护锁；清理默认保留可复制到新实例验证的恢复点，只处理身份、路径和进程均匹配的当前发布实例。
 - 当前默认运行配置只服务本机合成示例；非本机部署必须使用 M11 定义的安全配置。
 
 ## 6. Docker 次级交付
 
 Docker Compose 使用相同的 Java 构件、Python 源版本、Flyway 迁移、环境变量名和冒烟测试。Compose 不形成第二套业务方案，也不得阻塞原生包 P0 验收。数据卷和端口均采用项目专用名称；复位只处理本项目资源。
+
+本机 Compose 只向宿主回环发布 Java；网络模式使用独立覆盖配置，由 Java 直接提供 HTTPS 且不发布数据库和算法端口。缺证书、私钥或部署秘密时拒绝启动，不回退到明文服务。
 
 ## 7. 可观测性与故障行为
 

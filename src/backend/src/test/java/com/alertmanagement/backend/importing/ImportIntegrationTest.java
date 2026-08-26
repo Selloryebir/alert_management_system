@@ -35,10 +35,12 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.web.server.ResponseStatusException;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
+@WithMockUser(username = "test-admin", roles = "SYSTEM_ADMIN")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ImportIntegrationTest {
 
@@ -71,6 +73,10 @@ class ImportIntegrationTest {
         registry.add("spring.datasource.url", () -> POSTGRES.getJdbcUrl("postgres", "postgres"));
         registry.add("spring.datasource.username", () -> "postgres");
         registry.add("spring.datasource.password", () -> "");
+        registry.add("app.deployment-mode", () -> "LOCAL_NATIVE");
+        registry.add("app.bootstrap-admin-username", () -> "test-admin");
+        registry.add("app.bootstrap-admin-password-file",
+                () -> Path.of("src/test/resources/bootstrap-password.txt").toAbsolutePath().toString());
     }
 
     @BeforeEach

@@ -18,6 +18,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import com.alertmanagement.backend.project.ProjectValidationRules;
+import com.alertmanagement.backend.api.BusinessApiException;
+import org.springframework.http.HttpStatus;
 
 @Component
 class AlarmNormalizer {
@@ -77,6 +79,7 @@ class AlarmNormalizer {
 
             validateTimeOrder(row.sourceRow(), eventTime, returnTime, "return_time", errors);
             validateTimeOrder(row.sourceRow(), eventTime, ackTime, "ack_time", errors);
+            ensureErrorLimit(errors);
 
             if (errors.size() == errorStart) {
                 validRows++;
@@ -118,6 +121,7 @@ class AlarmNormalizer {
             range(record.sourceRow(), "value", record.value(), rules.valueMin(), rules.valueMax(), errors);
             range(record.sourceRow(), "threshold", record.threshold(),
                     rules.thresholdMin(), rules.thresholdMax(), errors);
+            ensureErrorLimit(errors);
             if (errors.size() == before) {
                 records.add(record);
             }
@@ -350,6 +354,13 @@ class AlarmNormalizer {
     private boolean hasGlobalError(List<ImportError> errors) {
         return errors.stream().anyMatch(error -> error.sourceRow() == 1
                 && Set.of("MISSING_HEADER", "DUPLICATE_HEADER", "INVALID_MAPPING").contains(error.code()));
+    }
+
+    private void ensureErrorLimit(List<ImportError> errors) {
+        if (errors.size() > ImportLimits.MAX_ERRORS) {
+            throw new BusinessApiException(HttpStatus.PAYLOAD_TOO_LARGE,
+                    "IMPORT_ERROR_LIMIT", "校验错误不能超过 1,000 个，请离线修正后重试");
+        }
     }
 
     private static Map<String, List<String>> aliases() {

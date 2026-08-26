@@ -9,7 +9,27 @@ python3 "$REPOSITORY_ROOT/scripts/validate_automation.py"
 if command -v java >/dev/null 2>&1; then
   "$REPOSITORY_ROOT/mvnw" -f "$REPOSITORY_ROOT/src/backend/pom.xml" test
 else
-  cmd.exe /d /c "set DEBUG=false&& mvnw.cmd -f src\\backend\\pom.xml test" </dev/null
+  windows_maven_log=$(mktemp)
+  trap 'rm -f "$windows_maven_log"' EXIT
+  for attempt in 1 2 3; do
+    if cmd.exe /d /c "set DEBUG=false&& mvnw.cmd -f src\\backend\\pom.xml test" \
+        </dev/null 2>&1 | tee "$windows_maven_log"; then
+      break
+    fi
+    windows_maven_status=${PIPESTATUS[0]}
+    if ! grep -Fq "UtilAcceptVsock" "$windows_maven_log" ||
+        ! grep -Fq "failed 110" "$windows_maven_log"; then
+      exit "$windows_maven_status"
+    fi
+    if ((attempt == 3)); then
+      echo "WSL 到 Windows 的 Maven 启动连续 3 次通信超时。" >&2
+      exit "$windows_maven_status"
+    fi
+    echo "WSL 到 Windows 的 Maven 启动失败，第 $attempt 次有限重试。" >&2
+    sleep 2
+  done
+  rm -f "$windows_maven_log"
+  trap - EXIT
 fi
 
 (

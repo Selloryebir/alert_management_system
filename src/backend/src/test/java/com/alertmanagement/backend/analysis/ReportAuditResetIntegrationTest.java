@@ -16,10 +16,15 @@ import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Path;
+import java.sql.Connection;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -34,12 +39,15 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
+@WithMockUser(username = "test-admin", roles = "SYSTEM_ADMIN")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReportAuditResetIntegrationTest {
 
@@ -54,11 +62,18 @@ class ReportAuditResetIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private DataSource dataSource;
+
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", () -> POSTGRES.getJdbcUrl("postgres", "postgres"));
         registry.add("spring.datasource.username", () -> "postgres");
         registry.add("spring.datasource.password", () -> "");
+        registry.add("app.deployment-mode", () -> "LOCAL_NATIVE");
+        registry.add("app.bootstrap-admin-username", () -> "test-admin");
+        registry.add("app.bootstrap-admin-password-file",
+                () -> Path.of("src/test/resources/bootstrap-password.txt").toAbsolutePath().toString());
     }
 
     @BeforeEach
@@ -108,7 +123,7 @@ class ReportAuditResetIntegrationTest {
                 .andExpect(jsonPath("$.noise_type").value("CHATTER"))
                 .andExpect(jsonPath("$.alarm_class").value("ACTIONABLE"))
                 .andExpect(jsonPath("$.algorithm_classification.noise_type").value("NORMAL"))
-                .andExpect(jsonPath("$.classification_override.operator").value("审核员A"))
+                .andExpect(jsonPath("$.classification_override.operator").value("test-admin"))
                 .andExpect(jsonPath("$.classification_override.reason").value("根据事件序列复核"));
         mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/classification",
                         seed.runId(), recordId).contentType(MediaType.APPLICATION_JSON).content(override))
@@ -300,9 +315,9 @@ class ReportAuditResetIntegrationTest {
                 .andExpect(jsonPath("$.deleted_counts.business_project").value(1));
         assertThat(count("alarm_record")).isZero();
         assertThat(count("analysis_run")).isZero();
-        assertThat(count("audit_event")).isZero();
+        assertThat(count("audit_event")).isOne();
         assertThat(count("app_metadata")).isZero();
-        assertThat(count("flyway_schema_history")).isEqualTo(8);
+        assertThat(count("flyway_schema_history")).isEqualTo(9);
         assertThat(count("business_project")).isOne();
         assertThat(jdbcTemplate.queryForMap("""
                 SELECT code, name, client_name, site, unit_name, status, report_title,
@@ -324,6 +339,29 @@ class ReportAuditResetIntegrationTest {
                 .andExpect(jsonPath("$.deleted_counts.alarm_record").value(0))
                 .andExpect(jsonPath("$.deleted_counts.import_batch").value(0))
                 .andExpect(jsonPath("$.deleted_counts.business_project").value(0));
+    }
+
+    @Test
+    void resetWaitsForTheSharedAnalysisTransactionGateBeforeTakingTableLocks() throws Exception {
+        seedCompletedRun();
+
+        try (Connection blocker = dataSource.getConnection();
+                var executor = new DelegatingSecurityContextExecutorService(
+                        Executors.newSingleThreadExecutor())) {
+            blocker.setAutoCommit(false);
+            blocker.createStatement().execute(
+                    "SELECT pg_advisory_xact_lock(1095517522, 1297040468)");
+
+            var result = executor.submit(() -> mockMvc.perform(post("/api/v1/demo/reset")
+                    .contentType(MediaType.APPLICATION_JSON).content(resetRequest())).andReturn());
+
+            awaitAdvisoryWaiter();
+            assertThat(result).isNotDone();
+            blocker.commit();
+
+            assertThat(result.get(15, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(200);
+            assertThat(count("alarm_record")).isZero();
+        }
     }
 
     private void disposition(UUID runId, UUID recordId, String statusValue, String note) throws Exception {
@@ -396,6 +434,19 @@ class ReportAuditResetIntegrationTest {
 
     private String resetRequest() {
         return "{\"operator\":\"demo-reviewer\",\"confirmation\":\"RESET_DEMO\"}";
+    }
+
+    private void awaitAdvisoryWaiter() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            Integer waiters = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM pg_locks WHERE locktype='advisory' AND NOT granted", Integer.class);
+            if (waiters != null && waiters > 0) {
+                return;
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("演示复位事务未等待共享 advisory lock");
     }
 
     private static EmbeddedPostgres startPostgres() {

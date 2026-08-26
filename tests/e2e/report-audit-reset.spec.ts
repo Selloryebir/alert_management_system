@@ -16,7 +16,7 @@ const dataset = path.resolve(
 const outputRoot = path.resolve(
   process.env.M5_OUTPUT_DIR ?? path.join(repositoryRoot, ".runtime/m5"),
 );
-const operator = "SYNTHETIC_M5_REVIEWER";
+const operator = "admin";
 
 type PreviewResponse = { batch_id: string; total_rows: number; status: string };
 type DashboardResponse = {
@@ -31,7 +31,7 @@ type AuditItem = {
   occurred_at: string;
   operator: string;
   target_type: string;
-  target_id: string;
+  target_id?: string;
   result: string;
   trace_id: string;
   details: Record<string, unknown>;
@@ -110,7 +110,6 @@ async function overrideClassification(page: Page, runId: string): Promise<void> 
   await page.getByTestId("classification-noise").selectOption("CHATTER");
   await page.getByTestId("classification-alarm-class").selectOption("NUISANCE");
   await page.getByTestId("classification-cause").selectOption("INSTRUMENT_ISSUE");
-  await page.getByTestId("classification-operator").fill(operator);
   await page.getByTestId("classification-reason").fill("[SYNTHETIC] 根据事件链完成审核修订");
   const responsePromise = page.waitForResponse(
     (response) => response.url().endsWith("/classification")
@@ -142,8 +141,7 @@ async function overrideClassification(page: Page, runId: string): Promise<void> 
 }
 
 async function closeAlarm(page: Page): Promise<void> {
-  await page.getByTestId("disposition-assignee").fill("SYNTHETIC_M5_ASSIGNEE");
-  await page.getByTestId("disposition-operator").fill(operator);
+  await page.getByTestId("disposition-assignee").fill("admin");
   await page.getByTestId("disposition-note").fill("[SYNTHETIC] 开始处理修订报警");
   await page.getByTestId("disposition-start").click();
   await page.getByTestId("disposition-note").fill("[SYNTHETIC] 完成审核并关闭");
@@ -199,7 +197,11 @@ async function auditSnapshot(
     expect(item.occurred_at).toBeTruthy();
     expect(item.operator).toBeTruthy();
     expect(item.target_type).toBeTruthy();
-    expect(item.target_id).toBeTruthy();
+    if (item.target_type === "SYSTEM") {
+      expect(item.target_id).toBeUndefined();
+    } else {
+      expect(item.target_id).toBeTruthy();
+    }
     expect(item.result).toBeTruthy();
     expect(item.trace_id).toBeTruthy();
     expect(item.details).toBeTruthy();
@@ -226,7 +228,7 @@ async function assertReportFailureKeepsState(page: Page, runId: string): Promise
 }
 
 async function resetDemo(page: Page, injectFailure: boolean): Promise<ResetResponse> {
-  await expect(page.getByTestId("reset-operator")).toHaveValue("demo-reviewer");
+  await expect(page.getByText("操作身份取自当前登录账号", { exact: true })).toBeVisible();
   await page.getByTestId("reset-confirmation").fill("RESET_DEMO");
   if (injectFailure) {
     await injectNextFetchFailure(page, "/api/v1/demo/reset", {
@@ -252,7 +254,9 @@ async function resetDemo(page: Page, injectFailure: boolean): Promise<ResetRespo
   await expect(page.getByTestId("reset-message")).toContainText("已复位");
   await expect(page.getByTestId("empty-state").first()).toBeVisible();
   const audit = await responseJson<AuditPage>(await page.request.get("/api/v1/audit-events?page=0&size=1"));
-  expect(audit.total).toBe(0);
+  expect(audit.total).toBe(1);
+  expect(audit.items).toHaveLength(1);
+  expect(audit.items[0]).toMatchObject({ event_type: "DEMO_RESET", result: "SUCCESS" });
   return reset;
 }
 
@@ -261,17 +265,18 @@ test("报告、审计、人工修订和明确复位结果一致", async ({ page 
   expect(Number.isInteger(cycles) && cycles > 0, "E2E_CYCLES 必须是正整数").toBeTruthy();
   mkdirSync(outputRoot, { recursive: true });
   const summaries: Array<Record<string, unknown>> = [];
+  await page.goto("/");
+  await resetDemo(page, false);
 
   for (let cycle = 1; cycle <= cycles; cycle += 1) {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "报警管理系统" })).toBeVisible();
-    await expect(page.getByText("本地演示身份 demo-reviewer", { exact: false }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "报警管理系统", exact: true })).toBeVisible();
+    await expect(page.getByText("admin · 系统管理员", { exact: false }).first()).toBeVisible();
     const runId = await importAndAnalyze(page);
     await openSyntheticChainAlarm(page);
     await overrideClassification(page, runId);
     await closeAlarm(page);
 
-    await page.getByTestId("report-operator").fill(operator);
     const reportDirectory = path.join(outputRoot, `cycle-${cycle}`);
     const reports = [
       await downloadReport(page, runId, "pdf", reportDirectory),
@@ -326,12 +331,12 @@ test("20000 行完成两类报告并记录可下载指标", async ({ page }) => 
   test.skip(mode !== "demo", "仅 Demo 模式执行 20000 行报告门槛");
   mkdirSync(outputRoot, { recursive: true });
   await page.goto("/");
+  await resetDemo(page, false);
   const runId = await importAndAnalyze(page);
   const dashboard = await responseJson<DashboardResponse>(
     await page.request.get(`/api/v1/analyses/${runId}/dashboard`),
   );
   expect(dashboard.total).toBe(20_000);
-  await page.getByTestId("report-operator").fill(operator);
   const reportDirectory = path.join(outputRoot, "demo-20000");
   const reports = [
     await downloadReport(page, runId, "pdf", reportDirectory),

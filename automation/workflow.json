@@ -26,6 +26,7 @@
     "docs/product/source-coverage.md",
     "docs/algorithm/model-v2.md",
     "docs/security/threat-model.md",
+    "docs/product/security-contract.md",
     "docs/releases/versioning.md"
   ],
   "stages": [
@@ -269,6 +270,9 @@
       "name": "身份权限与安全部署边界",
       "depends_on": ["M10"],
       "references": [
+        "docs/planning/M11-implementation.md",
+        "docs/product/security-contract.md",
+        "docs/security/threat-model.md",
         "docs/architecture/README.md",
         "docs/verification/README.md",
         "docs/verification/audit.md"

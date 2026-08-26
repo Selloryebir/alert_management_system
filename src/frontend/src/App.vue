@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
+import AccessManagement from "./AccessManagement.vue";
+import AccountPanel from "./AccountPanel.vue";
 import BusinessWorkflow from "./BusinessWorkflow.vue";
+import DataBackupPanel from "./DataBackupPanel.vue";
+import LoginPanel from "./LoginPanel.vue";
 import ManualAlarmPanel from "./ManualAlarmPanel.vue";
 import ProjectWorkspace from "./ProjectWorkspace.vue";
+import { currentUser as fetchCurrentUser, initializeCsrf, type CurrentUser } from "./auth";
+import { ApiError, setUnauthorizedHandler } from "./api";
 import { createUnknownHealth, fetchHealth, type HealthView } from "./health";
 import { fieldLabel, priorityLabel, zh } from "./labels";
 import { confirmImport, listImports, previewImport, type ImportBatch, type ImportCorrections } from "./imports";
@@ -22,6 +28,9 @@ const healthItems = [
 ] as const;
 
 const health = ref<HealthView>(createUnknownHealth());
+const authLoading = ref(true);
+const authMessage = ref("");
+const authenticatedUser = ref<CurrentUser>();
 const projectWorkspace = ref<InstanceType<typeof ProjectWorkspace>>();
 const loading = ref(false);
 const requestFailed = ref(false);
@@ -47,7 +56,10 @@ const healthSummary = computed(() => {
   if (statuses.some((status) => status === "UNKNOWN")) return "部分状态未知";
   return "所有基础服务正常";
 });
-const projectWritable = computed(() => currentProject.value?.status === "ACTIVE");
+const systemAdmin = computed(() => authenticatedUser.value?.global_role === "SYSTEM_ADMIN");
+const canManageProject = computed(() => Boolean(systemAdmin.value || currentProject.value?.project_role === "MANAGER"));
+const canOperateProject = computed(() => Boolean(canManageProject.value || currentProject.value?.project_role === "ANALYST"));
+const projectWritable = computed(() => currentProject.value?.status === "ACTIVE" && canOperateProject.value);
 const mappingHeaders = computed(() => currentBatch.value?.headers ?? []);
 const correctableErrors = computed(() => {
   const fields = new Set<string>(TARGET_FIELDS.map(([field]) => field));
@@ -203,7 +215,50 @@ async function handleDemoReset() {
   demoResetMessage.value = "演示数据已复位，已重新加载默认项目。";
 }
 
-onMounted(loadHealth);
+function handleUnauthorized() {
+  if (authenticatedUser.value) authMessage.value = "登录已失效，请重新登录。";
+  authenticatedUser.value = undefined;
+  currentProject.value = undefined;
+  resetProjectBusinessState();
+}
+
+async function initializeIdentity() {
+  authLoading.value = true;
+  try {
+    await initializeCsrf();
+    try {
+      authenticatedUser.value = await fetchCurrentUser();
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401) {
+        authMessage.value = error instanceof Error ? error.message : "身份服务暂不可用。";
+      }
+    }
+  } catch (error) {
+    authMessage.value = `安全令牌初始化失败：${error instanceof Error ? error.message : "未知错误"}。`;
+  } finally {
+    authLoading.value = false;
+  }
+}
+
+function handleAuthenticated(user: CurrentUser) {
+  authenticatedUser.value = user;
+  authMessage.value = "";
+}
+
+function handleLoggedOut() {
+  authenticatedUser.value = undefined;
+  currentProject.value = undefined;
+  authMessage.value = "已安全退出。";
+  resetProjectBusinessState();
+  void initializeCsrf();
+}
+
+onMounted(() => {
+  setUnauthorizedHandler(handleUnauthorized);
+  void loadHealth();
+  void initializeIdentity();
+});
+onBeforeUnmount(() => setUnauthorizedHandler(undefined));
 </script>
 
 <template>
@@ -214,7 +269,14 @@ onMounted(loadHealth);
       <p class="identity-copy">以项目为工作边界，完成文件导入、规则分析、统计查看、人工处置和报告输出。算法结果是可解释的分析建议，不代表已确认工业根因。</p>
     </header>
 
-    <ProjectWorkspace ref="projectWorkspace" @selected="handleProjectSelected" />
+    <p v-if="authLoading" class="import-message" role="status">正在初始化安全会话…</p>
+    <LoginPanel v-else-if="!authenticatedUser" :message="authMessage" @authenticated="handleAuthenticated" />
+    <template v-else>
+    <AccountPanel :user="authenticatedUser" @changed="handleAuthenticated" @logged-out="handleLoggedOut" />
+    <template v-if="!authenticatedUser.must_change_password">
+    <ProjectWorkspace ref="projectWorkspace" :system-admin="systemAdmin" @selected="handleProjectSelected" />
+    <AccessManagement :user="authenticatedUser" :project="currentProject" />
+    <DataBackupPanel v-if="systemAdmin" :user="authenticatedUser" />
     <p v-if="demoResetMessage" class="import-message" role="status" data-testid="reset-message">{{ demoResetMessage }}</p>
 
     <nav class="onboarding-panel" aria-labelledby="onboarding-title">
@@ -266,6 +328,8 @@ onMounted(loadHealth);
     </section>
 
     <ManualAlarmPanel v-if="currentProject" :project-id="currentProject.project_id" :site="currentProject.site" :area="currentProject.unit_name" :read-only="!projectWritable" @changed="handleManualChanged" />
-    <BusinessWorkflow v-if="currentProject" :key="currentProject.project_id" :current-batch="currentBatch" :batches="recentBatches" :read-only="!projectWritable" @analysis-completed="handleAnalysisCompleted" @disposition-completed="handleDispositionCompleted" @report-downloaded="reportDownloaded = true" @demo-reset="handleDemoReset" />
+    <BusinessWorkflow v-if="currentProject" :key="currentProject.project_id" :current-batch="currentBatch" :batches="recentBatches" :project-id="currentProject.project_id" :read-only="currentProject.status !== 'ACTIVE'" :can-operate="canOperateProject" :can-manage="canManageProject" :system-admin="systemAdmin" @analysis-completed="handleAnalysisCompleted" @disposition-completed="handleDispositionCompleted" @report-downloaded="reportDownloaded = true" @demo-reset="handleDemoReset" />
+    </template>
+    </template>
   </main>
 </template>

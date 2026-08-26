@@ -1,6 +1,7 @@
 package com.alertmanagement.backend.analysis;
 
 import com.alertmanagement.backend.config.AppProperties;
+import com.alertmanagement.backend.security.ProjectAccessService;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -12,16 +13,19 @@ class AnalysisService {
     private final AlgorithmAnalysisClient client;
     private final AnalysisResponseValidator validator;
     private final AppProperties properties;
+    private final ProjectAccessService accessService;
 
     AnalysisService(AnalysisPersistenceService persistence, AlgorithmAnalysisClient client,
-            AnalysisResponseValidator validator, AppProperties properties) {
+            AnalysisResponseValidator validator, AppProperties properties, ProjectAccessService accessService) {
         this.persistence = persistence;
         this.client = client;
         this.validator = validator;
         this.properties = properties;
+        this.accessService = accessService;
     }
 
     AnalysisView analyze(UUID batchId, AnalysisParameters requestedParameters) {
+        accessService.requireBatch(batchId);
         Map<String, Object> parameters = (requestedParameters == null
                 ? AnalysisParameters.defaults() : requestedParameters).validatedMap();
         StartedAnalysis started = persistence.begin(batchId, properties.algorithm().contractVersion(),
@@ -42,10 +46,12 @@ class AnalysisService {
     }
 
     AnalysisView get(UUID runId) {
+        accessService.requireRun(runId);
         return persistence.find(runId);
     }
 
     AnalysisView getLatest(UUID batchId) {
+        accessService.requireBatch(batchId);
         return persistence.findLatest(batchId);
     }
 

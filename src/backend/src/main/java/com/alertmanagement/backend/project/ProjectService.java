@@ -2,6 +2,8 @@ package com.alertmanagement.backend.project;
 
 import com.alertmanagement.backend.api.BusinessApiException;
 import com.alertmanagement.backend.audit.AuditService;
+import com.alertmanagement.backend.security.Actor;
+import com.alertmanagement.backend.security.ProjectAccessService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,14 +39,18 @@ public class ProjectService {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
+    private final ProjectAccessService accessService;
 
-    public ProjectService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, AuditService auditService) {
+    public ProjectService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, AuditService auditService,
+            ProjectAccessService accessService) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
+        this.accessService = accessService;
     }
 
     List<ProjectView> list(String q, boolean includeArchived) {
+        Actor actor = accessService.actor();
         if (q != null && q.length() > 160) {
             throw badRequest("q 长度不能超过 160");
         }
@@ -53,6 +59,11 @@ public class ProjectService {
         List<Object> arguments = new ArrayList<>();
         if (!includeArchived) {
             where.append(" AND status = 'ACTIVE'");
+        }
+        if (!actor.systemAdmin()) {
+            where.append(" AND EXISTS (SELECT 1 FROM project_membership m"
+                    + " WHERE m.project_id=business_project.project_id AND m.user_id=?)");
+            arguments.add(actor.userId());
         }
         if (query != null && !query.isEmpty()) {
             where.append(" AND (code ILIKE ? OR name ILIKE ? OR client_name ILIKE ? OR site ILIKE ? OR unit_name ILIKE ?)");
@@ -66,6 +77,7 @@ public class ProjectService {
 
     @Transactional
     ProjectView create(ProjectRequest request) {
+        accessService.requireSystemAdmin();
         if (request == null) {
             throw badRequest("请求体不能为空");
         }
@@ -88,12 +100,20 @@ public class ProjectService {
         } catch (DuplicateKeyException exception) {
             throw duplicate(exception);
         }
-        auditService.record("PROJECT_CREATED", AuditService.DEMO_OPERATOR, "PROJECT", projectId, "SUCCESS",
+        Actor actor = accessService.actor();
+        if (actor.userId() != null) {
+            jdbcTemplate.update("""
+                    INSERT INTO project_membership (project_id, user_id, project_role)
+                    VALUES (?, ?, 'MANAGER') ON CONFLICT (project_id, user_id) DO NOTHING
+                    """, projectId, actor.userId());
+        }
+        auditService.record("PROJECT_CREATED", "PROJECT", projectId, projectId, "SUCCESS",
                 Map.of("code", data.code(), "name", data.name()));
         return get(projectId);
     }
 
     public ProjectView get(UUID projectId) {
+        accessService.requireRead(projectId);
         try {
             return jdbcTemplate.queryForObject(projectSelect() + " WHERE project_id = ?",
                     (resultSet, rowNumber) -> project(resultSet, true), projectId);
@@ -104,6 +124,7 @@ public class ProjectService {
 
     @Transactional
     ProjectView update(UUID projectId, ProjectPatch patch) {
+        accessService.requireManager(projectId);
         if (patch == null) {
             throw badRequest("请求体不能为空");
         }
@@ -135,13 +156,14 @@ public class ProjectService {
         } catch (DuplicateKeyException exception) {
             throw duplicate(exception);
         }
-        auditService.record("PROJECT_UPDATED", AuditService.DEMO_OPERATOR, "PROJECT", projectId, "SUCCESS",
+        auditService.record("PROJECT_UPDATED", "PROJECT", projectId, projectId, "SUCCESS",
                 Map.of("before", projectSnapshot(current), "after", projectSnapshot(data)));
         return get(projectId);
     }
 
     @Transactional
     ProjectView setArchived(UUID projectId, boolean archived) {
+        accessService.requireManager(projectId);
         ProjectView current = get(projectId);
         String target = archived ? "ARCHIVED" : "ACTIVE";
         if (target.equals(current.status())) {
@@ -150,13 +172,15 @@ public class ProjectService {
         }
         jdbcTemplate.update("UPDATE business_project SET status=?, updated_at=CURRENT_TIMESTAMP WHERE project_id=?",
                 target, projectId);
-        auditService.record(archived ? "PROJECT_ARCHIVED" : "PROJECT_RESTORED", AuditService.DEMO_OPERATOR,
-                "PROJECT", projectId, "SUCCESS", Map.of("from_status", current.status(), "to_status", target));
+        auditService.record(archived ? "PROJECT_ARCHIVED" : "PROJECT_RESTORED",
+                "PROJECT", projectId, projectId, "SUCCESS",
+                Map.of("from_status", current.status(), "to_status", target));
         return get(projectId);
     }
 
     @Transactional
     void delete(UUID projectId) {
+        accessService.requireSystemAdmin();
         ProjectView project = get(projectId);
         if (!"ARCHIVED".equals(project.status())) {
             throw new BusinessApiException(HttpStatus.CONFLICT, "PROJECT_DELETE_CONFLICT", "只有已归档项目可以删除");
@@ -167,12 +191,13 @@ public class ProjectService {
             throw new BusinessApiException(HttpStatus.CONFLICT, "PROJECT_DELETE_CONFLICT",
                     "项目已经产生业务数据，不能删除");
         }
-        auditService.record("PROJECT_DELETED", AuditService.DEMO_OPERATOR, "PROJECT", projectId, "SUCCESS",
+        auditService.record("PROJECT_DELETED", "PROJECT", projectId, projectId, "SUCCESS",
                 Map.of("code", project.code(), "name", project.name()));
         jdbcTemplate.update("DELETE FROM business_project WHERE project_id=?", projectId);
     }
 
     ProjectOverview overview(UUID projectId) {
+        accessService.requireRead(projectId);
         get(projectId);
         ProjectStatistics statistics = statistics(projectId);
         List<ProjectTask> tasks = jdbcTemplate.query("""
@@ -191,6 +216,7 @@ public class ProjectService {
     }
 
     ProjectManifest export(UUID projectId) {
+        accessService.requireRead(projectId);
         ProjectView project = get(projectId);
         ProjectOverview overview = overview(projectId);
         Map<String, Object> manifest = new LinkedHashMap<>();
@@ -205,6 +231,7 @@ public class ProjectService {
     }
 
     public ProjectValidationRules requireActive(UUID projectId) {
+        accessService.requireRead(projectId);
         ProjectView project = get(projectId);
         if (!"ACTIVE".equals(project.status())) {
             throw new BusinessApiException(HttpStatus.CONFLICT, "PROJECT_ARCHIVED", "项目已归档，不能新增业务数据");
@@ -240,7 +267,7 @@ public class ProjectService {
                 readJson(resultSet.getString("validation_rules"), ProjectValidationRules.class),
                 resultSet.getObject("created_at", OffsetDateTime.class),
                 resultSet.getObject("updated_at", OffsetDateTime.class),
-                includeStatistics ? statistics(projectId) : null);
+                accessService.projectRole(projectId), includeStatistics ? statistics(projectId) : null);
     }
 
     private String projectSelect() {

@@ -241,7 +241,9 @@ if (-not (Test-Path -LiteralPath $templateRoot -PathType Container)) {
 $requiredTemplates = @(
     "README.txt", "THIRD-PARTY-NOTICES.txt", "config\runtime.json",
     "scripts\common.ps1", "scripts\preflight.ps1", "scripts\start.ps1",
-    "scripts\stop.ps1", "scripts\backup.ps1", "scripts\reset-demo.ps1",
+    "scripts\stop.ps1", "scripts\backup.ps1", "scripts\backup-status.ps1",
+    "scripts\backup-schedule.ps1", "scripts\restore-verify.ps1", "scripts\cleanup-instance.ps1",
+    "scripts\reset-demo.ps1",
     "scripts\self-check.ps1"
 )
 foreach ($relativeTemplate in $requiredTemplates) {
@@ -349,7 +351,9 @@ try {
     Copy-Item -LiteralPath (Join-Path $templateRoot "config") -Destination $releaseRoot -Recurse
     $releaseScripts = Join-Path $releaseRoot "scripts"
     New-Item -ItemType Directory -Path $releaseScripts -Force | Out-Null
-    foreach ($scriptName in @("common.ps1", "preflight.ps1", "start.ps1", "stop.ps1", "backup.ps1", "reset-demo.ps1")) {
+    foreach ($scriptName in @("common.ps1", "preflight.ps1", "start.ps1", "stop.ps1", "backup.ps1",
+            "backup-status.ps1", "backup-schedule.ps1", "restore-verify.ps1", "cleanup-instance.ps1",
+            "reset-demo.ps1")) {
         Copy-Item -LiteralPath (Join-Path $templateRoot "scripts\$scriptName") -Destination $releaseScripts
     }
 

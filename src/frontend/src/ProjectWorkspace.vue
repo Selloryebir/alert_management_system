@@ -16,6 +16,7 @@ import {
 } from "./projects";
 import { fieldLabel, projectStatusLabel, zh } from "./labels";
 
+const props = defineProps<{ systemAdmin?: boolean }>();
 const emit = defineEmits<{ selected: [project?: Project] }>();
 
 const REPORT_FIELDS = [
@@ -57,6 +58,7 @@ const settings = reactive({
 });
 
 const isReadOnly = computed(() => selectedProject.value?.status === "ARCHIVED");
+const canManage = computed(() => Boolean(props.systemAdmin || selectedProject.value?.project_role === "MANAGER"));
 
 function clearFeedback() {
   message.value = "";
@@ -275,7 +277,7 @@ onMounted(refreshProjects);
   <section class="project-panel" aria-labelledby="project-title">
     <div class="panel-heading">
       <div><p class="eyebrow">业务项目</p><h2 id="project-title">选择当前工作项目</h2></div>
-      <button type="button" @click="showCreate = !showCreate">{{ showCreate ? "取消新建" : "新建项目" }}</button>
+      <button v-if="systemAdmin" type="button" @click="showCreate = !showCreate">{{ showCreate ? "取消新建" : "新建项目" }}</button>
     </div>
     <p class="identity-copy">导入、分析、处置和报告均归入当前项目；切换项目后不会带出其他项目的数据。</p>
 
@@ -308,9 +310,9 @@ onMounted(refreshProjects);
       <div class="panel-heading compact-heading">
         <div><p class="eyebrow">当前项目</p><h3>当前：{{ selectedProject.name }}</h3><p>{{ selectedProject.code }} · {{ projectStatusLabel(selectedProject.status) }}</p></div>
         <div class="project-actions">
-          <button type="button" class="secondary-button" @click="showSettings = !showSettings">{{ showSettings ? "收起设置" : "项目设置" }}</button>
+          <button v-if="canManage" type="button" class="secondary-button" @click="showSettings = !showSettings">{{ showSettings ? "收起设置" : "项目设置" }}</button>
           <button type="button" class="secondary-button" @click="downloadManifest">导出项目清单</button>
-          <button type="button" :class="{ 'danger-button': !isReadOnly }" :disabled="busy" @click="toggleArchive">{{ isReadOnly ? "恢复项目" : "归档项目" }}</button>
+          <button v-if="canManage" type="button" :class="{ 'danger-button': !isReadOnly }" :disabled="busy" @click="toggleArchive">{{ isReadOnly ? "恢复项目" : "归档项目" }}</button>
         </div>
       </div>
       <div v-if="overview" class="project-overview">
@@ -318,14 +320,14 @@ onMounted(refreshProjects);
       </div>
       <div v-if="overview?.recent_tasks.length" class="table-wrap"><table><caption>最近任务</caption><thead><tr><th>类型</th><th>状态</th><th>时间</th></tr></thead><tbody><tr v-for="task in overview.recent_tasks" :key="task.id"><td>{{ task.type === 'IMPORT' ? '文件导入' : '报警分析' }}</td><td>{{ zh(task.status) }}</td><td>{{ task.occurred_at }}</td></tr></tbody></table></div>
       <p v-if="isReadOnly" class="archive-notice">该项目为归档状态，可查看历史，但不能新增导入或启动分析。</p>
-      <form v-if="isReadOnly && overview?.statistics.batch_count === 0" class="project-delete" data-testid="delete-project" @submit.prevent="removeEmptyProject">
+      <form v-if="canManage && isReadOnly && overview?.statistics.batch_count === 0" class="project-delete" data-testid="delete-project" @submit.prevent="removeEmptyProject">
         <h4>删除未使用的空项目</h4>
         <p>仅已归档且从未产生业务数据的项目可删除。请输入项目编号“{{ selectedProject.code }}”确认。</p>
         <label>输入项目编号以确认删除<input v-model="deleteConfirmation" autocomplete="off" /></label>
         <button type="submit" class="danger-button" :disabled="busy || deleteConfirmation !== selectedProject.code">删除项目</button>
       </form>
 
-      <form v-if="showSettings" class="project-settings" data-testid="project-settings" @submit.prevent="saveSettings">
+      <form v-if="canManage && showSettings" class="project-settings" data-testid="project-settings" @submit.prevent="saveSettings">
         <h4>基础资料与报告</h4>
         <div class="settings-grid">
           <label>项目名称<input v-model="settings.name" :disabled="isReadOnly" /></label><label>客户名称<input v-model="settings.client_name" :disabled="isReadOnly" /></label>

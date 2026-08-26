@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
-  "current_stage": "M11",
+  "current_stage": "M13",
   "active_run": null,
   "stages": {
     "M0": {
@@ -126,30 +126,34 @@
       "note": "第六固定候选经 PR #6 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、Windows 原生和 Docker 四条流水线全部成功。"
     },
     "M11": {
+      "status": "passed",
+      "attempt": 1,
+      "evidence_files": [
+        "docs/verification/evidence/M11.md"
+      ],
+      "checkpoint_commit": "5f3cce80a0bb96476b621663902146b411dc011e",
+      "remote_verified": true,
+      "next_action": "无；M11 已通过并解锁 M12。",
+      "note": "固定候选经独立对抗复审和 PR #9 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、Windows 原生和 Docker 四条远端流水线全部成功。"
+    },
+    "M12": {
+      "status": "passed",
+      "attempt": 2,
+      "evidence_files": [
+        "docs/verification/evidence/M12.md"
+      ],
+      "checkpoint_commit": "08a777b4a247b31e7a6ba73126b1add609244f8e",
+      "remote_verified": true,
+      "next_action": "无；M12 已通过并解锁 M13。",
+      "note": "第二固定候选经独立对抗复审和 PR #11 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、可靠性、Windows 原生和 Docker 五条远端流水线全部成功。"
+    },
+    "M13": {
       "status": "ready",
       "attempt": 0,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "冻结最小身份、项目授权、HTTPS 部署和输入资源边界，建立短期功能分支并实现 G11。",
-      "note": "M10 项目作用域和完整业务路径已通过，可开始 M11。"
-    },
-    "M12": {
-      "status": "blocked",
-      "attempt": 0,
-      "evidence_files": [],
-      "checkpoint_commit": null,
-      "remote_verified": false,
-      "next_action": "等待 M11 通过后实现恢复、质量和运行可靠性门槛。",
-      "note": "依赖安全部署配置和最终业务结构。"
-    },
-    "M13": {
-      "status": "blocked",
-      "attempt": 0,
-      "evidence_files": [],
-      "checkpoint_commit": null,
-      "remote_verified": false,
-      "next_action": "等待 M12 通过后生成正式说明书和项目过程文件。",
+      "next_action": "从最新 origin/dev 选择正式说明书与项目过程文件的最小实施增量。",
       "note": "文档必须从最终事实源生成，避免提前编写后漂移。"
     },
     "M14": {

@@ -4,7 +4,9 @@ services:
     environment:
       POSTGRES_DB: alert_management
       POSTGRES_USER: alert_management
-      POSTGRES_PASSWORD: alert_management
+      POSTGRES_PASSWORD_FILE: /run/secrets/database_password
+    secrets:
+      - database_password
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -39,13 +41,21 @@ services:
       context: .
       dockerfile: packaging/docker/backend.Dockerfile
     environment:
+      SERVER_ADDRESS: 0.0.0.0
       SERVER_PORT: "8080"
       DB_URL: jdbc:postgresql://postgres:5432/alert_management
       DB_USERNAME: alert_management
-      DB_PASSWORD: alert_management
+      DB_PASSWORD_FILE: /run/secrets/database_password
       ALGORITHM_HEALTH_URL: http://algorithm:8001/health
       ALGORITHM_ANALYSIS_URL: http://algorithm:8001/api/v2/analyze
       APP_IDENTITY: 报警管理系统
+      APP_DEPLOYMENT_MODE: LOCAL_CONTAINER
+      APP_BOOTSTRAP_ADMIN_USERNAME: admin
+      APP_BOOTSTRAP_ADMIN_PASSWORD_FILE: /run/secrets/bootstrap_admin_password
+      SESSION_COOKIE_SECURE: "false"
+    secrets:
+      - database_password
+      - bootstrap_admin_password
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,3 +73,9 @@ services:
 
 volumes:
   pgdata:
+
+secrets:
+  database_password:
+    file: ${APP_SECRETS_DIR:-.runtime/compose-secrets}/database-password.txt
+  bootstrap_admin_password:
+    file: ${APP_SECRETS_DIR:-.runtime/compose-secrets}/bootstrap-admin-password.txt

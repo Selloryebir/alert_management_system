@@ -2,6 +2,7 @@ package com.alertmanagement.backend.project;
 
 import com.alertmanagement.backend.api.BusinessApiException;
 import com.alertmanagement.backend.audit.AuditService;
+import com.alertmanagement.backend.security.ProjectAccessService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,13 +32,15 @@ class ManualAlarmService {
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
     private final ProjectService projectService;
+    private final ProjectAccessService accessService;
 
     ManualAlarmService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper,
-            AuditService auditService, ProjectService projectService) {
+            AuditService auditService, ProjectService projectService, ProjectAccessService accessService) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
         this.projectService = projectService;
+        this.accessService = accessService;
     }
 
     @Transactional
@@ -64,12 +67,13 @@ class ManualAlarmService {
                 data.area(), data.unit(), data.tag(), data.description(), data.priority(), data.state(),
                 data.value(), data.threshold(), data.engineeringUnit(), data.sourceSystem(), data.operator(),
                 writeJson(original));
-        auditService.record("MANUAL_ALARM_CREATED", auditOperator(data.operator()), "ALARM_RECORD", recordId,
+        auditService.record("MANUAL_ALARM_CREATED", "ALARM_RECORD", recordId, projectId,
                 "SUCCESS", Map.of("project_id", projectId, "batch_id", batchId, "original", original));
         return find(projectId, recordId);
     }
 
     List<ManualAlarmView> list(UUID projectId) {
+        accessService.requireRead(projectId);
         projectService.get(projectId);
         return jdbcTemplate.query(manualAlarmSelect() + """
                  WHERE b.project_id=? AND b.source_type='MANUAL_ENTRY'
@@ -116,8 +120,7 @@ class ManualAlarmService {
                 """, data.eventTime(), data.returnTime(), data.ackTime(), data.site(), data.area(), data.unit(),
                 data.tag(), data.description(), data.priority(), data.state(), data.value(), data.threshold(),
                 data.engineeringUnit(), data.sourceSystem(), data.operator(), recordId);
-        String editor = auditOperator(patch.editedBy());
-        auditService.record("MANUAL_ALARM_UPDATED", editor, "ALARM_RECORD", recordId, "SUCCESS",
+        auditService.record("MANUAL_ALARM_UPDATED", "ALARM_RECORD", recordId, projectId, "SUCCESS",
                 Map.of("project_id", projectId, "before", before, "after", after, "reason", reason));
         return find(projectId, recordId);
     }
@@ -128,7 +131,7 @@ class ManualAlarmService {
         if (request == null) {
             throw badRequest("请求体不能为空");
         }
-        String operator = required(request.operator(), "operator", 100);
+        String operator = accessService.actor().displayName();
         String reason = required(request.reason(), "reason", 500);
         ManualAlarmView current = lock(projectId, recordId);
         if (current.invalidatedAt() != null) {
@@ -138,7 +141,7 @@ class ManualAlarmService {
                 UPDATE alarm_record SET invalidated_at=CURRENT_TIMESTAMP, invalidated_by=?, invalidation_reason=?
                  WHERE record_id=?
                 """, operator, reason, recordId);
-        auditService.record("MANUAL_ALARM_INVALIDATED", operator, "ALARM_RECORD", recordId, "SUCCESS",
+        auditService.record("MANUAL_ALARM_INVALIDATED", "ALARM_RECORD", recordId, projectId, "SUCCESS",
                 Map.of("project_id", projectId, "reason", reason));
         return find(projectId, recordId);
     }
@@ -255,10 +258,6 @@ class ManualAlarmService {
             throw badRequest(field + " 长度不能超过 " + maximumLength);
         }
         return result;
-    }
-
-    private String auditOperator(String operator) {
-        return operator == null || operator.isBlank() ? AuditService.DEMO_OPERATOR : operator.trim();
     }
 
     private Map<String, Object> snapshot(ManualData data) {
