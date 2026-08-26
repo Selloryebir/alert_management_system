@@ -101,10 +101,10 @@ function Invoke-NativeProcess {
         }
         $output = @()
         if (Test-Path -LiteralPath $stdoutPath) {
-            $output += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
+            $output += @(Get-Content -LiteralPath $stdoutPath -Encoding UTF8 -ErrorAction SilentlyContinue)
         }
         if (Test-Path -LiteralPath $stderrPath) {
-            $output += @(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue)
+            $output += @(Get-Content -LiteralPath $stderrPath -Encoding UTF8 -ErrorAction SilentlyContinue)
         }
         return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $output }
     } finally {

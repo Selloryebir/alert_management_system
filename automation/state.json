@@ -48,7 +48,9 @@
       "首次 M14 Docker 实跑在 Maven Central 下载 byte-buddy-1.17.8.jar 时发生外部网络截断；退出 1，隔离资源和临时秘密清理 PASS，使用缓存重试后连续两次完整 PASS",
       "固定提交 bca8774 的远端仓库 run 33006680809 和应用 run 33006680753 因 validate_repository.py 把 scripts/release、tests/release 源码误判为生成目录而失败；限定两个源码前缀后重验",
       "固定提交 bca8774 的本机 Windows 业务预检查完成 RC 构建后，在 ACL 保存命令使用管道时被 Windows PowerShell 5.1 拒绝；改为与其余 ACL 操作一致的 Start-Process 后重验",
-      "固定提交 f5abd6d 的本机 Windows 进程本身已是非管理员标准用户，无法创建另一临时用户；旧 finally 的 ACL 整包恢复又返回 1300 并遮蔽主错误。改为标准用户直接验收、管理员 runner 才创建临时标准用户，且只删除本次显式 ACE；主错误与清理错误分别保留"
+      "固定提交 f5abd6d 的本机 Windows 进程本身已是非管理员标准用户，无法创建另一临时用户；旧 finally 的 ACL 整包恢复又返回 1300 并遮蔽主错误。改为标准用户直接验收、管理员 runner 才创建临时标准用户，且只删除本次显式 ACE；主错误与清理错误分别保留",
+      "固定提交 f5abd6d 的远端及 6e84a2a 的本机 Windows 业务验收均完成首登、改密、新建项目和备份页面断言，但 Chromium 把应用启动时 GET /api/v1/auth/me 的预期未登录 401 记为 console.error，严格夹具在清理阶段失败；轨迹确认唯一 401 的精确端点后，仅允许发布 UI 用例恰好一次该事件，其他浏览器错误继续阻断",
+      "固定提交 6e84a2a 的本机 Windows 输出证实页面断言中文正常，但包内 PowerShell 子进程及验收日志经过多层重定向后发生编码错读；包内公共脚本固定 UTF-8 输出，验收器显式按 UTF-8 读取，避免业务部署控制台乱码"
     ],
     "decision": "Windows 11 原生自包含包是首要业务终验路径，HTTPS Docker Compose 是次级部署路径；自动化验证失败必须阻断，最终真实业务人员终验和 main 正式发布保留人工门禁；发布标签只绑定已验证的 main 提交。",
     "next_action": "提交定向修复，在新干净提交重跑仓库、发布候选、HTTPS Docker 和 Windows 11 标准用户业务预检查。",

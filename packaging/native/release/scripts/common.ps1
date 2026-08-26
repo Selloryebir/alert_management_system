@@ -1,4 +1,6 @@
 ﻿Set-StrictMode -Version 2.0
+[Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)
+$OutputEncoding = [Console]::OutputEncoding
 $ErrorActionPreference = "Stop"
 
 function Get-ReleaseRoot {
