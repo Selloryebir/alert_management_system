@@ -36,6 +36,8 @@
 - `GET /api/v1/projects/{projectId}/members`
 - `PUT/DELETE /api/v1/projects/{projectId}/members/{userId}`
 
+共享 JSON 使用 snake_case：CSRF 响应为 `token`、`header_name`、`parameter_name`；登录请求为 `username`、`password`；当前身份响应为 `user_id`、`username`、`display_name`、`global_role`、`must_change_password`。改密请求为 `current_password`、`new_password`。账号视图另含 `status`、`locked_until`、`created_at`；项目成员视图另含 `project_role`。项目列表和详情为当前用户增加 `project_role`，系统管理员固定返回 `SYSTEM_ADMIN`。密码和摘要永不出现在响应中。
+
 不提供自助注册、邮件找回、OAuth/OIDC、JWT、API key、MFA、LDAP、Redis 会话或自定义角色。
 
 ## 项目授权与真实操作者
