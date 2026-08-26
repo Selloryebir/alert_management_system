@@ -15,8 +15,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +35,8 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -46,6 +55,7 @@ class SecurityIntegrationTest {
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private UserAdministrationService userAdministrationService;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -198,6 +208,109 @@ class SecurityIntegrationTest {
                         .content(oversizedJson))
                 .andExpect(status().isPayloadTooLarge())
                 .andExpect(jsonPath("$.code").value("REQUEST_BODY_TOO_LARGE"));
+    }
+
+    @Test
+    void concurrentAdminAndManagerDemotionsCannotRemoveLastAuthority() throws Exception {
+        UUID adminA = insertUser("admin-a", "并发管理员 A", "SYSTEM_ADMIN");
+        UUID adminB = insertUser("admin-b", "并发管理员 B", "SYSTEM_ADMIN");
+        jdbcTemplate.update("UPDATE user_account SET global_role='NONE' WHERE username='test-admin'");
+
+        List<String> adminOutcomes = runConcurrently(
+                actor(adminA, "admin-a", "并发管理员 A", "SYSTEM_ADMIN"),
+                () -> userAdministrationService.patchUser(
+                        adminA, new UserPatchRequest(null, null, "NONE")),
+                actor(adminB, "admin-b", "并发管理员 B", "SYSTEM_ADMIN"),
+                () -> userAdministrationService.patchUser(
+                        adminB, new UserPatchRequest(null, null, "NONE")));
+        assertThat(adminOutcomes).containsExactlyInAnyOrder("SUCCESS", "LAST_SYSTEM_ADMIN");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM user_account
+                WHERE global_role='SYSTEM_ADMIN' AND status='ACTIVE'
+                """, Long.class)).isOne();
+
+        jdbcTemplate.update("UPDATE user_account SET global_role='SYSTEM_ADMIN' WHERE username='test-admin'");
+        UUID testAdminId = jdbcTemplate.queryForObject(
+                "SELECT user_id FROM user_account WHERE username='test-admin'", UUID.class);
+        Actor systemAdmin = actor(testAdminId, "test-admin", "测试管理员", "SYSTEM_ADMIN");
+
+        UUID managerA = insertUser("manager-lock-a", "并发负责人 A", "NONE");
+        UUID managerB = insertUser("manager-lock-b", "并发负责人 B", "NONE");
+        jdbcTemplate.execute("DELETE FROM project_membership");
+        jdbcTemplate.update("""
+                INSERT INTO project_membership(project_id, user_id, project_role)
+                VALUES (?, ?, 'MANAGER'), (?, ?, 'MANAGER')
+                """, ProjectService.DEFAULT_PROJECT_ID, managerA,
+                ProjectService.DEFAULT_PROJECT_ID, managerB);
+
+        List<String> managerOutcomes = runConcurrently(
+                systemAdmin,
+                () -> userAdministrationService.putMember(ProjectService.DEFAULT_PROJECT_ID,
+                        managerA, new ProjectMemberRequest("ANALYST")),
+                systemAdmin,
+                () -> userAdministrationService.putMember(ProjectService.DEFAULT_PROJECT_ID,
+                        managerB, new ProjectMemberRequest("ANALYST")));
+        assertThat(managerOutcomes).containsExactlyInAnyOrder("SUCCESS", "LAST_PROJECT_MANAGER");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM project_membership m JOIN user_account u ON u.user_id=m.user_id
+                WHERE m.project_id=? AND m.project_role='MANAGER' AND u.status='ACTIVE'
+                """, Long.class, ProjectService.DEFAULT_PROJECT_ID)).isOne();
+    }
+
+    private UUID insertUser(String username, String displayName, String globalRole) {
+        UUID userId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO user_account (
+                    user_id, username, display_name, password_hash, global_role, status,
+                    must_change_password, credential_version
+                ) VALUES (?, ?, ?, ?, ?, 'ACTIVE', FALSE, 1)
+                """, userId, username, displayName, passwordEncoder.encode("Concurrent-Test-Password-2026!"),
+                globalRole);
+        return userId;
+    }
+
+    private Actor actor(UUID userId, String username, String displayName, String globalRole) {
+        return new Actor(userId, username, displayName, globalRole, false, 1);
+    }
+
+    private List<String> runConcurrently(Actor firstActor, Runnable firstAction,
+            Actor secondActor, Runnable secondAction) throws Exception {
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<String> first = executor.submit(concurrentAction(firstActor, firstAction, ready, start));
+            Future<String> second = executor.submit(concurrentAction(secondActor, secondAction, ready, start));
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            return List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    private Callable<String> concurrentAction(Actor actor, Runnable action,
+            CountDownLatch ready, CountDownLatch start) {
+        return () -> {
+            AuthenticatedUser principal = new AuthenticatedUser(actor, "", true);
+            SecurityContextHolder.getContext().setAuthentication(
+                    UsernamePasswordAuthenticationToken.authenticated(
+                            principal, "", principal.getAuthorities()));
+            ready.countDown();
+            try {
+                if (!start.await(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("并发测试启动屏障超时");
+                }
+                action.run();
+                return "SUCCESS";
+            } catch (com.alertmanagement.backend.api.BusinessApiException exception) {
+                return exception.code();
+            } finally {
+                SecurityContextHolder.clearContext();
+            }
+        };
     }
 
     private MockHttpSession login(String username, String password, boolean mustChange) throws Exception {

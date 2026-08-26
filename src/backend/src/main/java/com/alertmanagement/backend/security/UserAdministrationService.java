@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 class UserAdministrationService {
 
+    private static final long GLOBAL_ADMIN_INVARIANT_LOCK = 0x414C41524D41444DL;
     private static final Set<String> GLOBAL_ROLES = Set.of("SYSTEM_ADMIN", "NONE");
     private static final Set<String> STATUSES = Set.of("ACTIVE", "DISABLED");
     private static final Set<String> PROJECT_ROLES = Set.of("MANAGER", "ANALYST");
@@ -66,7 +67,7 @@ class UserAdministrationService {
     UserView patchUser(UUID userId, UserPatchRequest request) {
         accessService.requireSystemAdmin();
         if (request == null) throw invalid("请求体不能为空");
-        UserView current = getUser(userId);
+        UserView current = getUserForUpdate(userId);
         String displayName = request.displayName() == null ? current.displayName()
                 : text(request.displayName(), "display_name", 100);
         String status = request.status() == null ? current.status()
@@ -75,9 +76,11 @@ class UserAdministrationService {
                 : allowed(request.globalRole(), GLOBAL_ROLES, "global_role");
         if ("SYSTEM_ADMIN".equals(current.globalRole()) && "ACTIVE".equals(current.status())
                 && (!"SYSTEM_ADMIN".equals(role) || !"ACTIVE".equals(status))) {
+            lockGlobalAdminInvariant();
             requireAnotherAdmin(userId);
         }
         if ("ACTIVE".equals(current.status()) && "DISABLED".equals(status)) {
+            lockManagedProjects(userId);
             requireNoOrphanedProject(userId);
         }
         boolean credentialsChanged = !status.equals(current.status()) || !role.equals(current.globalRole());
@@ -124,6 +127,8 @@ class UserAdministrationService {
     ProjectMemberView putMember(UUID projectId, UUID userId, ProjectMemberRequest request) {
         accessService.requireManager(projectId);
         if (request == null) throw invalid("请求体不能为空");
+        lockProject(projectId);
+        accessService.requireManager(projectId);
         String projectRole = allowed(request.projectRole(), PROJECT_ROLES, "project_role");
         UserView user = getUser(userId);
         if (!"ACTIVE".equals(user.status())) {
@@ -149,6 +154,8 @@ class UserAdministrationService {
     @Transactional
     void deleteMember(UUID projectId, UUID userId) {
         accessService.requireManager(projectId);
+        lockProject(projectId);
+        accessService.requireManager(projectId);
         ProjectMemberView current = member(projectId, userId);
         if ("MANAGER".equals(current.projectRole())) {
             requireAnotherManager(projectId, userId);
@@ -160,6 +167,15 @@ class UserAdministrationService {
 
     private UserView getUser(UUID userId) {
         List<UserView> users = jdbcTemplate.query(userSelect() + " WHERE user_id=?",
+                (resultSet, rowNumber) -> user(resultSet), userId);
+        if (users.isEmpty()) {
+            throw new BusinessApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "账号不存在");
+        }
+        return users.getFirst();
+    }
+
+    private UserView getUserForUpdate(UUID userId) {
+        List<UserView> users = jdbcTemplate.query(userSelect() + " WHERE user_id=? FOR UPDATE",
                 (resultSet, rowNumber) -> user(resultSet), userId);
         if (users.isEmpty()) {
             throw new BusinessApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "账号不存在");
@@ -181,6 +197,33 @@ class UserAdministrationService {
         if (count == null || count == 0) {
             throw new BusinessApiException(HttpStatus.CONFLICT, "LAST_SYSTEM_ADMIN", "不能停用或降级最后一个系统管理员");
         }
+    }
+
+    private void lockGlobalAdminInvariant() {
+        jdbcTemplate.query("SELECT pg_advisory_xact_lock(?)", resultSet -> {
+            resultSet.next();
+            return null;
+        }, GLOBAL_ADMIN_INVARIANT_LOCK);
+    }
+
+    private void lockProject(UUID projectId) {
+        List<UUID> projects = jdbcTemplate.queryForList(
+                "SELECT project_id FROM business_project WHERE project_id=? FOR UPDATE",
+                UUID.class, projectId);
+        if (projects.isEmpty()) {
+            throw new BusinessApiException(HttpStatus.NOT_FOUND,
+                    "RESOURCE_NOT_FOUND", "资源不存在或无权访问");
+        }
+    }
+
+    private void lockManagedProjects(UUID userId) {
+        jdbcTemplate.queryForList("""
+                SELECT p.project_id FROM business_project p
+                JOIN project_membership m ON m.project_id=p.project_id
+                WHERE m.user_id=? AND m.project_role='MANAGER'
+                ORDER BY p.project_id
+                FOR UPDATE OF p
+                """, UUID.class, userId);
     }
 
     private void requireAnotherManager(UUID projectId, UUID excluded) {
