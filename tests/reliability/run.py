@@ -17,6 +17,7 @@ import subprocess
 import sys
 import threading
 import time
+from functools import cache
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -55,6 +56,24 @@ def run_command(
             f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
     return result
+
+
+@cache
+def discover_docker() -> str | None:
+    """返回能够连接 Engine 的 Docker CLI，而不是仅判断命令是否存在。"""
+    configured = os.environ.get("DOCKER_BIN", "").strip()
+    candidates = [configured, shutil.which("docker"), shutil.which("docker.exe")]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        result = run_command(
+            [candidate, "version", "--format", "{{.Server.Version}}"],
+            timeout=30,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return candidate
+    return None
 
 
 def load_smoke_module() -> Any:
@@ -125,7 +144,7 @@ def capture_environment() -> dict[str, Any]:
         result = run_command([java, "-version"], timeout=30, check=False)
         lines = (result.stdout + result.stderr).splitlines()
         environment["java"] = lines[0] if lines else "unknown"
-    docker = shutil.which("docker") or shutil.which("docker.exe")
+    docker = discover_docker()
     if docker:
         version = run_command(
             [docker, "version", "--format", "{{.Server.Version}}"], timeout=30, check=False
@@ -313,7 +332,7 @@ def parse_memory(value: str) -> float:
 
 
 def postgres_memory_mib() -> float | None:
-    docker = shutil.which("docker") or shutil.which("docker.exe")
+    docker = discover_docker()
     if not docker:
         return None
     result = run_command(
@@ -439,7 +458,7 @@ def windows_remote_addresses(pid: int) -> set[str]:
 
 
 def postgres_remote_addresses() -> set[str]:
-    docker = shutil.which("docker") or shutil.which("docker.exe")
+    docker = discover_docker()
     if not docker:
         raise ReliabilityError("无法审计 PostgreSQL 连接：未找到 Docker。")
     remotes: set[str] = set()
@@ -541,7 +560,7 @@ def assert_logs_clean(
     for path in sorted(LOG_ROOT.glob("*.log")):
         if baseline.get(path.name) != path.stat().st_mtime_ns:
             candidates.append(path)
-    docker = shutil.which("docker") or shutil.which("docker.exe")
+    docker = discover_docker()
     if docker:
         postgres_log = result_dir / "postgres.log"
         result = run_command(
