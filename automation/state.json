@@ -39,13 +39,16 @@
       "python3 scripts/validate_repository.py: PASS",
       "python3 scripts/validate_automation.py: PASS",
       "python3 scripts/validate_formal_baseline.py: PASS",
-      "git diff --check: PASS"
+      "git diff --check: PASS",
+      "固定候选 17dc0c4 的 G10: PASS（Java 38、Python 36、合成 5、契约 4、前端 24 及双项目浏览器闭环）",
+      "独立复审: PASS（证据目录 .runtime/m10-business-ux/results/20260826-013440-285968；无 P0/P1）",
+      "固定候选四条远端发布级检查: PASS（仓库 32918767471、应用 32918767425、Windows 32918767442、Docker 32918767417）"
     ],
     "failures": [
       "固定候选 d5f730e 的远端 M1、Docker 与 Windows 流水线返回 HTTP 400：M2/M3/Docker 黑盒和原生复位后的空批次查询未传 M10 新增的必填 project_id；修复过程中还发现成功预览无条件返回全部 source_rows 会放大大批次响应。第二候选 85f60e0 修复上述问题后，Docker/仓库远端已通过，但本机原生验收发现既有 Playwright 未等待项目就绪、未填写新增必填责任人且仍断言英文处置状态。第三候选 23de3d2 已对齐测试契约，但 Windows PowerShell 5 在直接启动器已退出而后台服务继续运行时返回了不可靠的 Process.ExitCode。第四候选 9197780 添加成功标记回退后，发现默认代码页读取 UTF-8 中文日志时会吞并 URL 首字母。第五候选 723b7e3 的本机 Windows 与四条远端门槛通过，但独立审查发现六种可达导入错误码仍会在页面显示英文；第六候选仅补齐当前后端错误词典和显示层断言。"
     ],
     "decision": "以项目作为导入、分析、处置和报告的统一业务作用域；在现有单体架构内补齐最小项目生命周期、图形化字段映射、全中文界面和首次使用引导，不引入通用工作流或任意模板引擎。",
-    "next_action": "提交并推送固定候选，由独立审查者在该提交上复跑 G10、检查实际差异和阻断/严重问题。",
+    "next_action": "提交证据并创建 feat/m10-business-ux → dev PR；检查实际差异、评论和 PR 流水线后合并。",
     "resume_status": null
   },
   "stages": {
@@ -162,11 +165,13 @@
     "M10": {
       "status": "review",
       "attempt": 6,
-      "evidence_files": [],
+      "evidence_files": [
+        "docs/verification/evidence/M10.md"
+      ],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "在第六固定候选上重跑 G10，并由独立审查者复核英文错误码 P1 已关闭。",
-      "note": "六种可达导入错误码已补齐中文词典；项目规则与文件结构错误的真实显示层断言、M10 前端测试和生产构建通过。"
+      "next_action": "提交证据并创建 feature → dev PR；PR 通过后合并并验证 dev 检查点。",
+      "note": "第六候选 G10、独立复审和精确提交四条远端发布级检查全部通过，待 PR 与 dev 合并检查点。"
     },
     "M11": {
       "status": "blocked",
