@@ -149,7 +149,7 @@ def _validate_sensitive_content(source_path: Path, text: str) -> None:
             raise SourceError(f"{source_path} 含疑似真实秘密：{pattern.pattern}")
     for line_number, line in enumerate(text.splitlines(), start=1):
         table_cells = [cell.strip() for cell in line.strip().strip("|").split("|")] if line.lstrip().startswith("|") else []
-        segments = table_cells if table_cells else re.split(r"[，,。！？!?；;]", line)
+        segments = table_cells if table_cells else re.split(r"[，,。！？!?；;：:]", line)
         for index, segment in enumerate(segments):
             if any(pattern.search(segment) for pattern in RISK_PATTERNS) and not any(
                 qualifier in segment for qualifier in RISK_QUALIFIERS

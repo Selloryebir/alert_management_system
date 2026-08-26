@@ -135,6 +135,29 @@ describe("M11 角色可见性和真实操作者", () => {
     expect(screen.getByRole("button", { name: "导出项目清单" })).toBeInTheDocument();
   });
 
+  it("项目负责人可恢复已归档项目但看不到系统管理员删除入口", async () => {
+    const project = {
+      project_id: "project-manager-1", code: "PRJ-MANAGER", name: "负责人项目", client_name: "客户",
+      site: "厂区", unit_name: "装置", status: "ARCHIVED", report_title: "报告", report_fields: ["summary"],
+      validation_rules: { required_fields: [] }, project_role: "MANAGER",
+      created_at: "2026-08-26T00:00:00Z", updated_at: "2026-08-26T00:00:00Z",
+    };
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/v1/projects?")) return response([project]);
+      if (url.endsWith("/overview")) return response({
+        project_id: project.project_id,
+        statistics: { batch_count: 0, alarm_count: 0, valid_alarm_count: 0, invalid_alarm_count: 0, pending_disposition_count: 0 },
+        recent_tasks: [],
+      });
+      throw new Error(`未处理请求 ${url}`);
+    }));
+    render(ProjectWorkspace, { props: { systemAdmin: false } });
+
+    expect(await screen.findByRole("button", { name: "恢复项目" })).toBeInTheDocument();
+    expect(screen.queryByTestId("delete-project")).not.toBeInTheDocument();
+  });
+
   it("动作身份输入已删除，报警源操作员仍是业务字段", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => response([])));
     render(ManualAlarmPanel, { props: { projectId: "project-1" } });

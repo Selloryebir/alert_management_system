@@ -11,18 +11,18 @@
   "documents": [
     {
       "source": "docs/guides/business-user-manual.md",
-      "source_sha256": "6cebb5e07d062a9016b5df6ac62707ecc98f46c40b4687beaad505b884a50843",
+      "source_sha256": "ca32a19973e3c6faba9c2fa6074e8090580123f3fd20b26e746bb880cb83e267",
       "title": "报警管理系统业务使用手册",
       "outputs": {
         "docx": {
           "path": "deliverables/business-user-manual.docx",
-          "sha256": "f708f103fac0c056298b55e0719278121a197942f4a69fbf09b3bb989d67ec62",
-          "size": 891892
+          "sha256": "b496736013fd07fbe2ad0963df91aaf06bff8b01e2e9a46404f4a9b967a7fe42",
+          "size": 892033
         },
         "pdf": {
           "path": "deliverables/business-user-manual.pdf",
-          "sha256": "dea4bc230997b67ad9526e445cb73aa60acfb430cf6693a09f87711465c7ee9f",
-          "size": 259828
+          "sha256": "7458bacd3e8683e5dc7a261f534d5fe92dfdf6f28856b8a04d828eca3bd25893",
+          "size": 260817
         }
       }
     },

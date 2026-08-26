@@ -320,7 +320,7 @@ onMounted(refreshProjects);
       </div>
       <div v-if="overview?.recent_tasks.length" class="table-wrap"><table><caption>最近任务</caption><thead><tr><th>类型</th><th>状态</th><th>时间</th></tr></thead><tbody><tr v-for="task in overview.recent_tasks" :key="task.id"><td>{{ task.type === 'IMPORT' ? '文件导入' : '报警分析' }}</td><td>{{ zh(task.status) }}</td><td>{{ task.occurred_at }}</td></tr></tbody></table></div>
       <p v-if="isReadOnly" class="archive-notice">该项目为归档状态，可查看历史，但不能新增导入或启动分析。</p>
-      <form v-if="canManage && isReadOnly && overview?.statistics.batch_count === 0" class="project-delete" data-testid="delete-project" @submit.prevent="removeEmptyProject">
+      <form v-if="systemAdmin && isReadOnly && overview?.statistics.batch_count === 0" class="project-delete" data-testid="delete-project" @submit.prevent="removeEmptyProject">
         <h4>删除未使用的空项目</h4>
         <p>仅已归档且从未产生业务数据的项目可删除。请输入项目编号“{{ selectedProject.code }}”确认。</p>
         <label>输入项目编号以确认删除<input v-model="deleteConfirmation" autocomplete="off" /></label>

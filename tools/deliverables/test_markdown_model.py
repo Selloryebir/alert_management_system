@@ -14,6 +14,8 @@ class SensitiveContentTest(unittest.TestCase):
     def test_rejects_qualifier_from_another_clause(self) -> None:
         with self.assertRaisesRegex(SourceError, "限定词必须与指标"):
             _validate_sensitive_content(Path("docs/guides/test.md"), "历史材料未经验证；当前系统准确率达到 98%。")
+        with self.assertRaisesRegex(SourceError, "限定词必须与指标"):
+            _validate_sensitive_content(Path("docs/guides/test.md"), "历史材料未经验证：当前系统准确率达到 98%。")
 
     def test_accepts_qualified_risk_in_same_clause(self) -> None:
         _validate_sensitive_content(Path("docs/guides/test.md"), "当前准确率 98% 未验证。")
