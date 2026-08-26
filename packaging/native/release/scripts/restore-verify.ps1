@@ -90,7 +90,7 @@ function Get-DatabaseFacts {
     foreach ($line in @([Regex]::Split($output.Trim(), '\r?\n'))) {
         if ($line -match '^(table:[a-z_]+)\|(\d+\|[0-9a-f]{32})$') {
             $facts[$Matches[1]] = $Matches[2]
-        } elseif ($line -match '^(sequence:[a-z_]+)\|(\d+\|(t|f))$') {
+        } elseif ($line -match '^(sequence:[a-z_]+)\|(\d+\|(true|false))$') {
             $facts[$Matches[1]] = $Matches[2]
         } else {
             throw "数据库事实输出格式无效：$line"
