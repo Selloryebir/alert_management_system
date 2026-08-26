@@ -93,10 +93,11 @@ scripts/dev/m5-report-audit-reset-smoke.sh
 Docker Desktop 或 Docker Engine 可用时，从仓库根目录启动同一套 Java、Python 和 PostgreSQL 17 实现：
 
 ```bash
+scripts/security/prepare-local-secrets.sh
 docker compose -p alert-management-m7 up --build --detach --wait
 ```
 
-浏览器访问 `http://127.0.0.1:8080`。停止并保留项目数据使用：
+浏览器访问 `http://127.0.0.1:8080`，使用账号 `admin` 和脚本输出路径中的首次登录密码，登录后立即改密。密钥仅保存在忽略的 `.runtime/compose-secrets/`，不得提交或发送。停止并保留项目数据使用：
 
 ```bash
 docker compose -p alert-management-m7 down --remove-orphans
@@ -109,6 +110,8 @@ docker compose -p alert-management-m7 down --volumes --remove-orphans
 docker compose -p alert-management-m7 up --build --detach --wait
 ```
 
+网络部署必须另行提供受信的 PKCS#12 证书及密码文件，并叠加 `compose.network.yaml`；该模式只发布 HTTPS 8443，不发布明文 8080、PostgreSQL 或算法端口。缺少 TLS 或实例密钥时会拒绝启动，不能把本机模式端口直接暴露到局域网。
+
 正式 G7 验收会使用隔离的临时 project，从空卷完成健康、CSV/TXT/XLSX 导入、固定分析、处置审计和清理闭环：
 
 ```bash
@@ -119,4 +122,4 @@ Compose 只向本机发布 Java 的 8080 端口；PostgreSQL 与算法服务仅�
 
 ## 版本与当前状态
 
-`v0.1.0` 已通过 PR、Windows 原生包、应用全链、Docker Compose 和仓库检查并发布为可运行功能基线。M0 至 M7 全部通过；当前为 M8 正式产品基线与来源闭环。后续标签和发布门槛见 [`docs/releases/versioning.md`](docs/releases/versioning.md)，实时状态以 `automation/state.json` 和提交绑定的验收证据为准。
+`v0.5.0` 已通过 PR、Windows 原生包、应用全链、Docker Compose 和仓库检查，包含 M0 至 M10 的项目化中文工作台。当前正实施 M11 身份权限与安全部署边界。后续标签和发布门槛见 [`docs/releases/versioning.md`](docs/releases/versioning.md)，实时状态以 `automation/state.json` 和提交绑定的验收证据为准。
