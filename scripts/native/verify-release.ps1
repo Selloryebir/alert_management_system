@@ -1079,11 +1079,19 @@ try {
     $firstSummary = $roundSummaries[0] | ConvertTo-Json -Depth 20 -Compress
     $secondSummary = $roundSummaries[1] | ConvertTo-Json -Depth 20 -Compress
     Assert-True ($firstSummary -eq $secondSummary) "两轮规范化业务摘要不一致。"
+    if ($BusinessRelease) {
+        Assert-True ($null -ne $crossInstanceSummary) "发布候选缺少跨实例恢复结果。"
+    }
+    $verificationIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $verificationPrincipal = New-Object Security.Principal.WindowsPrincipal($verificationIdentity)
     [ordered]@{
         source_commit = $sourceCommit
         archive = $archive
         archive_sha256 = $archiveHash
         completed_at = (Get-Date).ToUniversalTime().ToString("o")
+        windows_identity = $verificationIdentity.Name
+        windows_is_administrator = $verificationPrincipal.IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
         rounds = 2
         business_release = [bool]$BusinessRelease
         normalized_summary = $roundSummaries[0]
@@ -1091,7 +1099,6 @@ try {
         cross_instance_restore = $crossInstanceSummary
     } | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath (Join-Path $runRoot "verification-summary.json") -Encoding UTF8
     if ($BusinessRelease) {
-        Assert-True ($null -ne $crossInstanceSummary) "发布候选缺少跨实例恢复结果。"
         Write-Host "M14 Windows 原生发布业务终验预检查通过。"
     } else {
         Write-Host "M6 Windows 原生发布双目录验收通过。"

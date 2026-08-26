@@ -123,6 +123,8 @@ try {
     $technical = Get-Content -LiteralPath $summaries[0] -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ($technical.source_commit -eq $sourceCommit -and [bool]$technical.business_release) `
         "技术验收摘要未绑定当前提交或业务发布模式。"
+    Assert-True (-not [bool]$technical.windows_is_administrator) `
+        "业务发布预检查必须由 Windows 标准用户执行。"
     Assert-True ($null -ne $technical.cross_instance_restore) "技术验收摘要缺少跨实例恢复证据。"
 
     [ordered]@{

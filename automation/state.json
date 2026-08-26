@@ -47,7 +47,8 @@
     "failures": [
       "首次 M14 Docker 实跑在 Maven Central 下载 byte-buddy-1.17.8.jar 时发生外部网络截断；退出 1，隔离资源和临时秘密清理 PASS，使用缓存重试后连续两次完整 PASS",
       "固定提交 bca8774 的远端仓库 run 33006680809 和应用 run 33006680753 因 validate_repository.py 把 scripts/release、tests/release 源码误判为生成目录而失败；限定两个源码前缀后重验",
-      "固定提交 bca8774 的本机 Windows 业务预检查完成 RC 构建后，在 ACL 保存命令使用管道时被 Windows PowerShell 5.1 拒绝；改为与其余 ACL 操作一致的 Start-Process 后重验"
+      "固定提交 bca8774 的本机 Windows 业务预检查完成 RC 构建后，在 ACL 保存命令使用管道时被 Windows PowerShell 5.1 拒绝；改为与其余 ACL 操作一致的 Start-Process 后重验",
+      "固定提交 f5abd6d 的本机 Windows 进程本身已是非管理员标准用户，无法创建另一临时用户；旧 finally 的 ACL 整包恢复又返回 1300 并遮蔽主错误。改为标准用户直接验收、管理员 runner 才创建临时标准用户，且只删除本次显式 ACE；主错误与清理错误分别保留"
     ],
     "decision": "Windows 11 原生自包含包是首要业务终验路径，HTTPS Docker Compose 是次级部署路径；自动化验证失败必须阻断，最终真实业务人员终验和 main 正式发布保留人工门禁；发布标签只绑定已验证的 main 提交。",
     "next_action": "提交定向修复，在新干净提交重跑仓库、发布候选、HTTPS Docker 和 Windows 11 标准用户业务预检查。",
