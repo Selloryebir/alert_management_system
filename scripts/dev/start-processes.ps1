@@ -4,6 +4,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$WslRepositoryRoot,
     [Parameter(Mandatory = $true)]
+    [string]$BootstrapAdminPasswordFile,
+    [Parameter(Mandatory = $true)]
     [int]$PostgresPort
 )
 
@@ -29,9 +31,14 @@ try {
         -WindowStyle Hidden -PassThru
 
     $env:SERVER_PORT = "8080"
+    $env:SERVER_ADDRESS = "127.0.0.1"
     $env:DB_URL = "jdbc:postgresql://127.0.0.1:$PostgresPort/alert_management"
     $env:DB_USERNAME = "alert_management"
     $env:DB_PASSWORD = "alert_management"
+    $env:APP_DEPLOYMENT_MODE = "LOCAL_NATIVE"
+    $env:APP_BOOTSTRAP_ADMIN_USERNAME = "admin"
+    $env:APP_BOOTSTRAP_ADMIN_PASSWORD_FILE = $BootstrapAdminPasswordFile
+    $env:SESSION_COOKIE_SECURE = "false"
     $env:ALGORITHM_HEALTH_URL = "http://127.0.0.1:8001/health"
     $env:DEBUG = "false"
     $backend = Start-Process -FilePath $java -ArgumentList @("-jar", $jar) `

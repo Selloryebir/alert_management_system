@@ -16,6 +16,7 @@ cleanup_on_error() {
 trap cleanup_on_error EXIT
 
 "$REPOSITORY_ROOT/scripts/dev/bootstrap.sh"
+APP_SECRETS_DIR="$DEV_SECRET_ROOT" "$REPOSITORY_ROOT/scripts/security/prepare-local-secrets.sh" >/dev/null
 
 if docker_run container inspect "$POSTGRES_CONTAINER" >/dev/null 2>&1; then
   if [[ $(docker_run inspect --format '{{.State.Running}}' "$POSTGRES_CONTAINER") != "true" ]]; then
@@ -61,11 +62,13 @@ jar_path="$REPOSITORY_ROOT/src/backend/target/alert-management-backend-0.1.0.jar
 
 if command -v powershell.exe >/dev/null 2>&1 && command -v wslpath >/dev/null 2>&1; then
   windows_root=$(wslpath -w "$REPOSITORY_ROOT")
+  windows_bootstrap_password_file=$(wslpath -w "$DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE")
   read -r algorithm_pid backend_pid < <(
     powershell.exe -NoProfile -ExecutionPolicy Bypass \
       -File "$(wslpath -w "$REPOSITORY_ROOT/scripts/dev/start-processes.ps1")" \
       -RepositoryRoot "$windows_root" \
       -WslRepositoryRoot "$REPOSITORY_ROOT" \
+      -BootstrapAdminPasswordFile "$windows_bootstrap_password_file" \
       -PostgresPort "$POSTGRES_PORT" | tr -d '\r'
   )
   printf '%s\n' "$algorithm_pid" > "$PID_DIR/algorithm.winpid"
@@ -81,9 +84,14 @@ else
   java_bin=$(find_java)
   nohup env \
     SERVER_PORT=8080 \
+    SERVER_ADDRESS=127.0.0.1 \
     DB_URL="jdbc:postgresql://127.0.0.1:${POSTGRES_PORT}/alert_management" \
     DB_USERNAME=alert_management \
     DB_PASSWORD=alert_management \
+    APP_DEPLOYMENT_MODE=LOCAL_NATIVE \
+    APP_BOOTSTRAP_ADMIN_USERNAME=admin \
+    APP_BOOTSTRAP_ADMIN_PASSWORD_FILE="$DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE" \
+    SESSION_COOKIE_SECURE=false \
     ALGORITHM_HEALTH_URL=http://127.0.0.1:8001/health \
     "$java_bin" -jar "$jar_path" \
     </dev/null >"$LOG_DIR/backend.log" 2>&1 &
@@ -96,4 +104,5 @@ wait_for_url "http://127.0.0.1:8080/api/v1/health" "Java 后端"
 
 trap - EXIT
 echo "M1 四组件已启动：http://127.0.0.1:8080"
+echo "开发管理员：admin；首次密码文件：$DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE"
 echo "日志目录：$LOG_DIR"
