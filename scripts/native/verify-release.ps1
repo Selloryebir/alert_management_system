@@ -23,6 +23,8 @@ $originalPathExt = $env:PATHEXT
 $releaseRoots = New-Object System.Collections.ArrayList
 $observedSecrets = New-Object System.Collections.Generic.List[string]
 $credentialRoot = $null
+$cleanupFailures = New-Object System.Collections.Generic.List[string]
+$primaryFailure = $null
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $runtimeRoot "verification"
@@ -806,14 +808,18 @@ function Assert-ServiceLogsClean {
 
 function Stop-ReleaseSafely {
     param([string]$ReleaseRoot)
+    $failures = New-Object System.Collections.Generic.List[string]
     $scheduleScript = Join-Path $ReleaseRoot "scripts\backup-schedule.ps1"
     if (Test-Path -LiteralPath $scheduleScript -PathType Leaf) {
         try {
-            [void](Invoke-NativeProcess $powerShellExe @(
+            $scheduleResult = Invoke-NativeProcess $powerShellExe @(
                 "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scheduleScript,
-                "-Action", "Remove") $ReleaseRoot)
+                "-Action", "Remove") $ReleaseRoot
+            if ($scheduleResult.ExitCode -ne 0) {
+                [void]$failures.Add("移除每日备份任务退出 $($scheduleResult.ExitCode)：$($scheduleResult.Output -join ' | ')")
+            }
         } catch {
-            Write-Warning "清理时移除每日备份任务失败：$($_.Exception.Message)"
+            [void]$failures.Add("移除每日备份任务异常：$($_.Exception.Message)")
         }
     }
     $stopScript = Join-Path $ReleaseRoot "scripts\stop.ps1"
@@ -823,8 +829,11 @@ function Stop-ReleaseSafely {
             foreach ($line in $stopResult.Output) {
                 Write-Host $line
             }
+            if ($stopResult.ExitCode -ne 0) {
+                [void]$failures.Add("stop.ps1 退出 $($stopResult.ExitCode)：$($stopResult.Output -join ' | ')")
+            }
         } catch {
-            Write-Warning "清理时 stop.ps1 失败：$($_.Exception.Message)"
+            [void]$failures.Add("stop.ps1 异常：$($_.Exception.Message)")
         }
     }
     $cleanupAlias = $null
@@ -854,7 +863,7 @@ function Stop-ReleaseSafely {
                 $cleanupAlias = $recordWorkingRoot
             }
         } catch {
-            Write-Warning "未能验证 PostgreSQL 清理 Junction：$($_.Exception.Message)"
+            [void]$failures.Add("未能验证 PostgreSQL 清理 Junction：$($_.Exception.Message)")
         }
     }
     foreach ($recordPath in @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "pids") -Filter "*.json" -File -ErrorAction SilentlyContinue)) {
@@ -873,10 +882,19 @@ function Stop-ReleaseSafely {
                         [IO.Path]::GetFullPath([string]$record.executable_path),
                         [StringComparison]::OrdinalIgnoreCase)) "清理 PID 记录与实际可执行路径不一致。"
                 Assert-True (([string]$actual.CommandLine).Trim() -eq ([string]$record.command_line).Trim()) "清理 PID 记录与实际命令行不一致。"
-                Stop-Process -Id ([int]$record.pid) -Force -ErrorAction SilentlyContinue
+                Stop-Process -Id ([int]$record.pid) -Force -ErrorAction Stop
+                foreach ($attempt in 1..50) {
+                    if ($null -eq (Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$record.pid)" -ErrorAction SilentlyContinue)) {
+                        break
+                    }
+                    Start-Sleep -Milliseconds 200
+                }
+                if ($null -ne (Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$record.pid)" -ErrorAction SilentlyContinue)) {
+                    throw "进程在 10 秒有界等待后仍未退出：$($record.pid)"
+                }
             }
         } catch {
-            Write-Warning "清理 PID 记录失败：$($recordPath.FullName)：$($_.Exception.Message)"
+            [void]$failures.Add("清理 PID 记录失败：$($recordPath.FullName)：$($_.Exception.Message)")
         }
     }
     foreach ($port in @(55432, 8001, 8080)) {
@@ -889,10 +907,19 @@ function Stop-ReleaseSafely {
                     } else {
                         Assert-PathOwnedByReleaseOrAlias ([string]$actual.ExecutablePath) $ReleaseRoot $cleanupAlias "清理端口 $port 的进程"
                     }
-                    Stop-Process -Id ([int]$owner) -Force -ErrorAction SilentlyContinue
+                    Stop-Process -Id ([int]$owner) -Force -ErrorAction Stop
+                    foreach ($attempt in 1..50) {
+                        if ($null -eq (Get-CimInstance Win32_Process -Filter "ProcessId = $owner" -ErrorAction SilentlyContinue)) {
+                            break
+                        }
+                        Start-Sleep -Milliseconds 200
+                    }
+                    if ($null -ne (Get-CimInstance Win32_Process -Filter "ProcessId = $owner" -ErrorAction SilentlyContinue)) {
+                        throw "端口 $port 的发布进程在 10 秒有界等待后仍未退出：$owner"
+                    }
                 }
             } catch {
-                Write-Warning "清理端口 $port 的发布进程失败：$($_.Exception.Message)"
+                [void]$failures.Add("清理端口 $port 的发布进程失败：$($_.Exception.Message)")
             }
         }
     }
@@ -902,9 +929,26 @@ function Stop-ReleaseSafely {
             [IO.Directory]::Delete($cleanupAlias, $false)
             Assert-True (-not (Test-Path -LiteralPath $cleanupAlias)) "清理后受控 Junction 仍存在：$cleanupAlias"
         } catch {
-            Write-Warning "清理受控 Junction 失败：$($_.Exception.Message)"
+            [void]$failures.Add("清理受控 Junction 失败：$($_.Exception.Message)")
         }
     }
+    foreach ($port in @(55432, 8001, 8080)) {
+        foreach ($owner in @(Get-ListeningOwners $port)) {
+            try {
+                $actual = Get-CimInstance Win32_Process -Filter "ProcessId = $owner" -ErrorAction SilentlyContinue
+                if ($null -eq $actual) { continue }
+                if ($port -eq 8001) {
+                    Assert-PathUnderRoot ([string]$actual.ExecutablePath) $ReleaseRoot "复验端口 $port 的进程"
+                } else {
+                    Assert-PathOwnedByReleaseOrAlias ([string]$actual.ExecutablePath) $ReleaseRoot $cleanupAlias "复验端口 $port 的进程"
+                }
+                [void]$failures.Add("清理后端口 $port 仍由本发布进程 $owner 占用。")
+            } catch {
+                Write-Warning "清理后端口 $port 由非本发布进程占用，未执行越界停止：$($_.Exception.Message)"
+            }
+        }
+    }
+    return @($failures)
 }
 
 try {
@@ -1134,13 +1178,32 @@ try {
         Write-Host "M6 Windows 原生发布双目录验收通过。"
     }
     Write-Host "NATIVE_VERIFICATION_ROOT=$runRoot"
+} catch {
+    $primaryFailure = $_
 } finally {
     $env:PATH = $originalPath
     $env:PATHEXT = $originalPathExt
     for ($index = $releaseRoots.Count - 1; $index -ge 0; $index -= 1) {
-        Stop-ReleaseSafely ([string]$releaseRoots[$index])
+        foreach ($failure in @(Stop-ReleaseSafely ([string]$releaseRoots[$index]))) {
+            [void]$cleanupFailures.Add([string]$failure)
+        }
     }
     if ($null -ne $credentialRoot -and (Test-Path -LiteralPath $credentialRoot)) {
-        Remove-Item -LiteralPath $credentialRoot -Recurse -Force -ErrorAction SilentlyContinue
+        try {
+            Remove-Item -LiteralPath $credentialRoot -Recurse -Force -ErrorAction Stop
+        } catch {
+            [void]$cleanupFailures.Add("清理临时凭据目录失败：$($_.Exception.Message)")
+        }
     }
+}
+if ($cleanupFailures.Count -gt 0) {
+    $cleanupMessage = "发布验收清理不完整：`n" + ($cleanupFailures -join "`n")
+    if ($null -ne $primaryFailure) {
+        Write-Error $cleanupMessage -ErrorAction Continue
+    } else {
+        throw $cleanupMessage
+    }
+}
+if ($null -ne $primaryFailure) {
+    throw $primaryFailure
 }

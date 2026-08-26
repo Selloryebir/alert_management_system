@@ -21,10 +21,15 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repositoryRoot $OutputRoot
 }
 $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
+$expectedOutputRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot ".runtime\release"))
+if (-not $OutputRoot.Equals($expectedOutputRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "M14 正式验收输出根必须为仓库专用目录：$expectedOutputRoot"
+}
 $artifactRoot = Join-Path $OutputRoot "artifacts"
 $verificationRoot = Join-Path $OutputRoot "verification"
 $negativeRoot = Join-Path $OutputRoot ("negative-" + [Guid]::NewGuid().ToString("N"))
 $summaryPath = Join-Path $OutputRoot "business-release-summary.json"
+$ownershipMarkerPath = Join-Path $OutputRoot ".ams-business-release-output.json"
 $sourceCommit = $null
 $archive = $null
 $archiveHash = $null
@@ -82,6 +87,23 @@ try {
         "-c", "safe.directory=$repositoryRoot", "-C", $repositoryRoot, "rev-parse", "HEAD")
     $sourceCommit = (($commitResult.Output -join "`n").Trim())
     Assert-True ($commitResult.ExitCode -eq 0 -and $sourceCommit -match '^[0-9a-f]{40}$') "无法读取完整源提交。"
+
+    if (Test-Path -LiteralPath $ownershipMarkerPath -PathType Leaf) {
+        $ownership = Get-Content -LiteralPath $ownershipMarkerPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        Assert-True ($ownership.product -eq "alert-management-system-business-release" -and
+            ([IO.Path]::GetFullPath([string]$ownership.output_root)).Equals(
+                $OutputRoot, [StringComparison]::OrdinalIgnoreCase)) `
+            "正式验收输出目录身份标记无效，拒绝清理：$OutputRoot"
+    } else {
+        Assert-True (-not (Test-Path -LiteralPath $artifactRoot) -and
+            -not (Test-Path -LiteralPath $verificationRoot)) `
+            "正式验收输出目录缺少身份标记且已有生成目录，拒绝清理：$OutputRoot"
+        [ordered]@{
+            schema_version = 1
+            product = "alert-management-system-business-release"
+            output_root = $OutputRoot
+        } | ConvertTo-Json | Set-Content -LiteralPath $ownershipMarkerPath -Encoding UTF8
+    }
 
     $artifactDirectory = [IO.Path]::GetFullPath((Join-Path $artifactRoot $sourceCommit))
     $verificationRoot = [IO.Path]::GetFullPath($verificationRoot)

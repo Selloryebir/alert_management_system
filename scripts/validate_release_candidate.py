@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 
@@ -26,6 +27,21 @@ EXPECTED_DOCUMENT_SOURCES = {
     "docs/deliverables/closure-report.md",
     "docs/deliverables/development-process.md",
     "docs/deliverables/source-gap-analysis.md",
+}
+HUMAN_ACCEPTANCE_STEPS = {
+    "hash_and_extract",
+    "preflight",
+    "start_and_open_ui",
+    "first_login_and_password_change",
+    "project_and_sample_import",
+    "analysis_and_explanation",
+    "revision_assignment_and_disposition",
+    "pdf_and_xlsx_reports",
+    "backup_status_and_creation",
+    "isolated_restore",
+    "stop_and_data_retention",
+    "manual_without_oral_supplement",
+    "chinese_display_and_system_stability",
 }
 
 
@@ -111,14 +127,20 @@ def validate_git(mode: str, expected_commit: str | None) -> str:
         raise ValueError("M13 检查点不是当前候选的祖先。")
     for tag in (RC_TAG, FINAL_TAG):
         exists = run("git", "rev-parse", "--verify", f"refs/tags/{tag}", check=False).returncode == 0
-        if mode == "candidate" and exists:
+        if mode in {"candidate", "approved"} and exists:
             raise ValueError(f"候选阶段禁止提前存在标签：{tag}")
         if mode == "post-main" and tag == FINAL_TAG and exists:
             raise ValueError("RC 阶段禁止提前存在正式标签 v1.0.0。")
+    if mode in {"candidate", "approved"}:
+        remote_tags = run(
+            "git", "ls-remote", "--tags", "origin", f"refs/tags/{RC_TAG}", f"refs/tags/{FINAL_TAG}"
+        ).stdout.strip()
+        if remote_tags:
+            raise ValueError("候选阶段远端已存在保留发布标签，拒绝复用标签名。")
     return head
 
 
-def validate_state(mode: str) -> None:
+def validate_state(mode: str) -> dict[str, object]:
     state = json.loads((ROOT / "automation/state.json").read_text(encoding="utf-8"))
     for number in range(14):
         stage_id = f"M{number}"
@@ -134,11 +156,109 @@ def validate_state(mode: str) -> None:
     m14 = state["stages"].get("M14", {})
     allowed = {
         "candidate": {"in_progress", "review", "awaiting_human"},
-        "post-main": {"review", "awaiting_human"},
+        "approved": {"review"},
+        "post-main": {"review"},
         "released": {"passed"},
     }[mode]
     if m14.get("status") not in allowed:
         raise ValueError(f"{mode} 模式下 M14 状态非法：{m14.get('status')}")
+    return state
+
+
+def validate_human_acceptance(mode: str, state: dict[str, object], head: str) -> None:
+    stages = state.get("stages")
+    if not isinstance(stages, dict) or not isinstance(stages.get("M14"), dict):
+        raise ValueError("状态缺少 M14。")
+    m14 = stages["M14"]
+    acceptance = m14.get("human_acceptance")
+    if mode == "candidate":
+        if acceptance is not None:
+            raise ValueError("候选自动门槛阶段不得预填人工终验结果。")
+        return
+    if not isinstance(acceptance, dict):
+        raise ValueError(f"{mode} 模式缺少结构化 AC-022 人工终验记录。")
+    required = {
+        "candidate_commit",
+        "archive_path",
+        "archive_sha256",
+        "windows_version",
+        "browser",
+        "pdf_reader",
+        "xlsx_reader",
+        "acceptor",
+        "business_role",
+        "signature",
+        "independent_from_development",
+        "no_oral_supplement",
+        "step_results",
+        "blocker_count",
+        "severe_count",
+        "result",
+        "started_at",
+        "signed_at",
+        "record_file",
+    }
+    if set(acceptance) != required:
+        raise ValueError(
+            "AC-022 人工终验字段不完整或包含未定义字段："
+            f"缺少 {sorted(required - set(acceptance))}，多出 {sorted(set(acceptance) - required)}"
+        )
+    candidate = acceptance["candidate_commit"]
+    archive_path = acceptance["archive_path"]
+    archive_hash = acceptance["archive_sha256"]
+    if not isinstance(candidate, str) or not re.fullmatch(r"[0-9a-f]{40}", candidate):
+        raise ValueError("AC-022 候选提交必须是完整 SHA。")
+    if run("git", "merge-base", "--is-ancestor", candidate, head, check=False).returncode:
+        raise ValueError("AC-022 候选提交不是当前发布树的祖先。")
+    if not isinstance(archive_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", archive_hash):
+        raise ValueError("AC-022 ZIP SHA-256 格式无效。")
+    if not isinstance(archive_path, str) or not archive_path.strip().lower().endswith(".zip"):
+        raise ValueError("AC-022 ZIP 路径为空或后缀无效。")
+    for field in (
+        "windows_version", "browser", "pdf_reader", "xlsx_reader", "acceptor", "business_role", "signature"
+    ):
+        if not isinstance(acceptance[field], str) or not acceptance[field].strip():
+            raise ValueError(f"AC-022 字段不能为空：{field}")
+    if "Windows 11" not in acceptance["windows_version"] or "x64" not in acceptance["windows_version"]:
+        raise ValueError("AC-022 环境必须明确记录 Windows 11 x64。")
+    for field in ("independent_from_development", "no_oral_supplement"):
+        if acceptance[field] is not True:
+            raise ValueError(f"AC-022 必须明确为 true：{field}")
+    step_results = acceptance["step_results"]
+    if not isinstance(step_results, dict) or set(step_results) != HUMAN_ACCEPTANCE_STEPS:
+        raise ValueError("AC-022 必须逐项登记固定的 13 个业务终验步骤。")
+    failed_steps = sorted(step for step, result in step_results.items() if result != "PASS")
+    if failed_steps:
+        raise ValueError(f"AC-022 存在未通过步骤：{failed_steps}")
+    if acceptance["blocker_count"] != 0 or acceptance["severe_count"] != 0:
+        raise ValueError("AC-022 存在阻断或严重缺陷。")
+    if acceptance["result"] != "PASS":
+        raise ValueError("AC-022 最终结论不是 PASS。")
+    started_at = acceptance["started_at"]
+    signed_at = acceptance["signed_at"]
+    if not isinstance(started_at, str) or not isinstance(signed_at, str):
+        raise ValueError("AC-022 开始或签署时间无效。")
+    try:
+        started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        signed = datetime.fromisoformat(signed_at.replace("Z", "+00:00"))
+        if started.tzinfo is None or signed.tzinfo is None or signed < started:
+            raise ValueError
+    except ValueError as exc:
+        raise ValueError("AC-022 签署时间必须是带时区的 ISO-8601。") from exc
+    record_file = acceptance["record_file"]
+    if record_file != "docs/verification/evidence/M14.md":
+        raise ValueError("AC-022 记录必须位于 docs/verification/evidence/M14.md。")
+    evidence_files = m14.get("evidence_files")
+    if not isinstance(evidence_files, list) or record_file not in evidence_files:
+        raise ValueError("M14 证据列表未登记 AC-022 记录。")
+    record = safe_repository_file(record_file).read_text(encoding="utf-8")
+    markers = (
+        "AC-022", candidate, archive_path, archive_hash, acceptance["acceptor"], acceptance["signature"],
+        started_at, signed_at, "PASS", *sorted(HUMAN_ACCEPTANCE_STEPS)
+    )
+    for marker in markers:
+        if str(marker) not in record:
+            raise ValueError(f"AC-022 证据文件缺少绑定字段：{marker}")
 
 
 def validate_matrices(mode: str) -> None:
@@ -148,7 +268,7 @@ def validate_matrices(mode: str) -> None:
         differences = [key for key in coverage if coverage[key] != gap[key]]
         raise ValueError(f"两份来源闭环矩阵处置不一致：{differences}")
     staged = {key: value for key, value in coverage.items() if re.fullmatch(r"M(?:8|9|10|11|12|13|14)", value)}
-    expected = {"SC-042": "M14"} if mode in {"candidate", "post-main"} else {}
+    expected = {"SC-042": "M14"} if mode == "candidate" else {}
     if staged != expected:
         raise ValueError(f"来源能力仍有悬空阶段责任：实际 {staged}，期望 {expected}")
     for relative in ("README.md", "docs/deliverables/source-gap-analysis.md", "docs/deliverables/development-process.md"):
@@ -217,7 +337,7 @@ def validate_release_contract() -> None:
     workflow_markers = {
         ".github/workflows/windows-native-check.yml": "scripts/release/verify-business-release.ps1",
         ".github/workflows/docker-compose-check.yml": "python3 tests/smoke/run.py --target docker --fresh-volume",
-        ".github/workflows/repository-check.yml": "python3 scripts/validate_release_candidate.py",
+        ".github/workflows/repository-check.yml": "--mode post-main",
     }
     for relative, marker in workflow_markers.items():
         if marker not in (ROOT / relative).read_text(encoding="utf-8"):
@@ -242,16 +362,29 @@ def validate_published_tag(release_commit: str, require_head: bool) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="校验报警管理系统 M14 发布候选")
-    parser.add_argument("--mode", choices=("auto", "candidate", "post-main", "released"), default="auto")
+    parser.add_argument(
+        "--mode", choices=("auto", "candidate", "approved", "post-main", "released"), default="auto"
+    )
     parser.add_argument("--expected-commit")
     args = parser.parse_args()
     try:
         state = json.loads((ROOT / "automation/state.json").read_text(encoding="utf-8"))
         mode = args.mode
         if mode == "auto":
-            mode = "released" if state["stages"]["M14"].get("status") == "passed" else "candidate"
+            m14 = state["stages"]["M14"]
+            if os.getenv("GITHUB_REF_TYPE") == "tag":
+                if os.getenv("GITHUB_REF_NAME") != RC_TAG:
+                    raise ValueError("M14 仓库门槛只识别 v1.0.0-rc.1 标签事件。")
+                mode = "post-main"
+            elif m14.get("status") == "passed":
+                mode = "released"
+            elif isinstance(m14.get("human_acceptance"), dict):
+                mode = "approved"
+            else:
+                mode = "candidate"
         head = validate_git(mode, args.expected_commit)
-        validate_state(mode)
+        state = validate_state(mode)
+        validate_human_acceptance(mode, state, head)
         validate_matrices(mode)
         validate_deliverables()
         validate_release_contract()

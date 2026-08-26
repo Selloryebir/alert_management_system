@@ -69,7 +69,9 @@ test("发布候选首次登录通过页面改密、新建项目并查看初始�
 
   await openBackupPanel(page);
   const summary = page.getByLabel("数据与备份摘要");
+  await expect(summary).not.toContainText("数据库容量未知");
   await expect(summary).toContainText("恢复点数0");
+  await expect(summary).toContainText("备份总容量0 B");
   await expect(summary).toContainText("暂无成功备份");
   await expect(page.getByText("当前没有可列出的恢复点。", { exact: true })).toBeVisible();
   await expect(page.getByText("SHA-256 状态：待运行 backup-status.ps1 完整校验", { exact: true })).toBeVisible();
@@ -85,7 +87,9 @@ test("发布候选备份生成后通过页面显示恢复点和待完整校验�
   await openBackupPanel(page);
 
   const summary = page.getByLabel("数据与备份摘要");
+  await expect(summary).not.toContainText("数据库容量未知");
   await expect(summary).toContainText(`恢复点数${expectedRecoveryPoints}`);
+  await expect(summary).not.toContainText("备份总容量0 B");
   await expect(summary).not.toContainText("暂无成功备份");
   const recoveryTable = page.getByTestId("recovery-point-table");
   await expect(recoveryTable).toBeVisible();

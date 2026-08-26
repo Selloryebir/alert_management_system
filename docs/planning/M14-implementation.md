@@ -40,7 +40,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release/verify-b
 
 ```bash
 python3 tests/smoke/run.py --target docker --fresh-volume
-python3 scripts/validate_release_candidate.py
+python3 scripts/validate_release_candidate.py --mode candidate
 ```
 
 同时运行受影响的仓库、文档生成、PowerShell 解析、Python 单测和前端/Playwright 定向检查。自动证据至少记录完整提交、ZIP 与 SHA-256、发布版本、Windows 版本、双实例恢复、HTTPS 边界、业务摘要、清理结果、失败候选、远端 run 和独立复审结论。
@@ -53,7 +53,7 @@ python3 scripts/validate_release_candidate.py
 - 同名 `.sha256`；
 - ZIP 内 `manuals` 的业务手册和部署手册。
 
-该人员不读取仓库源码或测试脚本，按随包手册完成哈希核对、全新解压、预检、启动、网页登录与首次改密、项目与 300 行样例闭环、PDF/XLSX 下载、备份与隔离恢复、停止和确认式实例清理，并记录耗时、歧义、阻断/严重缺陷、报告打开软件及版本。验收人和项目责任方必须填写手册末尾记录；智能体不能代填。
+该人员不读取仓库源码或测试脚本，按随包手册完成哈希核对、全新解压、预检、启动、网页登录与首次改密、项目与 300 行样例闭环、PDF/XLSX 下载、备份与隔离恢复、停止和确认式实例清理，并记录耗时、歧义、阻断/严重缺陷、报告打开软件及版本。验收人和项目责任方必须填写手册末尾记录；智能体不能代填。通过后把原始记录转存为 `docs/verification/evidence/M14.md`，并在 `automation/state.json` 的 `human_acceptance` 中逐项绑定候选提交、ZIP SHA-256、环境、验收人、零阻断/严重缺陷和签署时间；发布校验器同时核对两处，不能仅靠把阶段状态改成 `passed` 绕过 AC-022。
 
 人工结果未返回或存在未关闭阻断/严重缺陷时，M14 使用 `awaiting_human` 或回到定向修复，不标记 `passed`，不创建候选标签。
 
@@ -61,7 +61,8 @@ python3 scripts/validate_release_candidate.py
 
 1. 在 `feat/m14-business-release` 形成固定实现候选，完成三条自动门槛和独立复审。
 2. 以该候选构建 ZIP，完成人工业务终验。
-3. 通过 PR 非快进合入 `dev`，在合并提交重跑适用门槛并记录树一致性。
-4. 经针对发布的人工确认后，以 `dev -> main` PR 合入；在 `main` 合并提交重跑适用远端检查和发布冒烟。
-5. 证据完整且标签不存在时创建 annotated `v1.0.0-rc.1`，并验证解引用提交精确等于已验证的 `main` 提交。
-6. M14 最终状态和证据同步回 `dev` 后停止在 `v1.0.0` 正式发布人工门禁；不得自动创建正式版标签。
+3. 人工 PASS 后先把 SC-042 在两份来源矩阵中改为“已实现”，同步正式结论、生成交付物和 M14 证据；运行 `python3 scripts/validate_release_candidate.py --mode approved`，标签此时仍必须不存在。
+4. 通过 PR 非快进合入 `dev`，在合并提交重跑适用门槛并记录树一致性。
+5. 经针对发布的人工确认后，以 `dev -> main` PR 合入；在 `main` 合并提交重跑适用远端检查和 `approved` 校验，随后把该 main 提交同步回 `dev`。
+6. 证据完整且标签不存在时在已验证的 main 提交创建 annotated `v1.0.0-rc.1`；标签事件显式运行 `--mode post-main`，并验证标签、远端 main 和 dev 均可达同一发布结果。
+7. M14 最终状态和证据同步回 `dev` 后运行 `--mode released`，停止在 `v1.0.0` 正式发布人工门禁；不得自动创建正式版标签。

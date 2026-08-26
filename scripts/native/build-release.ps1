@@ -494,7 +494,25 @@ try {
     )
 
     $zipTemporary = Join-Path $stagingRoot $zipName
-    Compress-Archive -LiteralPath $releaseRoot -DestinationPath $zipTemporary -CompressionLevel Optimal
+    $compressionFailure = $null
+    foreach ($attempt in 1..3) {
+        try {
+            Remove-Item -LiteralPath $zipTemporary -Force -ErrorAction SilentlyContinue
+            Compress-Archive -LiteralPath $releaseRoot -DestinationPath $zipTemporary `
+                -CompressionLevel Optimal -ErrorAction Stop
+            $compressionFailure = $null
+            break
+        } catch {
+            $compressionFailure = $_
+            if ($attempt -lt 3) {
+                Write-Warning "发布文件被短暂占用，1 秒后重试压缩（$attempt/3）。"
+                Start-Sleep -Seconds 1
+            }
+        }
+    }
+    if ($null -ne $compressionFailure) {
+        throw $compressionFailure
+    }
     New-Item -ItemType Directory -Path $artifactDirectory | Out-Null
     Move-Item -LiteralPath $zipTemporary -Destination $zipPath
     $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
