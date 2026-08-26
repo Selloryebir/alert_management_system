@@ -14,6 +14,22 @@ function Join-ReleasePath {
     return [IO.Path]::GetFullPath((Join-Path $Root $native))
 }
 
+function Resolve-ReleaseChildPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][string]$RelativePath
+    )
+    if ([IO.Path]::IsPathRooted($RelativePath)) {
+        throw "运行配置中的路径必须是发布目录内的相对路径：$RelativePath"
+    }
+    $resolved = Join-ReleasePath $Root $RelativePath
+    $rootPrefix = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if (-not $resolved.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "运行配置中的路径越出发布目录：$RelativePath"
+    }
+    return $resolved
+}
+
 function Get-RuntimeContext {
     $root = Get-ReleaseRoot
     $configPath = Join-ReleasePath $root "config/runtime.json"
@@ -31,6 +47,9 @@ function Get-RuntimeContext {
         PgBin = Join-ReleasePath $root "runtime/postgresql/bin"
         PgData = Join-ReleasePath $root "data/postgresql"
         PgDataArgument = "data\postgresql"
+        Secrets = Join-ReleasePath $root "data/secrets"
+        DatabasePasswordFile = Resolve-ReleaseChildPath $root ([string]$config.database.password_file)
+        BootstrapAdminPasswordFile = Resolve-ReleaseChildPath $root ([string]$config.bootstrap_admin.password_file)
         Logs = Join-ReleasePath $root "logs"
         Pids = Join-ReleasePath $root "pids"
         Backups = Join-ReleasePath $root "backups"
@@ -39,7 +58,8 @@ function Get-RuntimeContext {
 
 function Initialize-ReleaseDirectories {
     param([Parameter(Mandatory = $true)]$Context)
-    foreach ($path in @($Context.Logs, $Context.Pids, $Context.Backups, (Split-Path $Context.PgData -Parent))) {
+    foreach ($path in @($Context.Logs, $Context.Pids, $Context.Backups, $Context.Secrets,
+            (Split-Path $Context.PgData -Parent))) {
         if (-not (Test-Path -LiteralPath $path)) {
             New-Item -ItemType Directory -Path $path | Out-Null
         }
@@ -49,7 +69,8 @@ function Initialize-ReleaseDirectories {
 function Assert-FixedRuntimeConfig {
     param([Parameter(Mandatory = $true)]$Context)
     $config = $Context.Config
-    if ($config.identity -ne "报警管理系统") {
+    if ([int]$config.schema_version -ne 2 -or $config.identity -ne "报警管理系统" -or
+            $config.deployment_mode -ne "LOCAL_NATIVE") {
         throw "config/runtime.json 的 identity 与发布契约不一致。"
     }
     if ([int]$config.ports.postgres -ne 55432 -or [int]$config.ports.algorithm -ne 8001 -or
@@ -61,9 +82,79 @@ function Assert-FixedRuntimeConfig {
             throw "数据库名称和用户必须是安全的 PostgreSQL 标识符。"
         }
     }
-    if ([string]::IsNullOrWhiteSpace([string]$config.database.password)) {
-        throw "数据库密码不能为空。"
+    if ($config.PSObject.Properties.Name -contains "password") {
+        throw "config/runtime.json 不得包含数据库明文密码。"
     }
+    if ([string]$config.database.password_file -ne "data/secrets/database-password.txt" -or
+            [string]$config.bootstrap_admin.password_file -ne "data/secrets/bootstrap-admin-password.txt" -or
+            [string]$config.bootstrap_admin.username -notmatch '^[a-z0-9._-]{3,50}$') {
+        throw "密钥文件或初始管理员配置与发布契约不一致。"
+    }
+}
+
+function Protect-SecretFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $security = New-Object Security.AccessControl.FileSecurity
+    $security.SetAccessRuleProtection($true, $false)
+    $rule = New-Object Security.AccessControl.FileSystemAccessRule(
+        $identity, [Security.AccessControl.FileSystemRights]::FullControl,
+        [Security.AccessControl.AccessControlType]::Allow)
+    [void]$security.AddAccessRule($rule)
+    [IO.File]::SetAccessControl($Path, $security)
+}
+
+function New-RandomSecret {
+    $bytes = New-Object byte[] 32
+    $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $generator.GetBytes($bytes)
+    } finally {
+        $generator.Dispose()
+    }
+    return [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+}
+
+function Initialize-SecretFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (Test-Path -LiteralPath $Path) {
+        if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+            throw "密钥路径不是普通文件：$Path"
+        }
+        if ([string]::IsNullOrWhiteSpace([IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8))) {
+            throw "密钥文件为空，拒绝覆盖：$Path"
+        }
+        Protect-SecretFile $Path
+        return
+    }
+    $temporary = $Path + ".tmp-" + [Guid]::NewGuid().ToString("N")
+    try {
+        [IO.File]::WriteAllText($temporary, (New-RandomSecret), (New-Object Text.UTF8Encoding($false)))
+        Protect-SecretFile $temporary
+        [IO.File]::Move($temporary, $Path)
+    } finally {
+        if (Test-Path -LiteralPath $temporary) {
+            Remove-Item -LiteralPath $temporary -Force
+        }
+    }
+}
+
+function Initialize-InstanceSecrets {
+    param([Parameter(Mandatory = $true)]$Context)
+    Initialize-SecretFile $Context.DatabasePasswordFile
+    Initialize-SecretFile $Context.BootstrapAdminPasswordFile
+}
+
+function Get-SecretValue {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "密钥文件不存在：$Path"
+    }
+    $value = [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8).Trim()
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        throw "密钥文件为空：$Path"
+    }
+    return $value
 }
 
 function Test-PortAvailable {

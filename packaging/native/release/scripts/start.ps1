@@ -71,7 +71,7 @@ function Initialize-PostgresData {
     $passwordArgument = Join-Path $workingRoot (Join-Path "data" $passwordName)
     $postgresDataArgument = Join-Path $workingRoot $context.PgDataArgument
     try {
-        [IO.File]::WriteAllText($passwordFile, [string]$context.Config.database.password,
+        [IO.File]::WriteAllText($passwordFile, (Get-SecretValue $context.DatabasePasswordFile),
             (New-Object Text.UTF8Encoding($false)))
         Invoke-BundledCommand (Get-PostgresExecutable $context "initdb" $workingRoot) @(
             "-D", $postgresDataArgument,
@@ -87,7 +87,7 @@ function Initialize-PostgresData {
 
 function Ensure-DemoDatabase {
     $oldPassword = [Environment]::GetEnvironmentVariable("PGPASSWORD", "Process")
-    [Environment]::SetEnvironmentVariable("PGPASSWORD", [string]$context.Config.database.password, "Process")
+    [Environment]::SetEnvironmentVariable("PGPASSWORD", (Get-SecretValue $context.DatabasePasswordFile), "Process")
     try {
         $common = @("-h", "127.0.0.1", "-p", [string]$context.Config.ports.postgres,
             "-U", [string]$context.Config.database.user)
@@ -111,7 +111,7 @@ function Wait-PostgresReady {
     $lastExitCode = $null
     $lastOutput = "尚未收到 PostgreSQL 就绪响应"
     $oldPassword = [Environment]::GetEnvironmentVariable("PGPASSWORD", "Process")
-    [Environment]::SetEnvironmentVariable("PGPASSWORD", [string]$context.Config.database.password, "Process")
+    [Environment]::SetEnvironmentVariable("PGPASSWORD", (Get-SecretValue $context.DatabasePasswordFile), "Process")
     try {
         while ([DateTimeOffset]::UtcNow -lt $deadline) {
             $result = Invoke-BundledCommandResult (Get-PostgresExecutable $context "pg_isready" $workingRoot) @(
@@ -145,6 +145,7 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($preflightOutput)) {
         Write-Host $preflightOutput
     }
+    Initialize-InstanceSecrets $context
 
     $workingRoot = Initialize-PostgresWorkingRoot $context
     $backendJava = Join-Path $workingRoot "runtime\jre\bin\java.exe"
@@ -190,10 +191,15 @@ try {
     $jarArgument = '-jar "' + $backendJar + '"'
     $backendProcess = Start-BundledProcess $backendJava $jarArgument $workingRoot $backendOut $backendError @{
         SERVER_PORT = [string]$context.Config.ports.backend
+        SERVER_ADDRESS = "127.0.0.1"
         DB_URL = $databaseUrl
         DB_USERNAME = [string]$context.Config.database.user
-        DB_PASSWORD = [string]$context.Config.database.password
+        DB_PASSWORD = Get-SecretValue $context.DatabasePasswordFile
         APP_IDENTITY = [string]$context.Config.identity
+        APP_DEPLOYMENT_MODE = [string]$context.Config.deployment_mode
+        APP_BOOTSTRAP_ADMIN_USERNAME = [string]$context.Config.bootstrap_admin.username
+        APP_BOOTSTRAP_ADMIN_PASSWORD_FILE = $context.BootstrapAdminPasswordFile
+        SESSION_COOKIE_SECURE = "false"
         ALGORITHM_HEALTH_URL = "http://127.0.0.1:$($context.Config.ports.algorithm)/health"
         ALGORITHM_ANALYSIS_URL = "http://127.0.0.1:$($context.Config.ports.algorithm)/api/v2/analyze"
     }
@@ -209,6 +215,8 @@ try {
         } 120 "主程序"
 
     Write-Host "启动成功：http://127.0.0.1:8080"
+    Write-Host "初始管理员：$($context.Config.bootstrap_admin.username)"
+    Write-Host "首次登录临时密码文件：$($context.BootstrapAdminPasswordFile)"
     Write-Host "PostgreSQL、算法服务和主程序均为 UP，进程身份已写入 pids 目录。"
     exit 0
 } catch {

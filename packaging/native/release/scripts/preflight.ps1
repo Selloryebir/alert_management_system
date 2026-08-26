@@ -85,7 +85,8 @@ try {
         throw "samples 目录缺少演示文件。修复建议：重新完整解压发布 ZIP。"
     }
 
-    foreach ($directory in @($context.Logs, $context.Pids, $context.Backups, (Split-Path $context.PgData -Parent))) {
+    foreach ($directory in @($context.Logs, $context.Pids, $context.Backups, $context.Secrets,
+            (Split-Path $context.PgData -Parent))) {
         $probe = Join-Path $directory (".write-test-" + [Guid]::NewGuid().ToString("N"))
         [IO.File]::WriteAllText($probe, "ok")
         Remove-Item -LiteralPath $probe -Force
