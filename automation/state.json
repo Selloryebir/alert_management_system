@@ -40,7 +40,7 @@
       "scripts/dev/test.sh：PASS（固定候选 f210619；Java 51、算法 36、数据 5、契约 4、前端 35）",
       "python3 tests/reliability/run.py：PASS（5x300 摘要一致；3x20000 为 7.559/7.524/7.218 秒；后端 Full GC 后活对象 22.228/22.377/22.529 MiB；日志、外联、清理通过）",
       "scripts/native/verify-release.ps1：PASS（f210619 同一 ZIP 在 ASCII/中文空格双目录通过；两轮隔离恢复各对账 17 项事实）",
-      "固定候选远端：M1、M12、M6 Windows、M7 Docker 已 SUCCESS；仓库检查等待证据提交后用新增的手动入口执行",
+      "固定候选远端：M1、M12、M6 Windows、M7 Docker 已 SUCCESS；证据提交 fd38be7 的仓库基础检查已 SUCCESS",
       "独立对抗复审：PASS（实现、证据、状态与工作流 diff 无阻断项）"
     ],
     "failures": [
@@ -54,7 +54,7 @@
       "已修复：Windows/WSL 挂载盘上的 Vitest 线程 worker 超时；测试池改为单 worker forks，35 项发现范围与断言不变。"
     ],
     "decision": "以真实 PostgreSQL 自定义格式备份在隔离实例恢复并逐表对账；以当前发布实例身份约束安装、停止和清理；后端以内置 Full GC 后活对象判断持续泄漏趋势，原始 RSS 只承担硬上限，算法与 PostgreSQL 继续用 RSS；用有限且可复现的重复业务运行观测内存、进程、端口、外联、乱码和 20000 行退化，不把短测夸大为 7x24 小时工业承诺。质量门槛复用各语言锁定工具链，不引入第二套构建系统。",
-    "next_action": "提交证据并运行仓库基础检查，更新 Draft PR #11 为可审后合入 dev 并建立新检查点；检查点成立前不解锁 M13。",
+    "next_action": "更新 Draft PR #11 为可审后合入 dev 并建立新检查点；检查点成立前不解锁 M13。",
     "resume_status": null
   },
   "stages": {
@@ -198,8 +198,8 @@
       ],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "完成证据复核与仓库基础检查，通过 Draft PR #11 合入 dev，并核验合并提交的发布级远端检查。",
-      "note": "第一次 dev 检查点因不稳定的 JVM 原始 RSS 趋势门槛失败且未解锁 M13；第二固定候选 f210619 的三条本机 G12 及 M1/M12/M6/M7 四条远端功能检查已通过，证据与仓库检查收口中。"
+      "next_action": "通过 Draft PR #11 合入 dev，并核验合并提交的发布级远端检查。",
+      "note": "第一次 dev 检查点因不稳定的 JVM 原始 RSS 趋势门槛失败且未解锁 M13；第二固定候选 f210619 的三条本机 G12、四条远端功能检查、证据提交仓库检查和独立复审均已通过，等待 dev 集成检查点。"
     },
     "M13": {
       "status": "blocked",
