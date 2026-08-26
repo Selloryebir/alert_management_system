@@ -602,7 +602,7 @@ function Invoke-CrossInstanceRestoreCheck {
         -Filter "restore-verification-*.json" -File |
         Where-Object { $before -notcontains $_.FullName })
     Assert-True ($created.Count -eq 1) "跨实例隔离恢复未生成唯一结果证据。"
-    $payload = Get-Content -LiteralPath $created[0] -Raw -Encoding UTF8 | ConvertFrom-Json
+    $payload = Get-Content -LiteralPath $created[0].FullName -Raw -Encoding UTF8 | ConvertFrom-Json
     $identity = Get-Content -LiteralPath (Join-Path $ReleaseRoot "data\instance.json") -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ([bool]$payload.restored_to_isolated_instance) "跨实例恢复没有使用隔离实例。"
     Assert-True ([string]$payload.origin_instance_id -ne [string]$identity.instance_id) `
@@ -610,7 +610,7 @@ function Invoke-CrossInstanceRestoreCheck {
     Assert-True (@($payload.database_facts.PSObject.Properties).Count -ge 17) `
         "跨实例恢复结果缺少数据库对账事实。"
     $savedEvidence = Join-Path $ResultRoot "cross-instance-restore-verification.json"
-    Copy-Item -LiteralPath $created[0] -Destination $savedEvidence
+    Copy-Item -LiteralPath $created[0].FullName -Destination $savedEvidence
     return [ordered]@{
         origin_instance_id = [string]$payload.origin_instance_id
         destination_instance_id = [string]$identity.instance_id
