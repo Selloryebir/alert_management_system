@@ -68,12 +68,12 @@ class ImportPersistenceService {
         if (validated.status() == ImportBatchStatus.READY) {
             insertStaging(batchId, validated.records());
         }
-        auditService.record("IMPORT_CREATED", AuditService.DEMO_OPERATOR, "IMPORT_BATCH", batchId, "SUCCESS",
+        auditService.record("IMPORT_CREATED", "IMPORT_BATCH", batchId, projectId, "SUCCESS",
                 Map.of("project_id", projectId, "file_name", fileName, "format", validated.format().name(),
                         "record_count", validated.totalRows(), "corrections", corrections,
                         "corrected_row_count", corrections.size()));
         if (validated.status() == ImportBatchStatus.REJECTED) {
-            auditService.record("IMPORT_REJECTED", AuditService.DEMO_OPERATOR, "IMPORT_BATCH", batchId, "FAILURE",
+            auditService.record("IMPORT_REJECTED", "IMPORT_BATCH", batchId, projectId, "FAILURE",
                     Map.of("error_count", validated.errors().size(), "error_codes",
                             new LinkedHashSet<>(validated.errors().stream().map(ImportError::code).toList())));
         }
@@ -121,7 +121,7 @@ class ImportPersistenceService {
         if (updated != 1) {
             throw new IllegalStateException("批次状态更新失败");
         }
-        auditService.record("IMPORT_CONFIRMED", AuditService.DEMO_OPERATOR, "IMPORT_BATCH", batchId, "SUCCESS",
+        auditService.record("IMPORT_CONFIRMED", "IMPORT_BATCH", batchId, batch.projectId(), "SUCCESS",
                 Map.of("success_count", inserted, "warning_count", 0));
         return find(batchId);
     }
@@ -175,12 +175,12 @@ class ImportPersistenceService {
     private LockedBatch lockBatch(UUID batchId) {
         try {
             return jdbcTemplate.queryForObject("""
-                    SELECT b.status, b.valid_rows, p.status AS project_status
+                    SELECT b.project_id, b.status, b.valid_rows, p.status AS project_status
                       FROM import_batch b JOIN business_project p ON p.project_id=b.project_id
                      WHERE b.batch_id = ?
                      FOR UPDATE
                     """, (resultSet, rowNumber) -> new LockedBatch(
-                    ImportBatchStatus.valueOf(resultSet.getString("status")),
+                    resultSet.getObject("project_id", UUID.class), ImportBatchStatus.valueOf(resultSet.getString("status")),
                     resultSet.getInt("valid_rows"), resultSet.getString("project_status")), batchId);
         } catch (EmptyResultDataAccessException exception) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "导入批次不存在");
@@ -310,7 +310,7 @@ class ImportPersistenceService {
         }
     }
 
-    private record LockedBatch(ImportBatchStatus status, int validRows, String projectStatus) {
+    private record LockedBatch(UUID projectId, ImportBatchStatus status, int validRows, String projectStatus) {
     }
 
     private record BatchRow(

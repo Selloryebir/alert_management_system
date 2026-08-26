@@ -16,6 +16,7 @@ import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +38,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
+@WithMockUser(username = "test-admin", roles = "SYSTEM_ADMIN")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReportAuditResetIntegrationTest {
 
@@ -59,6 +62,10 @@ class ReportAuditResetIntegrationTest {
         registry.add("spring.datasource.url", () -> POSTGRES.getJdbcUrl("postgres", "postgres"));
         registry.add("spring.datasource.username", () -> "postgres");
         registry.add("spring.datasource.password", () -> "");
+        registry.add("app.deployment-mode", () -> "LOCAL_NATIVE");
+        registry.add("app.bootstrap-admin-username", () -> "test-admin");
+        registry.add("app.bootstrap-admin-password-file",
+                () -> Path.of("src/test/resources/bootstrap-password.txt").toAbsolutePath().toString());
     }
 
     @BeforeEach
@@ -108,7 +115,7 @@ class ReportAuditResetIntegrationTest {
                 .andExpect(jsonPath("$.noise_type").value("CHATTER"))
                 .andExpect(jsonPath("$.alarm_class").value("ACTIONABLE"))
                 .andExpect(jsonPath("$.algorithm_classification.noise_type").value("NORMAL"))
-                .andExpect(jsonPath("$.classification_override.operator").value("审核员A"))
+                .andExpect(jsonPath("$.classification_override.operator").value("test-admin"))
                 .andExpect(jsonPath("$.classification_override.reason").value("根据事件序列复核"));
         mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/classification",
                         seed.runId(), recordId).contentType(MediaType.APPLICATION_JSON).content(override))
@@ -300,9 +307,9 @@ class ReportAuditResetIntegrationTest {
                 .andExpect(jsonPath("$.deleted_counts.business_project").value(1));
         assertThat(count("alarm_record")).isZero();
         assertThat(count("analysis_run")).isZero();
-        assertThat(count("audit_event")).isZero();
+        assertThat(count("audit_event")).isOne();
         assertThat(count("app_metadata")).isZero();
-        assertThat(count("flyway_schema_history")).isEqualTo(8);
+        assertThat(count("flyway_schema_history")).isEqualTo(9);
         assertThat(count("business_project")).isOne();
         assertThat(jdbcTemplate.queryForMap("""
                 SELECT code, name, client_name, site, unit_name, status, report_title,

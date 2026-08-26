@@ -1,5 +1,13 @@
 server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
   port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}
 
 spring:
   application:
@@ -7,11 +15,11 @@ spring:
   servlet:
     multipart:
       max-file-size: ${IMPORT_MAX_FILE_SIZE:50MB}
-      max-request-size: ${IMPORT_MAX_REQUEST_SIZE:50MB}
+      max-request-size: ${IMPORT_MAX_REQUEST_SIZE:52MB}
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/alert_management}
     username: ${DB_USERNAME:alert_management}
-    password: ${DB_PASSWORD:alert_management}
+    password: ${DB_PASSWORD:}
     hikari:
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:1000}
   flyway:
@@ -25,6 +33,9 @@ app:
   service: ${APP_SERVICE_NAME:alert-management-backend}
   version: ${APP_VERSION:0.1.0}
   identity: ${APP_IDENTITY:报警管理系统}
+  deployment-mode: ${APP_DEPLOYMENT_MODE:LOCAL_NATIVE}
+  bootstrap-admin-username: ${APP_BOOTSTRAP_ADMIN_USERNAME:}
+  bootstrap-admin-password-file: ${APP_BOOTSTRAP_ADMIN_PASSWORD_FILE:}
   algorithm:
     health-url: ${ALGORITHM_HEALTH_URL:http://127.0.0.1:8001/health}
     analysis-url: ${ALGORITHM_ANALYSIS_URL:http://127.0.0.1:8001/api/v2/analyze}

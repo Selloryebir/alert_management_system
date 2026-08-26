@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
@@ -29,9 +30,11 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
+@WithMockUser(username = "test-admin", roles = "SYSTEM_ADMIN")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ProjectIntegrationTest {
 
@@ -51,6 +54,10 @@ class ProjectIntegrationTest {
         registry.add("spring.datasource.url", () -> POSTGRES.getJdbcUrl("postgres", "postgres"));
         registry.add("spring.datasource.username", () -> "postgres");
         registry.add("spring.datasource.password", () -> "");
+        registry.add("app.deployment-mode", () -> "LOCAL_NATIVE");
+        registry.add("app.bootstrap-admin-username", () -> "test-admin");
+        registry.add("app.bootstrap-admin-password-file",
+                () -> Path.of("src/test/resources/bootstrap-password.txt").toAbsolutePath().toString());
     }
 
     @BeforeEach
@@ -151,7 +158,7 @@ class ProjectIntegrationTest {
                 .andExpect(jsonPath("$[0].record_id").value(recordId.toString()))
                 .andExpect(jsonPath("$[0].description").value("修订描述"))
                 .andExpect(jsonPath("$[0].raw_payload.description").value("原始描述"))
-                .andExpect(jsonPath("$[0].invalidated_by").value("复核员"))
+                .andExpect(jsonPath("$[0].invalidated_by").value("test-admin"))
                 .andExpect(jsonPath("$[0].invalidation_reason").value("无效报警"));
         mockMvc.perform(get("/api/v1/projects/{projectId}/overview", projectId))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.statistics.batch_count").value(2))

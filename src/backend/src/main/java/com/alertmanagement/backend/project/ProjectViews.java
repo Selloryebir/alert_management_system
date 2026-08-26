@@ -18,6 +18,7 @@ record ProjectView(
         @JsonProperty("validation_rules") ProjectValidationRules validationRules,
         @JsonProperty("created_at") OffsetDateTime createdAt,
         @JsonProperty("updated_at") OffsetDateTime updatedAt,
+        @JsonProperty("project_role") String projectRole,
         ProjectStatistics statistics) {
 }
 

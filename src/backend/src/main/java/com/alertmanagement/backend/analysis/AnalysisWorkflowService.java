@@ -2,6 +2,7 @@ package com.alertmanagement.backend.analysis;
 
 import com.alertmanagement.backend.api.BusinessApiException;
 import com.alertmanagement.backend.audit.AuditService;
+import com.alertmanagement.backend.security.ProjectAccessService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,11 +35,14 @@ class AnalysisWorkflowService {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
+    private final ProjectAccessService accessService;
 
-    AnalysisWorkflowService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, AuditService auditService) {
+    AnalysisWorkflowService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, AuditService auditService,
+            ProjectAccessService accessService) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
+        this.accessService = accessService;
     }
 
     DashboardView dashboard(UUID runId) {
@@ -226,14 +230,16 @@ class AnalysisWorkflowService {
 
     @Transactional
     public DispositionView updateDisposition(UUID runId, UUID recordId, DispositionRequest request) {
-        requireWritable(requireCompleted(runId));
+        RunIdentity run = requireCompleted(runId);
+        requireWritable(run);
         if (request == null) {
             throw badRequest("请求体不能为空");
         }
         String target = required(request.status(), "status", 20);
-        String operator = required(request.operator(), "operator", 100);
+        String operator = accessService.actor().displayName();
         String note = required(request.note(), "note", 500);
         String assignee = request.assignee() == null ? null : required(request.assignee(), "assignee", 100);
+        accessService.requireAssignee(run.projectId(), assignee);
         if (!DISPOSITION_STATUSES.contains(target)) {
             throw badRequest("status 必须是 OPEN、IN_PROGRESS 或 CLOSED");
         }
@@ -281,7 +287,7 @@ class AnalysisWorkflowService {
                     run_id, record_id, from_status, to_status, operator_name, assignee, note
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, runId, recordId, current, target, operator, assignee, note);
-        auditService.record("DISPOSITION_CHANGED", operator, "ALARM_RECORD", recordId, "SUCCESS",
+        auditService.record("DISPOSITION_CHANGED", "ALARM_RECORD", recordId, run.projectId(), "SUCCESS",
                 nullableMap("run_id", runId, "from_status", current, "to_status", target,
                         "old_assignee", currentAssignee, "assignee", assignee, "note", note));
         return disposition(runId, recordId);
@@ -289,14 +295,15 @@ class AnalysisWorkflowService {
 
     @Transactional
     public AlarmDetail updateClassification(UUID runId, UUID recordId, ClassificationRequest request) {
-        requireWritable(requireCompleted(runId));
+        RunIdentity run = requireCompleted(runId);
+        requireWritable(run);
         if (request == null) {
             throw badRequest("请求体不能为空");
         }
         String noiseType = required(request.noiseType(), "noise_type", 20);
         String alarmClass = required(request.alarmClass(), "alarm_class", 100);
         String causeCategory = required(request.causeCategory(), "cause_category", 30);
-        String operator = required(request.operator(), "operator", 100);
+        String operator = accessService.actor().displayName();
         String reason = required(request.reason(), "reason", 500);
         if (!NOISE_TYPES.contains(noiseType)) {
             throw badRequest("noise_type 取值非法");
@@ -344,7 +351,7 @@ class AnalysisWorkflowService {
                     reason = EXCLUDED.reason,
                     updated_at = CURRENT_TIMESTAMP
                 """, runId, recordId, noiseType, alarmClass, causeCategory, operator, reason);
-        auditService.record("RESULT_OVERRIDDEN", operator, "ALARM_RECORD", recordId, "SUCCESS",
+        auditService.record("RESULT_OVERRIDDEN", "ALARM_RECORD", recordId, run.projectId(), "SUCCESS",
                 Map.of("run_id", runId,
                         "old_value", Map.of("noise_type", currentNoise, "alarm_class", currentClass,
                                 "cause_category", currentCause),
@@ -412,19 +419,23 @@ class AnalysisWorkflowService {
     }
 
     private RunIdentity requireCompleted(UUID runId) {
+        UUID authorizedProjectId = accessService.requireRun(runId);
         List<RunIdentity> rows = jdbcTemplate.query("""
-                SELECT r.batch_id, r.status, p.status AS project_status
+                SELECT b.project_id, r.batch_id, r.status, p.status AS project_status
                   FROM analysis_run r JOIN import_batch b ON b.batch_id=r.batch_id
                   JOIN business_project p ON p.project_id=b.project_id
                  WHERE r.run_id = ?
                 """,
                 (resultSet, rowNumber) -> new RunIdentity(
-                        resultSet.getObject("batch_id", UUID.class), resultSet.getString("status"),
+                        resultSet.getObject("project_id", UUID.class), resultSet.getObject("batch_id", UUID.class), resultSet.getString("status"),
                         resultSet.getString("project_status")), runId);
         if (rows.isEmpty()) {
             throw notFound("分析运行不存在");
         }
         RunIdentity run = rows.getFirst();
+        if (!authorizedProjectId.equals(run.projectId())) {
+            throw notFound("分析运行不存在");
+        }
         if (!"COMPLETED".equals(run.status())) {
             throw new BusinessApiException(HttpStatus.CONFLICT, "ANALYSIS_STATUS_CONFLICT",
                     "只有 COMPLETED 分析运行可以查询业务结果或处置");
@@ -454,6 +465,9 @@ class AnalysisWorkflowService {
     private void validateTextFilter(String name, String value) {
         if (value != null && value.isBlank()) {
             throw badRequest(name + " 过滤值不能为空");
+        }
+        if (value != null && value.length() > 160) {
+            throw badRequest(name + " 过滤值长度不能超过 160");
         }
     }
 
@@ -508,7 +522,7 @@ class AnalysisWorkflowService {
         }
     }
 
-    private record RunIdentity(UUID batchId, String status, String projectStatus) {
+    private record RunIdentity(UUID projectId, UUID batchId, String status, String projectStatus) {
     }
 
     private record DispositionState(String status, String assignee) {

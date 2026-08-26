@@ -2,6 +2,7 @@ package com.alertmanagement.backend.analysis;
 
 import com.alertmanagement.backend.api.BusinessApiException;
 import com.alertmanagement.backend.audit.AuditService;
+import com.alertmanagement.backend.security.ProjectAccessService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,18 +44,21 @@ class ReportService {
     private final AnalysisWorkflowService workflowService;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
+    private final ProjectAccessService accessService;
 
     ReportService(JdbcTemplate jdbcTemplate, AnalysisWorkflowService workflowService, AuditService auditService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper, ProjectAccessService accessService) {
         this.jdbcTemplate = jdbcTemplate;
         this.workflowService = workflowService;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
+        this.accessService = accessService;
     }
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     public ReportFile generate(UUID runId, String format, ReportRequest request) {
-        String operator = requiredOperator(request);
+        UUID projectId = accessService.requireRun(runId);
+        String operator = accessService.actor().displayName();
         DashboardView dashboard = workflowService.dashboard(runId);
         RunReportInfo run = runInfo(runId);
         List<ReportAlarmRow> alarms = reportAlarms(runId);
@@ -66,7 +70,7 @@ class ReportService {
             case "XLSX" -> xlsx(run, dashboard, alarms, chains, dispositions, operator);
             default -> throw new IllegalArgumentException("未知报告格式");
         };
-        auditService.record("REPORT_EXPORTED", operator, "ANALYSIS_RUN", runId, "SUCCESS",
+        auditService.record("REPORT_EXPORTED", "ANALYSIS_RUN", runId, projectId, "SUCCESS",
                 Map.of("format", format, "filters", Map.of(), "record_count", dashboard.total()));
         String extension = format.toLowerCase();
         String mediaType = "PDF".equals(format) ? "application/pdf"
@@ -362,18 +366,6 @@ class ReportService {
                 resultSet.getString("from_status"), resultSet.getString("to_status"),
                 resultSet.getString("operator_name"), resultSet.getString("note"), resultSet.getString("assignee"),
                 resultSet.getObject("occurred_at", OffsetDateTime.class)), runId);
-    }
-
-    private String requiredOperator(ReportRequest request) {
-        if (request == null || request.operator() == null || request.operator().isBlank()) {
-            throw new BusinessApiException(HttpStatus.BAD_REQUEST, "REPORT_REQUEST_INVALID", "operator 不能为空");
-        }
-        String operator = request.operator().trim();
-        if (operator.length() > 100) {
-            throw new BusinessApiException(HttpStatus.BAD_REQUEST, "REPORT_REQUEST_INVALID",
-                    "operator 长度不能超过 100");
-        }
-        return operator;
     }
 
     private record RunReportInfo(

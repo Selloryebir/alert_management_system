@@ -16,6 +16,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Iterator;
+import com.alertmanagement.backend.api.BusinessApiException;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -28,6 +30,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.SheetVisibility;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -38,6 +41,12 @@ class ImportFileParser {
 
     private static final DateTimeFormatter EXCEL_DATE_TIME =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    static {
+        ZipSecureFile.setMinInflateRatio(0.01);
+        ZipSecureFile.setMaxEntrySize(64L * 1024 * 1024);
+        ZipSecureFile.setMaxTextSize(64L * 1024 * 1024);
+    }
 
     SourceTable parse(MultipartFile file) {
         String filename = file.getOriginalFilename();
@@ -81,31 +90,37 @@ class ImportFileParser {
                 .setIgnoreEmptyLines(false)
                 .get();
         try (CSVParser parser = csvFormat.parse(new StringReader(text))) {
-            List<CSVRecord> records = parser.getRecords();
-            if (records.isEmpty()) {
+            Iterator<CSVRecord> records = parser.iterator();
+            if (!records.hasNext()) {
                 return emptyTable(format);
             }
-            List<String> headers = valuesOf(records.getFirst());
-            return buildTable(format, headers, records.subList(1, records.size()));
-        }
-    }
-
-    private SourceTable buildTable(ImportFormat format, List<String> headers, List<CSVRecord> data) {
-        List<ImportError> errors = validateHeaders(headers);
-        List<SourceTable.SourceRow> rows = new ArrayList<>();
-        for (CSVRecord record : data) {
-            int sourceRow = Math.toIntExact(record.getRecordNumber());
-            if (record.size() != headers.size()) {
-                errors.add(new ImportError(sourceRow, "_row", "COLUMN_COUNT_MISMATCH",
-                        "第 " + sourceRow + " 行列数与表头不一致"));
+            List<String> headers = valuesOf(records.next());
+            requireColumnCount(headers.size());
+            List<ImportError> errors = validateHeaders(headers);
+            List<SourceTable.SourceRow> rows = new ArrayList<>();
+            while (records.hasNext()) {
+                checkInterrupted();
+                CSVRecord record = records.next();
+                if (rows.size() >= ImportLimits.MAX_ROWS) {
+                    throw tooLarge("IMPORT_ROW_LIMIT", "数据行不能超过 100,000 行");
+                }
+                requireColumnCount(record.size());
+                int sourceRow = Math.toIntExact(record.getRecordNumber());
+                if (record.size() != headers.size()) {
+                    addError(errors, new ImportError(sourceRow, "_row", "COLUMN_COUNT_MISMATCH",
+                            "第 " + sourceRow + " 行列数与表头不一致"));
+                }
+                rows.add(new SourceTable.SourceRow(sourceRow, rawValues(headers, valuesOf(record))));
             }
-            rows.add(new SourceTable.SourceRow(sourceRow, rawValues(headers, valuesOf(record))));
+            return new SourceTable(format, List.copyOf(headers), List.copyOf(rows), List.copyOf(errors));
         }
-        return new SourceTable(format, List.copyOf(headers), List.copyOf(rows), List.copyOf(errors));
     }
 
     private SourceTable parseWorkbook(byte[] content) throws IOException {
         try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(content))) {
+            if (workbook.getNumberOfSheets() > ImportLimits.MAX_SHEETS) {
+                throw tooLarge("IMPORT_SHEET_LIMIT", "XLSX 工作表不能超过 8 个");
+            }
             Sheet sheet = firstVisibleSheet(workbook);
             if (sheet == null) {
                 throw badRequest("XLSX 中没有可见工作表");
@@ -119,11 +134,19 @@ class ImportFileParser {
             if (columnCount <= 0) {
                 return emptyTable(ImportFormat.XLSX);
             }
+            requireColumnCount(columnCount);
+            if (sheet.getLastRowNum() > ImportLimits.MAX_ROWS) {
+                throw tooLarge("IMPORT_ROW_LIMIT", "数据行不能超过 100,000 行");
+            }
             List<String> headers = rowValues(headerRow, columnCount, formatter);
             List<ImportError> errors = validateHeaders(headers);
             List<SourceTable.SourceRow> rows = new ArrayList<>();
             for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+                checkInterrupted();
                 Row row = sheet.getRow(rowIndex);
+                if (row != null && row.getLastCellNum() > ImportLimits.MAX_COLUMNS) {
+                    throw tooLarge("IMPORT_COLUMN_LIMIT", "列数不能超过 256 列");
+                }
                 List<String> values = row == null
                         ? java.util.Collections.nCopies(columnCount, "")
                         : rowValues(row, columnCount, formatter);
@@ -155,17 +178,17 @@ class ImportFileParser {
             return "";
         }
         if (cell.getCellType() == CellType.FORMULA) {
-            return "=" + cell.getCellFormula();
+            return checkedCell("=" + cell.getCellFormula());
         }
         if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
-            return EXCEL_DATE_TIME.format(cell.getLocalDateTimeCellValue());
+            return checkedCell(EXCEL_DATE_TIME.format(cell.getLocalDateTimeCellValue()));
         }
-        return formatter.formatCellValue(cell);
+        return checkedCell(formatter.formatCellValue(cell));
     }
 
     private List<String> valuesOf(CSVRecord record) {
         List<String> values = new ArrayList<>(record.size());
-        record.forEach(values::add);
+        record.forEach(value -> values.add(checkedCell(value)));
         return values;
     }
 
@@ -174,11 +197,14 @@ class ImportFileParser {
         Set<String> seen = new HashSet<>();
         for (int index = 0; index < headers.size(); index++) {
             String header = headers.get(index).trim();
+            if (header.length() > ImportLimits.MAX_HEADER_CHARACTERS) {
+                throw tooLarge("IMPORT_HEADER_LIMIT", "表头文本不能超过 120 个字符");
+            }
             if (header.isEmpty()) {
-                errors.add(new ImportError(1, "_header", "MISSING_HEADER",
+                addError(errors, new ImportError(1, "_header", "MISSING_HEADER",
                         "第 " + (index + 1) + " 列表头为空"));
             } else if (!seen.add(header)) {
-                errors.add(new ImportError(1, header, "DUPLICATE_HEADER", "表头重复：" + header));
+                addError(errors, new ImportError(1, header, "DUPLICATE_HEADER", "表头重复：" + header));
             }
         }
         return errors;
@@ -223,6 +249,37 @@ class ImportFileParser {
 
     private ResponseStatusException badRequest(String message) {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+    }
+
+    private String checkedCell(String value) {
+        if (value.length() > ImportLimits.MAX_CELL_CHARACTERS) {
+            throw tooLarge("IMPORT_CELL_LIMIT", "单元格文本不能超过 4,096 个字符");
+        }
+        return value;
+    }
+
+    private void requireColumnCount(int columns) {
+        if (columns > ImportLimits.MAX_COLUMNS) {
+            throw tooLarge("IMPORT_COLUMN_LIMIT", "列数不能超过 256 列");
+        }
+    }
+
+    private void addError(List<ImportError> errors, ImportError error) {
+        if (errors.size() >= ImportLimits.MAX_ERRORS) {
+            throw tooLarge("IMPORT_ERROR_LIMIT", "校验错误不能超过 1,000 个，请离线修正后重试");
+        }
+        errors.add(error);
+    }
+
+    private void checkInterrupted() {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new BusinessApiException(HttpStatus.BAD_REQUEST,
+                    "IMPORT_PARSE_INTERRUPTED", "文件解析已中断，请重试");
+        }
+    }
+
+    private BusinessApiException tooLarge(String code, String message) {
+        return new BusinessApiException(HttpStatus.PAYLOAD_TOO_LARGE, code, message);
     }
 
     private String safeReason(Exception exception) {

@@ -1,6 +1,9 @@
 package com.alertmanagement.backend.demo;
 
 import com.alertmanagement.backend.api.BusinessApiException;
+import com.alertmanagement.backend.audit.AuditService;
+import com.alertmanagement.backend.security.ProjectAccessService;
+import com.alertmanagement.backend.security.SecurityProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
@@ -32,17 +35,25 @@ class DemoResetService {
             "audit_event");
 
     private final JdbcTemplate jdbcTemplate;
+    private final ProjectAccessService accessService;
+    private final SecurityProperties securityProperties;
+    private final AuditService auditService;
 
-    DemoResetService(JdbcTemplate jdbcTemplate) {
+    DemoResetService(JdbcTemplate jdbcTemplate, ProjectAccessService accessService,
+            SecurityProperties securityProperties, AuditService auditService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.accessService = accessService;
+        this.securityProperties = securityProperties;
+        this.auditService = auditService;
     }
 
     @Transactional
     public DemoResetView reset(DemoResetRequest request) {
-        if (request == null || request.operator() == null || request.operator().isBlank()) {
-            throw badRequest("operator 不能为空");
+        accessService.requireSystemAdmin();
+        if (securityProperties.networkMode()) {
+            throw new BusinessApiException(HttpStatus.FORBIDDEN, "DEMO_RESET_LOCAL_ONLY", "演示复位只允许在本机模式执行");
         }
-        if (!CONFIRMATION.equals(request.confirmation())) {
+        if (request == null || !CONFIRMATION.equals(request.confirmation())) {
             throw badRequest("confirmation 必须是 RESET_DEMO");
         }
         jdbcTemplate.execute("LOCK TABLE " + String.join(", ", BUSINESS_TABLES) + ", business_project"
@@ -83,6 +94,8 @@ class DemoResetService {
                     validation_rules=EXCLUDED.validation_rules,
                     updated_at=business_project.created_at
                 """, DEFAULT_PROJECT_ID);
+        auditService.record("DEMO_RESET", "SYSTEM", null, DEFAULT_PROJECT_ID, "SUCCESS",
+                Map.of("deleted_counts", deleted));
         return new DemoResetView(OffsetDateTime.now(), "EMPTY", deleted);
     }
 

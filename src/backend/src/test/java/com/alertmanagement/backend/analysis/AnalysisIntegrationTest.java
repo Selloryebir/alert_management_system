@@ -18,6 +18,7 @@ import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -38,9 +39,11 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
+@WithMockUser(username = "test-admin", roles = "SYSTEM_ADMIN")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AnalysisIntegrationTest {
 
@@ -64,6 +67,10 @@ class AnalysisIntegrationTest {
         registry.add("spring.datasource.url", () -> POSTGRES.getJdbcUrl("postgres", "postgres"));
         registry.add("spring.datasource.username", () -> "postgres");
         registry.add("spring.datasource.password", () -> "");
+        registry.add("app.deployment-mode", () -> "LOCAL_NATIVE");
+        registry.add("app.bootstrap-admin-username", () -> "test-admin");
+        registry.add("app.bootstrap-admin-password-file",
+                () -> Path.of("src/test/resources/bootstrap-password.txt").toAbsolutePath().toString());
         registry.add("app.algorithm.analysis-url",
                 () -> "http://127.0.0.1:" + ALGORITHM.getAddress().getPort() + "/api/v2/analyze");
         registry.add("app.algorithm.analysis-timeout", () -> "2s");
@@ -434,17 +441,13 @@ class AnalysisIntegrationTest {
         mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/disposition", firstRun, firstRecord)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"IN_PROGRESS\",\"operator\":\"\",\"note\":\"接单\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("ANALYSIS_REQUEST_INVALID"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.operator").value("test-admin"));
         mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/disposition", firstRun, firstRecord)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"PENDING\",\"operator\":\"审核员\",\"note\":\"非法状态\"}"))
                 .andExpect(status().isBadRequest());
 
-        patchDisposition(firstRun, firstRecord, "IN_PROGRESS", "值班员", "开始核查")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
-                .andExpect(jsonPath("$.closed_at").doesNotExist());
         patchDisposition(firstRun, firstRecord, "CLOSED", "班长", "确认并关闭")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CLOSED"))
