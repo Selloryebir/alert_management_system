@@ -863,7 +863,7 @@ def main() -> int:
         evidence.check("源操作员与 SQL/XSS/路径业务文本隔离", source_operator_check)
 
         def session_invalidation_check() -> dict[str, Any]:
-            manager.json("POST", "/api/v1/auth/logout")
+            manager.request("POST", "/api/v1/auth/logout", expected=(200, 204))
             expect_error(manager, "GET", "/api/v1/auth/me", expected=(401,), context="退出后会话失效")
             manager.login(manager_user["username"], manager_user["active_password"])
 
