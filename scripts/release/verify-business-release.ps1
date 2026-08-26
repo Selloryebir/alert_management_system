@@ -157,7 +157,7 @@ try {
 
     $summaries = @(Get-ChildItem -LiteralPath $verificationRoot -Filter "verification-summary.json" -File -Recurse)
     Assert-True ($summaries.Count -eq 1) "业务终验必须生成唯一 verification-summary.json。"
-    $technical = Get-Content -LiteralPath $summaries[0] -Raw -Encoding UTF8 | ConvertFrom-Json
+    $technical = Get-Content -LiteralPath $summaries[0].FullName -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ($technical.source_commit -eq $sourceCommit -and [bool]$technical.business_release) `
         "技术验收摘要未绑定当前提交或业务发布模式。"
     Assert-True (-not [bool]$technical.windows_is_administrator) `
