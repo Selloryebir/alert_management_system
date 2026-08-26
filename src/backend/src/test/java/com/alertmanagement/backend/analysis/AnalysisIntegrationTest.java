@@ -66,7 +66,7 @@ class AnalysisIntegrationTest {
         registry.add("spring.datasource.password", () -> "");
         registry.add("app.algorithm.analysis-url",
                 () -> "http://127.0.0.1:" + ALGORITHM.getAddress().getPort() + "/api/v2/analyze");
-        registry.add("app.algorithm.analysis-timeout", () -> "250ms");
+        registry.add("app.algorithm.analysis-timeout", () -> "2s");
     }
 
     @BeforeEach
@@ -270,7 +270,7 @@ class AnalysisIntegrationTest {
         UUID batchId = importedBatch();
         RESPONDER.set(request -> {
             try {
-                Thread.sleep(Duration.ofSeconds(1));
+                Thread.sleep(Duration.ofSeconds(3));
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
             }
