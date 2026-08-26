@@ -137,7 +137,7 @@ function Invoke-ReleaseScript {
     }
     $exitCode = $result.ExitCode
     if ($processOnly) {
-        $reportedReady = ($result.Output -join "`n") -match 'http://127\.0\.0\.1:8080'
+        $reportedReady = ($result.Output -join "`n") -match '127\.0\.0\.1:8080'
         if ($reportedReady) {
             $exitCode = 0
         } elseif ($null -eq $exitCode) {
