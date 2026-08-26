@@ -1,0 +1,3 @@
+event_time,site,area,unit,tag,description,priority,state,value,threshold,engineering_unit,source_system,operator
+2026-08-26T09:00:00+08:00,修正测试厂区,修正测试区域,修正测试装置,M10-CORRECT-2,待修正报警,p9,ACTIVE,bad,80.0,℃,M10_CORRECTION,录入员甲
+2026-08-26T09:01:00+08:00,修正测试厂区,修正测试区域,修正测试装置,M10-CORRECT-3,合法报警,P2,RETURNED,7.5,8.0,MPa,M10_CORRECTION,录入员乙

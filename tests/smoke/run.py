@@ -279,6 +279,9 @@ def multipart_file(path: Path) -> tuple[bytes, str]:
     body = b"".join(
         [
             f"--{boundary}\r\n".encode(),
+            b'Content-Disposition: form-data; name="project_id"\r\n\r\n',
+            b"00000000-0000-0000-0000-000000000001\r\n",
+            f"--{boundary}\r\n".encode(),
             (
                 f'Content-Disposition: form-data; name="file"; filename="{path.name}"\r\n'
             ).encode(),

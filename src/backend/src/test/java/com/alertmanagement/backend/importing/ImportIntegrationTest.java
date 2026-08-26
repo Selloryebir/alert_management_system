@@ -8,7 +8,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alertmanagement.backend.project.ProjectService;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -93,6 +95,7 @@ class ImportIntegrationTest {
                 .containsOnly(ImportBatchStatus.READY);
         assertThat(List.of(csv.totalRows(), txt.totalRows(), xlsx.totalRows())).containsOnly(300);
         assertThat(List.of(csv.validRows(), txt.validRows(), xlsx.validRows())).containsOnly(300);
+        assertThat(List.of(csv.sourceRows(), txt.sourceRows(), xlsx.sourceRows())).allMatch(List::isEmpty);
         assertThat(normalizedPreview(csv)).isEqualTo(normalizedPreview(txt)).isEqualTo(normalizedPreview(xlsx));
 
         importService.confirm(csv.batchId());
@@ -194,7 +197,8 @@ class ImportIntegrationTest {
     @Test
     void apiSupportsPreviewSummaryAndRejectsRepeatedConfirmation() throws Exception {
         MockMultipartFile file = file("api.csv", delimited(',').getBytes(StandardCharsets.UTF_8));
-        String response = mockMvc.perform(multipart("/api/v1/imports/preview").file(file))
+        String response = mockMvc.perform(multipart("/api/v1/imports/preview").file(file)
+                        .param("project_id", ProjectService.DEFAULT_PROJECT_ID.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("READY"))
                 .andExpect(jsonPath("$.total_rows").value(2))
@@ -216,15 +220,70 @@ class ImportIntegrationTest {
     }
 
     @Test
+    void previewCorrectionsAreValidatedAppliedAndKeepOriginalRowsTraceable() throws Exception {
+        String csv = String.join(",", HEADERS) + "\n"
+                + "2026-08-25 10:00:00,,,厂区,区域,单元,TAG-C,描述,p1,ACTIVE,bad,1,MPa,DCS,录入员\n";
+        MockMultipartFile correctedFile = file("corrected.csv", csv.getBytes(StandardCharsets.UTF_8));
+        String corrections = "{\"2\":{\"priority\":\"P1\",\"value\":\"5.5\"}}";
+
+        String response = mockMvc.perform(multipart("/api/v1/imports/preview").file(correctedFile)
+                        .param("project_id", ProjectService.DEFAULT_PROJECT_ID.toString())
+                        .param("corrections", corrections))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("READY"))
+                .andExpect(jsonPath("$.source_rows.length()").value(1))
+                .andExpect(jsonPath("$.source_rows[0].source_row").value(2))
+                .andExpect(jsonPath("$.source_rows[0].values.priority").value("p1"))
+                .andExpect(jsonPath("$.source_rows[0].values.value").value("bad"))
+                .andExpect(jsonPath("$.preview_rows[0].priority").value("P1"))
+                .andExpect(jsonPath("$.preview_rows[0].value").value(5.5))
+                .andExpect(jsonPath("$.preview_rows[0].raw_payload.priority").value("p1"))
+                .andExpect(jsonPath("$.preview_rows[0].raw_payload.value").value("bad"))
+                .andReturn().getResponse().getContentAsString();
+        JsonNode body = objectMapper.readTree(response);
+        UUID batchId = UUID.fromString(body.path("batch_id").asText());
+        assertThat(body.path("corrections").path("2").path("priority").asText()).isEqualTo("P1");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT corrections->'2'->>'value' FROM import_batch WHERE batch_id=?",
+                String.class, batchId)).isEqualTo("5.5");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT details->'corrections'->'2'->>'priority' FROM audit_event
+                 WHERE target_id=? AND event_type='IMPORT_CREATED'
+                """, String.class, batchId)).isEqualTo("P1");
+
+        importService.confirm(batchId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT priority FROM alarm_record WHERE batch_id=?", String.class, batchId)).isEqualTo("P1");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT raw_payload->>'priority' FROM alarm_record WHERE batch_id=?",
+                String.class, batchId)).isEqualTo("p1");
+
+        MockMultipartFile badRowFile = file("bad-row.csv", csv.getBytes(StandardCharsets.UTF_8));
+        mockMvc.perform(multipart("/api/v1/imports/preview").file(badRowFile)
+                        .param("project_id", ProjectService.DEFAULT_PROJECT_ID.toString())
+                        .param("corrections", "{\"999\":{\"priority\":\"P1\"}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("corrections 包含不存在的源行号：999"));
+        MockMultipartFile badFieldFile = file("bad-field.csv", csv.getBytes(StandardCharsets.UTF_8));
+        mockMvc.perform(multipart("/api/v1/imports/preview").file(badFieldFile)
+                        .param("project_id", ProjectService.DEFAULT_PROJECT_ID.toString())
+                        .param("corrections", "{\"2\":{\"unknown\":\"x\"}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("corrections 包含未知目标字段：unknown"));
+    }
+
+    @Test
     void batchListAndRecordPagesExposeAllRowsWithStableBounds() throws Exception {
         ImportBatchSummary ready = importService.preview(sample("synthetic_smoke_utf8.csv"), null);
         importService.confirm(ready.batchId());
         importService.preview(file("second.csv", delimited(',').getBytes(StandardCharsets.UTF_8)), null);
 
-        mockMvc.perform(get("/api/v1/imports"))
+        mockMvc.perform(get("/api/v1/imports")
+                        .param("project_id", ProjectService.DEFAULT_PROJECT_ID.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
-        mockMvc.perform(get("/api/v1/imports").param("limit", "1"))
+        mockMvc.perform(get("/api/v1/imports")
+                        .param("project_id", ProjectService.DEFAULT_PROJECT_ID.toString()).param("limit", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
 
@@ -254,9 +313,11 @@ class ImportIntegrationTest {
     void listDetailAndRecordParametersRejectInvalidRequests() throws Exception {
         UUID missing = UUID.randomUUID();
 
-        mockMvc.perform(get("/api/v1/imports").param("limit", "0"))
+        mockMvc.perform(get("/api/v1/imports")
+                        .param("project_id", ProjectService.DEFAULT_PROJECT_ID.toString()).param("limit", "0"))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(get("/api/v1/imports").param("limit", "101"))
+        mockMvc.perform(get("/api/v1/imports")
+                        .param("project_id", ProjectService.DEFAULT_PROJECT_ID.toString()).param("limit", "101"))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(get("/api/v1/imports/{batchId}", missing))
                 .andExpect(status().isNotFound());

@@ -76,6 +76,7 @@ export interface AlarmListItem {
   cause_category: string;
   score: number;
   disposition_status: DispositionStatus;
+  assignee?: string;
 }
 
 export interface AlarmPage {
@@ -88,6 +89,7 @@ export interface AlarmPage {
 export interface Disposition {
   status: DispositionStatus;
   operator?: string;
+  assignee?: string;
   note?: string;
   updated_at?: string;
   closed_at?: string;
@@ -97,6 +99,7 @@ export interface DispositionHistory {
   from_status: DispositionStatus;
   to_status: DispositionStatus;
   operator: string;
+  assignee?: string;
   note?: string;
   occurred_at: string;
 }
@@ -161,6 +164,7 @@ export interface AlarmFilters {
   noise_type: string;
   cause_category: string;
   disposition_status: string;
+  assignee: string;
 }
 
 async function apiResponse<T>(response: Response): Promise<T> {
@@ -244,13 +248,14 @@ export async function updateDisposition(
   recordId: string,
   status: DispositionStatus,
   operator: string,
+  assignee: string,
   note: string,
 ): Promise<Disposition> {
   return apiResponse<Disposition>(
     await fetch(`/api/v1/analyses/${runId}/alarms/${recordId}/disposition`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ status, operator, note }),
+      body: JSON.stringify({ status, operator, assignee, note }),
     }),
   );
 }

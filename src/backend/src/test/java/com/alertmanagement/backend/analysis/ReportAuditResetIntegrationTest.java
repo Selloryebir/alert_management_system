@@ -11,12 +11,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alertmanagement.backend.project.ProjectService;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -238,6 +240,21 @@ class ReportAuditResetIntegrationTest {
     @Test
     void resetIsConfirmedAtomicWhitelistedAndRepeatable() throws Exception {
         Seed seed = seedCompletedRun();
+        UUID extraProject = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO business_project (
+                    project_id, code, name, client_name, site, unit_name, status, report_title,
+                    report_fields, validation_rules
+                ) VALUES (?, 'RESET-EXTRA', '待复位项目', '客户', '厂区', '装置', 'ACTIVE', '临时报告',
+                          '["summary"]'::jsonb, '{"required_fields":["operator"]}'::jsonb)
+                """, extraProject);
+        jdbcTemplate.update("""
+                UPDATE business_project SET code='CHANGED', name='已修改默认项目', client_name='其他客户',
+                       site='其他厂区', unit_name='其他装置', status='ARCHIVED', report_title='其他报告',
+                       report_fields='["summary"]'::jsonb,
+                       validation_rules='{"required_fields":["operator"],"value_min":1}'::jsonb
+                 WHERE project_id=?
+                """, ProjectService.DEFAULT_PROJECT_ID);
         jdbcTemplate.execute("CREATE TABLE external_sentinel (id INTEGER PRIMARY KEY, value VARCHAR(20) NOT NULL)");
         jdbcTemplate.update("INSERT INTO external_sentinel VALUES (1, 'keep')");
 
@@ -279,12 +296,24 @@ class ReportAuditResetIntegrationTest {
                 .andExpect(jsonPath("$.business_state").value("EMPTY"))
                 .andExpect(jsonPath("$.deleted_counts.alarm_record").value(5))
                 .andExpect(jsonPath("$.deleted_counts.import_batch").value(1))
-                .andExpect(jsonPath("$.deleted_counts.audit_event").value(0));
+                .andExpect(jsonPath("$.deleted_counts.audit_event").value(0))
+                .andExpect(jsonPath("$.deleted_counts.business_project").value(1));
         assertThat(count("alarm_record")).isZero();
         assertThat(count("analysis_run")).isZero();
         assertThat(count("audit_event")).isZero();
         assertThat(count("app_metadata")).isZero();
-        assertThat(count("flyway_schema_history")).isEqualTo(6);
+        assertThat(count("flyway_schema_history")).isEqualTo(8);
+        assertThat(count("business_project")).isOne();
+        assertThat(jdbcTemplate.queryForMap("""
+                SELECT code, name, client_name, site, unit_name, status, report_title,
+                       report_fields::text AS report_fields, validation_rules::text AS validation_rules
+                  FROM business_project WHERE project_id=?
+                """, ProjectService.DEFAULT_PROJECT_ID)).containsAllEntriesOf(Map.of(
+                        "code", "DEFAULT-DEMO", "name", "默认演示项目", "client_name", "演示客户",
+                        "site", "合成厂区", "unit_name", "演示装置", "status", "ACTIVE",
+                        "report_title", "报警分析报告",
+                        "report_fields", "[\"summary\", \"priority\", \"area\", \"unit\", \"noise\", \"cause\", \"disposition\", \"chains\"]",
+                        "validation_rules", "{\"required_fields\": []}"));
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT value FROM external_sentinel WHERE id = 1", String.class)).isEqualTo("keep");
 
@@ -293,7 +322,8 @@ class ReportAuditResetIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.business_state").value("EMPTY"))
                 .andExpect(jsonPath("$.deleted_counts.alarm_record").value(0))
-                .andExpect(jsonPath("$.deleted_counts.import_batch").value(0));
+                .andExpect(jsonPath("$.deleted_counts.import_batch").value(0))
+                .andExpect(jsonPath("$.deleted_counts.business_project").value(0));
     }
 
     private void disposition(UUID runId, UUID recordId, String statusValue, String note) throws Exception {
@@ -309,11 +339,11 @@ class ReportAuditResetIntegrationTest {
         UUID runId = UUID.randomUUID();
         jdbcTemplate.update("""
                 INSERT INTO import_batch (
-                    batch_id, file_name, file_format, status, total_rows, valid_rows, error_count,
+                    batch_id, project_id, file_name, file_format, status, total_rows, valid_rows, error_count,
                     headers, field_mapping, errors, imported_at
-                ) VALUES (?, 'synthetic.csv', 'CSV', 'COMPLETED', 5, 5, 0,
+                ) VALUES (?, ?, 'synthetic.csv', 'CSV', 'COMPLETED', 5, 5, 0,
                           '[]'::jsonb, '{}'::jsonb, '[]'::jsonb, CURRENT_TIMESTAMP)
-                """, batchId);
+                """, batchId, ProjectService.DEFAULT_PROJECT_ID);
         List<UUID> records = new java.util.ArrayList<>();
         OffsetDateTime start = OffsetDateTime.parse("2026-08-25T08:00:00+08:00");
         for (int index = 0; index < 5; index++) {

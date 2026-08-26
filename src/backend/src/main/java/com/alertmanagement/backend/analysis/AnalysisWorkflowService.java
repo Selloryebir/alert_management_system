@@ -102,7 +102,7 @@ class AnalysisWorkflowService {
     }
 
     AlarmPage alarms(UUID runId, int page, int size, String priority, String area, String unit,
-            String noiseType, String causeCategory, String dispositionStatus) {
+            String noiseType, String causeCategory, String dispositionStatus, String assignee) {
         requireCompleted(runId);
         if (page < 0 || size < 1 || size > 200) {
             throw badRequest("page 必须大于等于 0，size 必须在 1 到 200 之间");
@@ -113,6 +113,7 @@ class AnalysisWorkflowService {
         validateEnum("disposition_status", dispositionStatus, DISPOSITION_STATUSES);
         validateTextFilter("area", area);
         validateTextFilter("unit", unit);
+        validateTextFilter("assignee", assignee);
 
         StringBuilder where = new StringBuilder(" WHERE r.run_id = ?");
         List<Object> arguments = new ArrayList<>();
@@ -129,6 +130,11 @@ class AnalysisWorkflowService {
         addFilter(where, arguments, "COALESCE(o.noise_type, r.noise_type) = ?", noiseType);
         addFilter(where, arguments, "COALESCE(o.cause_category, r.cause_category) = ?", causeCategory);
         addFilter(where, arguments, "COALESCE(d.status, 'OPEN') = ?", dispositionStatus);
+        if ("UNASSIGNED".equals(assignee)) {
+            where.append(" AND NULLIF(d.assignee, '') IS NULL");
+        } else {
+            addFilter(where, arguments, "d.assignee = ?", assignee);
+        }
 
         String from = """
                  FROM analysis_result r
@@ -148,7 +154,7 @@ class AnalysisWorkflowService {
                        COALESCE(o.noise_type, r.noise_type) AS noise_type,
                        COALESCE(o.alarm_class, r.alarm_class) AS alarm_class,
                        COALESCE(o.cause_category, r.cause_category) AS cause_category, r.score,
-                       COALESCE(d.status, 'OPEN') AS disposition_status
+                       COALESCE(d.status, 'OPEN') AS disposition_status, d.assignee
                 """ + from + where + " ORDER BY a.source_row LIMIT ? OFFSET ?",
                 (resultSet, rowNumber) -> new AlarmItem(
                         resultSet.getObject("record_id", UUID.class), resultSet.getInt("source_row"),
@@ -157,7 +163,8 @@ class AnalysisWorkflowService {
                         resultSet.getString("description"), resultSet.getString("priority"),
                         resultSet.getString("alarm_state"), resultSet.getString("noise_type"),
                         resultSet.getString("alarm_class"), resultSet.getString("cause_category"),
-                        resultSet.getBigDecimal("score"), resultSet.getString("disposition_status")),
+                        resultSet.getBigDecimal("score"), resultSet.getString("disposition_status"),
+                        resultSet.getString("assignee")),
                 pageArguments.toArray());
         return new AlarmPage(runId, page, size, total, items);
     }
@@ -177,7 +184,7 @@ class AnalysisWorkflowService {
                        o.operator_name AS override_operator, o.reason AS override_reason,
                        o.updated_at AS override_updated_at,
                        COALESCE(d.status, 'OPEN') AS disposition_status,
-                       d.operator_name AS disposition_operator, d.note, d.updated_at, d.closed_at
+                       d.operator_name AS disposition_operator, d.assignee, d.note, d.updated_at, d.closed_at
                   FROM analysis_result r
                   JOIN alarm_record a ON a.record_id = r.record_id
                   LEFT JOIN alarm_disposition d ON d.run_id = r.run_id AND d.record_id = r.record_id
@@ -192,6 +199,7 @@ class AnalysisWorkflowService {
                 resultSet.getString("alarm_state"), resultSet.getString("noise_type"),
                 resultSet.getString("alarm_class"), resultSet.getString("cause_category"),
                 resultSet.getBigDecimal("score"), resultSet.getString("disposition_status"),
+                resultSet.getString("assignee"),
                 resultSet.getObject("return_time", OffsetDateTime.class),
                 resultSet.getObject("ack_time", OffsetDateTime.class), resultSet.getBigDecimal("alarm_value"),
                 resultSet.getBigDecimal("threshold"), resultSet.getString("engineering_unit"),
@@ -205,7 +213,8 @@ class AnalysisWorkflowService {
                         resultSet.getString("override_operator"), resultSet.getString("override_reason"),
                         resultSet.getObject("override_updated_at", OffsetDateTime.class)),
                 new DispositionView(resultSet.getString("disposition_status"),
-                        resultSet.getString("disposition_operator"), resultSet.getString("note"),
+                        resultSet.getString("disposition_operator"), resultSet.getString("assignee"),
+                        resultSet.getString("note"),
                         resultSet.getObject("updated_at", OffsetDateTime.class),
                         resultSet.getObject("closed_at", OffsetDateTime.class)),
                 dispositionHistory(runId, recordId), eventChains(runId, recordId)), runId, recordId);
@@ -217,13 +226,14 @@ class AnalysisWorkflowService {
 
     @Transactional
     public DispositionView updateDisposition(UUID runId, UUID recordId, DispositionRequest request) {
-        requireCompleted(runId);
+        requireWritable(requireCompleted(runId));
         if (request == null) {
             throw badRequest("请求体不能为空");
         }
         String target = required(request.status(), "status", 20);
         String operator = required(request.operator(), "operator", 100);
         String note = required(request.note(), "note", 500);
+        String assignee = request.assignee() == null ? null : required(request.assignee(), "assignee", 100);
         if (!DISPOSITION_STATUSES.contains(target)) {
             throw badRequest("status 必须是 OPEN、IN_PROGRESS 或 CLOSED");
         }
@@ -235,44 +245,51 @@ class AnalysisWorkflowService {
         if (records.isEmpty()) {
             throw notFound("该分析运行中不存在此报警记录");
         }
-        List<String> currentRows = jdbcTemplate.queryForList("""
-                SELECT status FROM alarm_disposition
+        List<DispositionState> currentRows = jdbcTemplate.query("""
+                SELECT status, assignee FROM alarm_disposition
                  WHERE run_id = ? AND record_id = ?
                  FOR UPDATE
-                """, String.class, runId, recordId);
-        String current = currentRows.isEmpty() ? "OPEN" : currentRows.getFirst();
-        if (!allowed(current, target)) {
+                """, (resultSet, rowNumber) -> new DispositionState(
+                resultSet.getString("status"), resultSet.getString("assignee")), runId, recordId);
+        String current = currentRows.isEmpty() ? "OPEN" : currentRows.getFirst().status();
+        String currentAssignee = currentRows.isEmpty() ? null : currentRows.getFirst().assignee();
+        boolean assignmentChanged = !java.util.Objects.equals(currentAssignee, assignee);
+        if (!current.equals(target) && !allowed(current, target)) {
             throw new BusinessApiException(HttpStatus.CONFLICT, "DISPOSITION_STATUS_CONFLICT",
                     "不允许从 " + current + " 流转到 " + target);
+        }
+        if (current.equals(target) && !assignmentChanged) {
+            throw new BusinessApiException(HttpStatus.CONFLICT, "DISPOSITION_NO_CHANGE", "处置状态和责任人均未变化");
         }
         if (currentRows.isEmpty()) {
             jdbcTemplate.update("""
                     INSERT INTO alarm_disposition (
-                        run_id, record_id, status, operator_name, note, updated_at, closed_at
-                    ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP,
+                        run_id, record_id, status, operator_name, assignee, note, updated_at, closed_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP,
                               CASE WHEN ? = 'CLOSED' THEN CURRENT_TIMESTAMP ELSE NULL END)
-                    """, runId, recordId, target, operator, note, target);
+                    """, runId, recordId, target, operator, assignee, note, target);
         } else {
             jdbcTemplate.update("""
                     UPDATE alarm_disposition
-                       SET status = ?, operator_name = ?, note = ?, updated_at = CURRENT_TIMESTAMP,
+                       SET status = ?, operator_name = ?, assignee = ?, note = ?, updated_at = CURRENT_TIMESTAMP,
                            closed_at = CASE WHEN ? = 'CLOSED' THEN CURRENT_TIMESTAMP ELSE NULL END
                      WHERE run_id = ? AND record_id = ?
-                    """, target, operator, note, target, runId, recordId);
+                    """, target, operator, assignee, note, target, runId, recordId);
         }
         jdbcTemplate.update("""
                 INSERT INTO disposition_history (
-                    run_id, record_id, from_status, to_status, operator_name, note
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                """, runId, recordId, current, target, operator, note);
+                    run_id, record_id, from_status, to_status, operator_name, assignee, note
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, runId, recordId, current, target, operator, assignee, note);
         auditService.record("DISPOSITION_CHANGED", operator, "ALARM_RECORD", recordId, "SUCCESS",
-                Map.of("run_id", runId, "from_status", current, "to_status", target, "note", note));
+                nullableMap("run_id", runId, "from_status", current, "to_status", target,
+                        "old_assignee", currentAssignee, "assignee", assignee, "note", note));
         return disposition(runId, recordId);
     }
 
     @Transactional
     public AlarmDetail updateClassification(UUID runId, UUID recordId, ClassificationRequest request) {
-        requireCompleted(runId);
+        requireWritable(requireCompleted(runId));
         if (request == null) {
             throw badRequest("请求体不能为空");
         }
@@ -339,13 +356,13 @@ class AnalysisWorkflowService {
 
     private List<DispositionHistoryView> dispositionHistory(UUID runId, UUID recordId) {
         return jdbcTemplate.query("""
-                SELECT from_status, to_status, operator_name, note, occurred_at
+                SELECT from_status, to_status, operator_name, assignee, note, occurred_at
                   FROM disposition_history
                  WHERE run_id = ? AND record_id = ?
                  ORDER BY occurred_at, history_id
                 """, (resultSet, rowNumber) -> new DispositionHistoryView(
                 resultSet.getString("from_status"), resultSet.getString("to_status"),
-                resultSet.getString("operator_name"), resultSet.getString("note"),
+                resultSet.getString("operator_name"), resultSet.getString("assignee"), resultSet.getString("note"),
                 resultSet.getObject("occurred_at", OffsetDateTime.class)), runId, recordId);
     }
 
@@ -384,20 +401,26 @@ class AnalysisWorkflowService {
 
     private DispositionView disposition(UUID runId, UUID recordId) {
         return jdbcTemplate.queryForObject("""
-                SELECT status, operator_name, note, updated_at, closed_at
+                SELECT status, operator_name, assignee, note, updated_at, closed_at
                   FROM alarm_disposition
                  WHERE run_id = ? AND record_id = ?
                 """, (resultSet, rowNumber) -> new DispositionView(
-                resultSet.getString("status"), resultSet.getString("operator_name"), resultSet.getString("note"),
+                resultSet.getString("status"), resultSet.getString("operator_name"),
+                resultSet.getString("assignee"), resultSet.getString("note"),
                 resultSet.getObject("updated_at", OffsetDateTime.class),
                 resultSet.getObject("closed_at", OffsetDateTime.class)), runId, recordId);
     }
 
     private RunIdentity requireCompleted(UUID runId) {
-        List<RunIdentity> rows = jdbcTemplate.query(
-                "SELECT batch_id, status FROM analysis_run WHERE run_id = ?",
+        List<RunIdentity> rows = jdbcTemplate.query("""
+                SELECT r.batch_id, r.status, p.status AS project_status
+                  FROM analysis_run r JOIN import_batch b ON b.batch_id=r.batch_id
+                  JOIN business_project p ON p.project_id=b.project_id
+                 WHERE r.run_id = ?
+                """,
                 (resultSet, rowNumber) -> new RunIdentity(
-                        resultSet.getObject("batch_id", UUID.class), resultSet.getString("status")), runId);
+                        resultSet.getObject("batch_id", UUID.class), resultSet.getString("status"),
+                        resultSet.getString("project_status")), runId);
         if (rows.isEmpty()) {
             throw notFound("分析运行不存在");
         }
@@ -407,6 +430,12 @@ class AnalysisWorkflowService {
                     "只有 COMPLETED 分析运行可以查询业务结果或处置");
         }
         return run;
+    }
+
+    private void requireWritable(RunIdentity run) {
+        if (!"ACTIVE".equals(run.projectStatus())) {
+            throw new BusinessApiException(HttpStatus.CONFLICT, "PROJECT_ARCHIVED", "项目已归档，不能修改业务数据");
+        }
     }
 
     private Map<String, Long> counts(String sql, UUID runId) {
@@ -433,6 +462,14 @@ class AnalysisWorkflowService {
             where.append(" AND ").append(condition);
             arguments.add(value);
         }
+    }
+
+    private Map<String, Object> nullableMap(Object... pairs) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (int index = 0; index < pairs.length; index += 2) {
+            result.put((String) pairs[index], pairs[index + 1]);
+        }
+        return result;
     }
 
     private String required(String value, String name, int maximumLength) {
@@ -471,7 +508,10 @@ class AnalysisWorkflowService {
         }
     }
 
-    private record RunIdentity(UUID batchId, String status) {
+    private record RunIdentity(UUID batchId, String status, String projectStatus) {
+    }
+
+    private record DispositionState(String status, String assignee) {
     }
 
     private record ClassificationRow(

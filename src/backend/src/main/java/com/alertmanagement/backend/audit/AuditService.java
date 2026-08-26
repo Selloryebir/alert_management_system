@@ -20,9 +20,11 @@ public class AuditService {
     private static final Set<String> EVENT_TYPES = Set.of(
             "IMPORT_CREATED", "IMPORT_REJECTED", "IMPORT_CONFIRMED",
             "ANALYSIS_STARTED", "ANALYSIS_COMPLETED", "ANALYSIS_FAILED",
-            "RESULT_OVERRIDDEN", "DISPOSITION_CHANGED", "REPORT_EXPORTED");
+            "RESULT_OVERRIDDEN", "DISPOSITION_CHANGED", "REPORT_EXPORTED",
+            "PROJECT_CREATED", "PROJECT_UPDATED", "PROJECT_ARCHIVED", "PROJECT_RESTORED", "PROJECT_DELETED",
+            "MANUAL_ALARM_CREATED", "MANUAL_ALARM_UPDATED", "MANUAL_ALARM_INVALIDATED");
     private static final Set<String> TARGET_TYPES = Set.of(
-            "IMPORT_BATCH", "ANALYSIS_RUN", "ALARM_RECORD");
+            "IMPORT_BATCH", "ANALYSIS_RUN", "ALARM_RECORD", "PROJECT");
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;

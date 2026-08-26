@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.alertmanagement.backend.project.ProjectService;
 import com.sun.net.httpserver.HttpServer;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.IOException;
@@ -530,7 +531,8 @@ class AnalysisIntegrationTest {
         }
         MockMultipartFile file = new MockMultipartFile("file", "analysis.csv", "text/csv",
                 csv.toString().getBytes(StandardCharsets.UTF_8));
-        String body = mockMvc.perform(multipart("/api/v1/imports/preview").file(file))
+        String body = mockMvc.perform(multipart("/api/v1/imports/preview").file(file)
+                        .param("project_id", ProjectService.DEFAULT_PROJECT_ID.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("READY"))
                 .andReturn().getResponse().getContentAsString();

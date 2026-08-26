@@ -46,7 +46,8 @@ record AlarmItem(
         @JsonProperty("alarm_class") String alarmClass,
         @JsonProperty("cause_category") String causeCategory,
         BigDecimal score,
-        @JsonProperty("disposition_status") String dispositionStatus) {
+        @JsonProperty("disposition_status") String dispositionStatus,
+        String assignee) {
 }
 
 record AlarmDetail(
@@ -65,6 +66,7 @@ record AlarmDetail(
         @JsonProperty("cause_category") String causeCategory,
         BigDecimal score,
         @JsonProperty("disposition_status") String dispositionStatus,
+        String assignee,
         @JsonProperty("return_time") OffsetDateTime returnTime,
         @JsonProperty("ack_time") OffsetDateTime ackTime,
         BigDecimal value,
@@ -84,6 +86,7 @@ record AlarmDetail(
 record DispositionView(
         String status,
         String operator,
+        String assignee,
         String note,
         @JsonProperty("updated_at") OffsetDateTime updatedAt,
         @JsonProperty("closed_at") OffsetDateTime closedAt) {
@@ -93,11 +96,12 @@ record DispositionHistoryView(
         @JsonProperty("from_status") String fromStatus,
         @JsonProperty("to_status") String toStatus,
         String operator,
+        String assignee,
         String note,
         @JsonProperty("occurred_at") OffsetDateTime occurredAt) {
 }
 
-record DispositionRequest(String status, String operator, String note) {
+record DispositionRequest(String status, String operator, String assignee, String note) {
 }
 
 record ClassificationValues(
