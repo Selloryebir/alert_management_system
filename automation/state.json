@@ -36,7 +36,8 @@
       "docs/product/",
       "docs/security/",
       "docs/verification/",
-      "automation/state.json"
+      "automation/state.json",
+      "automation/workflow.json"
     ],
     "checks": [],
     "failures": [],

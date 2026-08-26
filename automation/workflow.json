@@ -26,6 +26,7 @@
     "docs/product/source-coverage.md",
     "docs/algorithm/model-v2.md",
     "docs/security/threat-model.md",
+    "docs/product/security-contract.md",
     "docs/releases/versioning.md"
   ],
   "stages": [
@@ -156,6 +157,9 @@
       "name": "Windows 11 x64 原生发布与验收",
       "depends_on": ["M5"],
       "references": [
+        "docs/planning/M11-implementation.md",
+        "docs/product/security-contract.md",
+        "docs/security/threat-model.md",
         "docs/architecture/README.md",
         "docs/verification/README.md",
         "docs/verification/automation-audit.md"
