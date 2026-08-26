@@ -21,6 +21,7 @@
 | 字段 | 类型 | 必填 | 规则 |
 |---|---|---:|---|
 | `record_id` | UUID | 系统生成 | 规范化记录标识 |
+| `project_id` | UUID | 系统关联 | 所属项目；通过导入批次继承且所有业务查询按项目隔离 |
 | `batch_id` | UUID | 系统生成 | 所属导入批次 |
 | `source_row` | 正整数 | 是 | 含表头时首条数据通常为 2 |
 | `event_time` | timestamptz | 是 | 报警发生时间 |
@@ -43,6 +44,10 @@
 默认字段别名只服务于样例和常见中文表头；未知列由用户映射，不在代码中猜测厂商语义。空字符串按缺失处理。每个阻断错误至少返回 `source_row`、目标字段、错误码和中文消息。
 
 推荐稳定错误码：`MISSING_HEADER`、`REQUIRED_VALUE_MISSING`、`INVALID_TIME`、`INVALID_ENUM`、`INVALID_NUMBER`、`TIME_ORDER_INVALID`、`DUPLICATE_SOURCE_ROW`。
+
+项目模型、生命周期和 API 以[项目化业务契约](project-contract.md)为准。导入预览允许业务人员对阻断行按“源行号、目标字段、修正文本”提交临时修正并重新执行全量校验；修正后的规范化值用于业务分析，但原始文件和 `raw_payload` 保留修正前文本，批次同时保存修正明细用于审计。
+
+人工补录记录的来源为 `MANUAL_ENTRY`。尚未分析时可带理由修订；删除语义统一为受控作废，不物理擦除记录。作废记录保留在列表和审计中，但不进入新的分析运行。
 
 ## 4. 批次与处理状态
 

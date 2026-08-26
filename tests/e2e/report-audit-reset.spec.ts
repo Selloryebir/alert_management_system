@@ -65,6 +65,8 @@ async function assertSuccessfulWithoutBody(
 }
 
 async function importAndAnalyze(page: Page): Promise<string> {
+  await page.getByTestId("select-project-DEFAULT-DEMO").click();
+  await expect(page.getByTestId("file-input")).toBeEnabled();
   await page.getByTestId("file-input").setInputFiles(dataset);
   const previewPromise = page.waitForResponse(
     (response) => response.url().endsWith("/api/v1/imports/preview")
@@ -140,13 +142,14 @@ async function overrideClassification(page: Page, runId: string): Promise<void> 
 }
 
 async function closeAlarm(page: Page): Promise<void> {
+  await page.getByTestId("disposition-assignee").fill("SYNTHETIC_M5_ASSIGNEE");
   await page.getByTestId("disposition-operator").fill(operator);
   await page.getByTestId("disposition-note").fill("[SYNTHETIC] 开始处理修订报警");
   await page.getByTestId("disposition-start").click();
   await page.getByTestId("disposition-note").fill("[SYNTHETIC] 完成审核并关闭");
   await page.getByTestId("disposition-close").click();
-  await expect(page.getByTestId("disposition-history")).toContainText("OPEN → IN_PROGRESS");
-  await expect(page.getByTestId("disposition-history")).toContainText("IN_PROGRESS → CLOSED");
+  await expect(page.getByTestId("disposition-history")).toContainText("待处理 → 处理中");
+  await expect(page.getByTestId("disposition-history")).toContainText("处理中 → 已关闭");
 }
 
 async function downloadReport(
@@ -170,7 +173,7 @@ async function downloadReport(
     ? "application/pdf"
     : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   expect(response.headers()["content-type"]).toContain(expectedType);
-  expect(download.suggestedFilename()).toMatch(new RegExp(`^alert-report-${runId}\\.${format}$`));
+  expect(download.suggestedFilename()).toMatch(new RegExp(`^DEFAULT-DEMO-alert-report-${runId}\\.${format}$`));
   expect(await download.failure()).toBeNull();
 
   const reportPath = path.join(outputDirectory, `report.${format}`);
@@ -277,7 +280,7 @@ test("报告、审计、人工修订和明确复位结果一致", async ({ page 
 
     await page.getByTestId("audit-filter").selectOption("REPORT_EXPORTED");
     await page.getByTestId("audit-refresh").click();
-    await expect(page.getByTestId("audit-table")).toContainText("REPORT_EXPORTED");
+    await expect(page.getByTestId("audit-table")).toContainText("导出报告");
     await expect(page.getByTestId("audit-table")).toContainText(operator);
     const audit = await auditSnapshot(page, [
       "IMPORT_CREATED",

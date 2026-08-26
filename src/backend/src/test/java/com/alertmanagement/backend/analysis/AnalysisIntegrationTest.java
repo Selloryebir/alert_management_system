@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.alertmanagement.backend.project.ProjectService;
 import com.sun.net.httpserver.HttpServer;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import java.io.IOException;
@@ -65,7 +66,7 @@ class AnalysisIntegrationTest {
         registry.add("spring.datasource.password", () -> "");
         registry.add("app.algorithm.analysis-url",
                 () -> "http://127.0.0.1:" + ALGORITHM.getAddress().getPort() + "/api/v2/analyze");
-        registry.add("app.algorithm.analysis-timeout", () -> "250ms");
+        registry.add("app.algorithm.analysis-timeout", () -> "2s");
     }
 
     @BeforeEach
@@ -269,7 +270,7 @@ class AnalysisIntegrationTest {
         UUID batchId = importedBatch();
         RESPONDER.set(request -> {
             try {
-                Thread.sleep(Duration.ofSeconds(1));
+                Thread.sleep(Duration.ofSeconds(3));
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
             }
@@ -530,7 +531,8 @@ class AnalysisIntegrationTest {
         }
         MockMultipartFile file = new MockMultipartFile("file", "analysis.csv", "text/csv",
                 csv.toString().getBytes(StandardCharsets.UTF_8));
-        String body = mockMvc.perform(multipart("/api/v1/imports/preview").file(file))
+        String body = mockMvc.perform(multipart("/api/v1/imports/preview").file(file)
+                        .param("project_id", ProjectService.DEFAULT_PROJECT_ID.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("READY"))
                 .andReturn().getResponse().getContentAsString();

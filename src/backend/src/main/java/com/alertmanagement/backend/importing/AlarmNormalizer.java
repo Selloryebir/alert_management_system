@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
+import com.alertmanagement.backend.project.ProjectValidationRules;
 
 @Component
 class AlarmNormalizer {
@@ -33,6 +34,11 @@ class AlarmNormalizer {
             DateTimeFormatter.ofPattern("yyyy/M/d H:mm"));
 
     ValidatedImport normalize(SourceTable table, Map<String, String> requestedMapping) {
+        return normalize(table, requestedMapping, Map.of());
+    }
+
+    ValidatedImport normalize(SourceTable table, Map<String, String> requestedMapping,
+            Map<Integer, Map<String, String>> corrections) {
         List<ImportError> errors = new ArrayList<>(table.errors());
         Map<String, String> mapping = resolveMapping(table.headers(), requestedMapping, errors);
         List<NormalizedAlarm> normalized = new ArrayList<>();
@@ -45,28 +51,29 @@ class AlarmNormalizer {
 
         for (SourceTable.SourceRow row : table.rows()) {
             int errorStart = errors.size();
+            Map<String, String> rowCorrections = corrections.getOrDefault(row.sourceRow(), Map.of());
             if (!sourceRows.add(row.sourceRow())) {
                 errors.add(new ImportError(row.sourceRow(), "source_row", "DUPLICATE_SOURCE_ROW",
                         "源数据行号重复"));
             }
 
-            OffsetDateTime eventTime = time(row, mapping, "event_time", true, errors);
-            OffsetDateTime returnTime = time(row, mapping, "return_time", false, errors);
-            OffsetDateTime ackTime = time(row, mapping, "ack_time", false, errors);
-            String site = text(row, mapping, "site", true, 100, errors);
-            String area = text(row, mapping, "area", true, 100, errors);
-            String unit = text(row, mapping, "unit", false, 100, errors);
-            String tag = text(row, mapping, "tag", true, 120, errors);
-            String description = text(row, mapping, "description", true, 500, errors);
-            String priority = enumeration(row, mapping, "priority", true,
+            OffsetDateTime eventTime = time(row, mapping, rowCorrections, "event_time", true, errors);
+            OffsetDateTime returnTime = time(row, mapping, rowCorrections, "return_time", false, errors);
+            OffsetDateTime ackTime = time(row, mapping, rowCorrections, "ack_time", false, errors);
+            String site = text(row, mapping, rowCorrections, "site", true, 100, errors);
+            String area = text(row, mapping, rowCorrections, "area", true, 100, errors);
+            String unit = text(row, mapping, rowCorrections, "unit", false, 100, errors);
+            String tag = text(row, mapping, rowCorrections, "tag", true, 120, errors);
+            String description = text(row, mapping, rowCorrections, "description", true, 500, errors);
+            String priority = enumeration(row, mapping, rowCorrections, "priority", true,
                     Set.of("P1", "P2", "P3", "P4"), errors);
-            String state = enumeration(row, mapping, "state", true,
+            String state = enumeration(row, mapping, rowCorrections, "state", true,
                     Set.of("ACTIVE", "RETURNED", "ACKNOWLEDGED"), errors);
-            BigDecimal value = number(row, mapping, "value", errors);
-            BigDecimal threshold = number(row, mapping, "threshold", errors);
-            String engineeringUnit = text(row, mapping, "engineering_unit", false, 40, errors);
-            String sourceSystem = text(row, mapping, "source_system", true, 100, errors);
-            String operator = text(row, mapping, "operator", false, 100, errors);
+            BigDecimal value = number(row, mapping, rowCorrections, "value", errors);
+            BigDecimal threshold = number(row, mapping, rowCorrections, "threshold", errors);
+            String engineeringUnit = text(row, mapping, rowCorrections, "engineering_unit", false, 40, errors);
+            String sourceSystem = text(row, mapping, rowCorrections, "source_system", true, 100, errors);
+            String operator = text(row, mapping, rowCorrections, "operator", false, 100, errors);
 
             validateTimeOrder(row.sourceRow(), eventTime, returnTime, "return_time", errors);
             validateTimeOrder(row.sourceRow(), eventTime, ackTime, "ack_time", errors);
@@ -88,6 +95,68 @@ class AlarmNormalizer {
         return new ValidatedImport(
                 table.format(), table.headers(), Map.copyOf(mapping), table.rows().size(), validRows,
                 List.copyOf(errors), List.copyOf(normalized));
+    }
+
+    boolean supportsField(String field) {
+        return ALIASES.containsKey(field);
+    }
+
+    ValidatedImport applyProjectRules(ValidatedImport validated, ProjectValidationRules rules) {
+        if (rules == null) {
+            return validated;
+        }
+        List<ImportError> errors = new ArrayList<>(validated.errors());
+        List<NormalizedAlarm> records = new ArrayList<>();
+        for (NormalizedAlarm record : validated.records()) {
+            int before = errors.size();
+            for (String field : rules.requiredFields()) {
+                if (fieldValue(record, field) == null) {
+                    errors.add(new ImportError(record.sourceRow(), field, "PROJECT_RULE_REQUIRED",
+                            "项目校验规则“附加必填字段”未通过：" + field));
+                }
+            }
+            range(record.sourceRow(), "value", record.value(), rules.valueMin(), rules.valueMax(), errors);
+            range(record.sourceRow(), "threshold", record.threshold(),
+                    rules.thresholdMin(), rules.thresholdMax(), errors);
+            if (errors.size() == before) {
+                records.add(record);
+            }
+        }
+        return new ValidatedImport(validated.format(), validated.headers(), validated.mapping(),
+                validated.totalRows(), records.size(), List.copyOf(errors), List.copyOf(records));
+    }
+
+    private Object fieldValue(NormalizedAlarm record, String field) {
+        return switch (field) {
+            case "event_time" -> record.eventTime();
+            case "return_time" -> record.returnTime();
+            case "ack_time" -> record.ackTime();
+            case "site" -> record.site();
+            case "area" -> record.area();
+            case "unit" -> record.unit();
+            case "tag" -> record.tag();
+            case "description" -> record.description();
+            case "priority" -> record.priority();
+            case "state" -> record.state();
+            case "value" -> record.value();
+            case "threshold" -> record.threshold();
+            case "engineering_unit" -> record.engineeringUnit();
+            case "source_system" -> record.sourceSystem();
+            case "operator" -> record.operator();
+            default -> null;
+        };
+    }
+
+    private void range(int sourceRow, String field, BigDecimal value, BigDecimal minimum,
+            BigDecimal maximum, List<ImportError> errors) {
+        if (value == null) {
+            return;
+        }
+        if ((minimum != null && value.compareTo(minimum) < 0)
+                || (maximum != null && value.compareTo(maximum) > 0)) {
+            errors.add(new ImportError(sourceRow, field, "PROJECT_RULE_RANGE",
+                    "项目校验规则“数值范围”未通过：" + field));
+        }
     }
 
     private Map<String, String> resolveMapping(
@@ -136,7 +205,12 @@ class AlarmNormalizer {
         return java.util.Optional.empty();
     }
 
-    private String raw(SourceTable.SourceRow row, Map<String, String> mapping, String field) {
+    private String raw(SourceTable.SourceRow row, Map<String, String> mapping,
+            Map<String, String> corrections, String field) {
+        if (corrections.containsKey(field)) {
+            String corrected = corrections.get(field);
+            return corrected.trim().isEmpty() ? null : corrected.trim();
+        }
         String header = mapping.get(field);
         if (header == null) {
             return null;
@@ -148,13 +222,14 @@ class AlarmNormalizer {
     private String text(
             SourceTable.SourceRow row,
             Map<String, String> mapping,
+            Map<String, String> corrections,
             String field,
             boolean required,
             int maximumLength,
             List<ImportError> errors) {
-        String value = raw(row, mapping, field);
+        String value = raw(row, mapping, corrections, field);
         if (value == null) {
-            if (required && mapping.containsKey(field)) {
+            if (required && (mapping.containsKey(field) || corrections.containsKey(field))) {
                 errors.add(new ImportError(row.sourceRow(), field, "REQUIRED_VALUE_MISSING",
                         "必填字段不能为空：" + field));
             }
@@ -170,12 +245,13 @@ class AlarmNormalizer {
     private OffsetDateTime time(
             SourceTable.SourceRow row,
             Map<String, String> mapping,
+            Map<String, String> corrections,
             String field,
             boolean required,
             List<ImportError> errors) {
-        String value = raw(row, mapping, field);
+        String value = raw(row, mapping, corrections, field);
         if (value == null) {
-            if (required && mapping.containsKey(field)) {
+            if (required && (mapping.containsKey(field) || corrections.containsKey(field))) {
                 errors.add(new ImportError(row.sourceRow(), field, "REQUIRED_VALUE_MISSING",
                         "必填时间不能为空：" + field));
             }
@@ -221,13 +297,14 @@ class AlarmNormalizer {
     private String enumeration(
             SourceTable.SourceRow row,
             Map<String, String> mapping,
+            Map<String, String> corrections,
             String field,
             boolean required,
             Set<String> accepted,
             List<ImportError> errors) {
-        String value = raw(row, mapping, field);
+        String value = raw(row, mapping, corrections, field);
         if (value == null) {
-            if (required && mapping.containsKey(field)) {
+            if (required && (mapping.containsKey(field) || corrections.containsKey(field))) {
                 errors.add(new ImportError(row.sourceRow(), field, "REQUIRED_VALUE_MISSING",
                         "必填枚举不能为空：" + field));
             }
@@ -243,9 +320,10 @@ class AlarmNormalizer {
     private BigDecimal number(
             SourceTable.SourceRow row,
             Map<String, String> mapping,
+            Map<String, String> corrections,
             String field,
             List<ImportError> errors) {
-        String value = raw(row, mapping, field);
+        String value = raw(row, mapping, corrections, field);
         if (value == null) {
             return null;
         }

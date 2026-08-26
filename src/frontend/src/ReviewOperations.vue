@@ -9,9 +9,10 @@ import {
   resetDemo,
   type AuditPage,
 } from "./operations";
+import { auditDetails, zh } from "./labels";
 
 const props = defineProps<{ runId?: string }>();
-const emit = defineEmits<{ demoReset: [] }>();
+const emit = defineEmits<{ demoReset: []; reportDownloaded: [] }>();
 
 const AUDIT_PAGE_SIZE = 50;
 const reportOperator = ref("");
@@ -56,6 +57,7 @@ async function downloadReport(format: "pdf" | "xlsx") {
     anchor.remove();
     URL.revokeObjectURL(url);
     reportMessage.value = `${report.filename} 已下载（${report.blob.size} 字节）。`;
+    emit("reportDownloaded");
   } catch (error) {
     reportError.value = `报告导出失败：${error instanceof Error ? error.message : "未知错误"}。请保留当前分析并重试。`;
   } finally {
@@ -75,10 +77,6 @@ async function loadAudit(page = 0) {
   }
 }
 
-function detailsText(details: Record<string, unknown>): string {
-  return Object.keys(details).length === 0 ? "—" : JSON.stringify(details);
-}
-
 async function handleReset() {
   resetError.value = "";
   resetMessage.value = "";
@@ -89,10 +87,8 @@ async function handleReset() {
   resetBusy.value = true;
   try {
     const result = await resetDemo(resetConfirmation.value);
-    const deleted = Object.entries(result.deleted_counts)
-      .map(([table, count]) => `${table} ${count}`)
-      .join("、");
-    resetMessage.value = `演示数据已复位（${result.completed_at}；${deleted || "业务表均为空"}）。`;
+    const deleted = Object.values(result.deleted_counts).reduce((total, count) => total + count, 0);
+    resetMessage.value = `演示数据已复位（${result.completed_at}；共清理 ${deleted} 条业务与审计记录）。`;
     resetConfirmation.value = "";
     auditPage.value = undefined;
     auditError.value = "";
@@ -111,8 +107,8 @@ async function handleReset() {
   <section class="review-operations" aria-labelledby="review-operations-title">
     <div class="panel-heading compact-heading">
       <div>
-        <p class="eyebrow">M5 · 报告、审计与复位</p>
-        <h3 id="review-operations-title">演示运维闭环</h3>
+        <p class="eyebrow">报告与追溯</p>
+        <h3 id="review-operations-title">报告、审计与演示数据维护</h3>
       </div>
       <p class="demo-operator">本地演示身份 <strong>{{ DEMO_OPERATOR }}</strong></p>
     </div>
@@ -145,7 +141,7 @@ async function handleReset() {
             事件类型
             <select v-model="auditFilter" data-testid="audit-filter" :disabled="auditBusy">
               <option value="">全部</option>
-              <option v-for="eventType in AUDIT_EVENT_TYPES" :key="eventType" :value="eventType">{{ eventType }}</option>
+              <option v-for="eventType in AUDIT_EVENT_TYPES" :key="eventType" :value="eventType">{{ zh(eventType) }}</option>
             </select>
           </label>
           <button type="button" data-testid="audit-refresh" :disabled="auditBusy" @click="loadAudit(0)">
@@ -162,8 +158,8 @@ async function handleReset() {
             <thead><tr><th>时间</th><th>事件</th><th>操作者</th><th>目标</th><th>结果</th><th>详情</th></tr></thead>
             <tbody>
               <tr v-for="event in auditPage.items" :key="event.event_id">
-                <td>{{ event.occurred_at }}</td><td>{{ event.event_type }}</td><td>{{ event.operator }}</td>
-                <td>{{ event.target_type }} / {{ event.target_id }}</td><td>{{ event.result }}</td><td class="audit-details">{{ detailsText(event.details) }}</td>
+                <td>{{ event.occurred_at }}</td><td>{{ zh(event.event_type) }}</td><td>{{ event.operator }}</td>
+                <td>{{ zh(event.target_type) }} / {{ event.target_id }}</td><td>{{ zh(event.result) }}</td><td class="audit-details">{{ auditDetails(event.details) }}</td>
               </tr>
             </tbody>
           </table>
@@ -178,7 +174,7 @@ async function handleReset() {
 
     <section class="danger-zone" aria-labelledby="reset-title">
       <h4 id="reset-title">危险操作：复位演示数据</h4>
-      <p>这会清空本项目全部导入、分析、处置和审计数据。失败时页面不会伪装成功或清除当前状态。</p>
+      <p>这会清空系统内全部演示项目的导入、分析、处置和审计数据，而不只是当前项目。失败时页面不会伪装成功或清除当前状态。</p>
       <div class="reset-grid">
         <label>
           操作者

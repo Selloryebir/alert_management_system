@@ -34,9 +34,10 @@ class AnalysisWorkflowController {
             @RequestParam(required = false) String unit,
             @RequestParam(name = "noise_type", required = false) String noiseType,
             @RequestParam(name = "cause_category", required = false) String causeCategory,
-            @RequestParam(name = "disposition_status", required = false) String dispositionStatus) {
+            @RequestParam(name = "disposition_status", required = false) String dispositionStatus,
+            @RequestParam(required = false) String assignee) {
         return workflowService.alarms(
-                runId, page, size, priority, area, unit, noiseType, causeCategory, dispositionStatus);
+                runId, page, size, priority, area, unit, noiseType, causeCategory, dispositionStatus, assignee);
     }
 
     @GetMapping("/alarms/{recordId}")
