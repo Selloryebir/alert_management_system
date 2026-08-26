@@ -98,14 +98,20 @@ dev_admin_refresh_csrf() {
 }
 
 find_docker() {
-  if command -v docker >/dev/null 2>&1 && docker version >/dev/null 2>&1; then
-    command -v docker
-    return
-  fi
-  if command -v docker.exe >/dev/null 2>&1 && docker.exe version >/dev/null 2>&1; then
-    command -v docker.exe
-    return
-  fi
+  local attempt
+  for attempt in 1 2 3; do
+    if command -v docker >/dev/null 2>&1 && docker version >/dev/null 2>&1; then
+      command -v docker
+      return
+    fi
+    if command -v docker.exe >/dev/null 2>&1 && docker.exe version >/dev/null 2>&1; then
+      command -v docker.exe
+      return
+    fi
+    if ((attempt < 3)); then
+      sleep 1
+    fi
+  done
   echo "Docker Desktop 未运行或当前终端无法访问 Docker；M1 仅用它承载开发期 PostgreSQL。" >&2
   return 1
 }
