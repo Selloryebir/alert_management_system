@@ -112,12 +112,11 @@ test("浏览器完成导入、分析、详情、事件链和人工处置闭环",
   await expect(page.getByTestId("detail-event-chains")).toContainText("不代表已确认根因");
   await expect(page.getByTestId("event-chain")).toContainText("222 → 223 → 224 → 225 → 226");
 
-  const operator = "SYNTHETIC_E2E_OPERATOR";
-  const assignee = "SYNTHETIC_E2E_ASSIGNEE";
+  const operator = "admin";
+  const assignee = "admin";
   const startedNote = "[SYNTHETIC] E2E 开始处置";
   const closedNote = "[SYNTHETIC] E2E 审核完成";
   await page.getByTestId("disposition-assignee").fill(assignee);
-  await page.getByTestId("disposition-operator").fill(operator);
   await page.getByTestId("disposition-note").fill(startedNote);
   await page.getByTestId("disposition-start").click();
   await expect(page.getByTestId("disposition-history")).toContainText("待处理 → 处理中");

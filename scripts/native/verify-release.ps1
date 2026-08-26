@@ -294,6 +294,65 @@ function Assert-HealthUp {
     }
 }
 
+function Initialize-AdminCredential {
+    param([string]$ReleaseRoot)
+    $passwordFile = Join-Path $ReleaseRoot "data\secrets\bootstrap-admin-password.txt"
+    Assert-True (Test-Path -LiteralPath $passwordFile -PathType Leaf) "缺少初始管理员密码文件。"
+    $currentPassword = [IO.File]::ReadAllText($passwordFile, [Text.Encoding]::UTF8).Trim()
+    Assert-True (-not [string]::IsNullOrWhiteSpace($currentPassword)) "初始管理员密码为空。"
+
+    $csrf = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/v1/auth/csrf" -Method Get `
+        -TimeoutSec 15 -UseBasicParsing -SessionVariable adminSession
+    $headers = @{}
+    $headers[[string]$csrf.header_name] = [string]$csrf.token
+    $loginPayload = @{ username = "admin"; password = $currentPassword } | ConvertTo-Json -Compress
+    $current = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/v1/auth/login" -Method Post `
+        -ContentType "application/json" -Body ([Text.Encoding]::UTF8.GetBytes($loginPayload)) `
+        -Headers $headers -WebSession $adminSession -TimeoutSec 15 -UseBasicParsing
+    Assert-True ($current.username -eq "admin" -and $current.global_role -eq "SYSTEM_ADMIN") `
+        "发布包初始管理员身份不正确。"
+
+    if ([bool]$current.must_change_password) {
+        $bytes = New-Object byte[] 24
+        $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+        try {
+            $generator.GetBytes($bytes)
+        } finally {
+            $generator.Dispose()
+        }
+        $newPassword = "Native-M11-" + [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+        $changePayload = @{
+            current_password = $currentPassword
+            new_password = $newPassword
+        } | ConvertTo-Json -Compress
+        $changed = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/v1/auth/password" -Method Post `
+            -ContentType "application/json" -Body ([Text.Encoding]::UTF8.GetBytes($changePayload)) `
+            -Headers $headers -WebSession $adminSession -TimeoutSec 15 -UseBasicParsing
+        Assert-True (-not [bool]$changed.must_change_password) "发布包首次改密后仍要求改密。"
+
+        $verifyCsrf = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/v1/auth/csrf" -Method Get `
+            -TimeoutSec 15 -UseBasicParsing -SessionVariable verifySession
+        $verifyHeaders = @{}
+        $verifyHeaders[[string]$verifyCsrf.header_name] = [string]$verifyCsrf.token
+        $verifyPayload = @{ username = "admin"; password = $newPassword } | ConvertTo-Json -Compress
+        $verified = Invoke-RestMethod -Uri "http://127.0.0.1:8080/api/v1/auth/login" -Method Post `
+            -ContentType "application/json" -Body ([Text.Encoding]::UTF8.GetBytes($verifyPayload)) `
+            -Headers $verifyHeaders -WebSession $verifySession -TimeoutSec 15 -UseBasicParsing
+        Assert-True ($verified.username -eq "admin" -and -not [bool]$verified.must_change_password) `
+            "发布包首次改密后无法重新登录。"
+        [IO.File]::WriteAllText($passwordFile, $newPassword, (New-Object Text.UTF8Encoding($false)))
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+        $security = New-Object Security.AccessControl.FileSecurity
+        $security.SetAccessRuleProtection($true, $false)
+        $rule = New-Object Security.AccessControl.FileSystemAccessRule(
+            $identity, [Security.AccessControl.FileSystemRights]::FullControl,
+            [Security.AccessControl.AccessControlType]::Allow)
+        [void]$security.AddAccessRule($rule)
+        [IO.File]::SetAccessControl($passwordFile, $security)
+    }
+    return $passwordFile
+}
+
 function Assert-JunctionTargetsRelease {
     param([string]$AliasRoot, [string]$ReleaseRoot)
     Assert-True ($AliasRoot -notmatch '[^\x00-\x7F]') "PostgreSQL 路径别名必须是纯 ASCII：$AliasRoot"
@@ -406,6 +465,8 @@ function Invoke-E2e {
     $savedPath = $env:PATH
     try {
         $env:PATH = "$nodeRoot;$savedPath"
+        $env:E2E_ADMIN_USERNAME = "admin"
+        $env:E2E_ADMIN_PASSWORD_FILE = Join-Path $ReleaseRoot "data\secrets\bootstrap-admin-password.txt"
         $env:E2E_BASE_URL = "http://127.0.0.1:8080"
         $env:E2E_MODE = $Mode
         $env:E2E_DATASET = $Dataset
@@ -416,6 +477,7 @@ function Invoke-E2e {
         Invoke-CheckedCommand $Npm @("--prefix", $E2eRoot, "run", $Script) "Playwright $Script/$Mode 验收失败"
     } finally {
         $env:PATH = $savedPath
+        Remove-Item Env:E2E_ADMIN_USERNAME, Env:E2E_ADMIN_PASSWORD_FILE -ErrorAction SilentlyContinue
     }
 }
 
@@ -442,8 +504,9 @@ function Invoke-BackupCheck {
 }
 
 function Invoke-ResetCheck {
-    param([string]$ReleaseRoot)
-    Invoke-ReleaseScript $ReleaseRoot "reset-demo.ps1" @("-Force") | Out-Null
+    param([string]$ReleaseRoot, [string]$PasswordFile)
+    Invoke-ReleaseScript $ReleaseRoot "reset-demo.ps1" @(
+        "-Force", "-Username", "admin", "-PasswordFile", $PasswordFile) | Out-Null
     Assert-ResetEmpty
 }
 
@@ -655,11 +718,12 @@ try {
         Invoke-ReleaseScript $releaseRoot "preflight.ps1" | Out-Null
         Invoke-ReleaseScript $releaseRoot "start.ps1" | Out-Null
         Assert-HealthUp
+        $adminPasswordFile = Initialize-AdminCredential $releaseRoot
         $processInventory = Assert-ProcessInventory $releaseRoot
         $startedPids = @($processInventory.Pids)
         $postgresAlias = [string]$processInventory.PostgresAlias
 
-        Invoke-ResetCheck $releaseRoot
+        Invoke-ResetCheck $releaseRoot $adminPasswordFile
         $roundResultRoot = Join-Path $runRoot "round-$round-results"
         $smokeDataset = Join-Path $releaseRoot "samples\smoke\synthetic_smoke_utf8.csv"
         $demoDataset = Join-Path $releaseRoot "samples\demo\synthetic_demo_20000.csv"
@@ -668,11 +732,11 @@ try {
 
         Invoke-E2e $e2eRoot $npm $releaseRoot "smoke" $smokeDataset 300 "test:smoke" $roundResultRoot
         $backupPath = Invoke-BackupCheck $releaseRoot $postgresAlias
-        Invoke-ResetCheck $releaseRoot
+        Invoke-ResetCheck $releaseRoot $adminPasswordFile
         Assert-True (Test-Path -LiteralPath $backupPath -PathType Leaf) "演示复位越界删除了备份。"
 
         Invoke-E2e $e2eRoot $npm $releaseRoot "demo" $demoDataset 20000 "test:smoke" $roundResultRoot
-        Invoke-ResetCheck $releaseRoot
+        Invoke-ResetCheck $releaseRoot $adminPasswordFile
         Invoke-E2e $e2eRoot $npm $releaseRoot "smoke" $smokeDataset 300 "test:m5" $roundResultRoot
         Invoke-E2e $e2eRoot $npm $releaseRoot "demo" $demoDataset 20000 "test:m5" $roundResultRoot
 

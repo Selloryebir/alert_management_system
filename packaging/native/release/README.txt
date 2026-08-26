@@ -17,8 +17,8 @@
 --------
 - 停止：powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\stop.ps1
 - 备份：powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\backup.ps1
-- 演示复位：powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\reset-demo.ps1
-- 无交互复位：powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\reset-demo.ps1 -Force
+- 演示复位：powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\reset-demo.ps1（会安全提示输入管理员凭据）
+- 自动化复位：scripts\reset-demo.ps1 -Force -Username admin -PasswordFile <受限访问的当前密码文件>
 
 数据与日志
 ----------

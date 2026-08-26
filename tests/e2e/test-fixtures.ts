@@ -1,4 +1,5 @@
 import { expect, test as base, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 type BrowserErrorFixtures = {
   browserErrors: string[];
@@ -15,6 +16,19 @@ export const test = base.extend<BrowserErrorFixtures>({
     page.on("pageerror", (error) => {
       browserErrors.push(`pageerror: ${error.stack ?? error.message}`);
     });
+
+    const passwordFile = process.env.E2E_ADMIN_PASSWORD_FILE;
+    if (passwordFile) {
+      const username = process.env.E2E_ADMIN_USERNAME ?? "admin";
+      const password = readFileSync(passwordFile, "utf8").trim();
+      expect(password, "E2E 管理员密码文件不能为空").not.toBe("");
+      await page.goto("/");
+      await page.getByTestId("login-username").fill(username);
+      await page.getByTestId("login-password").fill(password);
+      await page.getByTestId("login-submit").click();
+      await expect(page.getByTestId("login-submit")).toHaveCount(0);
+      await expect(page.getByText(`${username} · 系统管理员`, { exact: false })).toBeVisible();
+    }
 
     await use(browserErrors);
 
