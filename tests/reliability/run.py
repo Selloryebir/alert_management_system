@@ -416,16 +416,25 @@ def parse_proc_tcp(
 
 
 def windows_remote_addresses(pid: int) -> set[str]:
+    command = (
+        "try {@(Get-NetTCPConnection -ErrorAction Stop | Where-Object {"
+        f"$_.OwningProcess -eq {pid} -and $_.State -eq 'Established'"
+        "}) | "
+        "Select-Object -ExpandProperty RemoteAddress -Unique} "
+        "catch {Write-Error $_; exit 1}"
+    )
     result = run_command(
         [
             "powershell.exe",
             "-NoProfile",
             "-Command",
-            f"Get-NetTCPConnection -OwningProcess {pid} -State Established -ErrorAction SilentlyContinue | Select-Object -ExpandProperty RemoteAddress -Unique",
+            command,
         ],
-        timeout=20,
+        timeout=5,
         check=False,
     )
+    if result.returncode != 0:
+        raise ReliabilityError(f"无法读取 Windows 进程 TCP 连接：PID={pid}")
     return {line.strip().replace("\r", "") for line in result.stdout.splitlines() if line.strip()}
 
 
@@ -434,14 +443,19 @@ def postgres_remote_addresses() -> set[str]:
     if not docker:
         raise ReliabilityError("无法审计 PostgreSQL 连接：未找到 Docker。")
     remotes: set[str] = set()
+    tcp_succeeded = False
     for path, ipv6 in (("/proc/net/tcp", False), ("/proc/net/tcp6", True)):
         result = run_command(
             [docker, "exec", "alert-management-m1-postgres", "cat", path],
-            timeout=20,
+            timeout=5,
             check=False,
         )
         if result.returncode == 0:
             remotes.update(parse_proc_tcp(result.stdout, ipv6=ipv6))
+            if path == "/proc/net/tcp":
+                tcp_succeeded = True
+    if not tcp_succeeded:
+        raise ReliabilityError("无法读取 PostgreSQL 容器的 IPv4 TCP 连接表。")
     return remotes
 
 
@@ -461,7 +475,7 @@ class ConnectionMonitor:
 
     def stop(self) -> dict[str, list[str]]:
         self._stop.set()
-        self._thread.join(timeout=15)
+        self._thread.join(timeout=30)
         if self._thread.is_alive():
             raise ReliabilityError("受管进程外联监视线程未能停止。")
         if self.errors:
@@ -610,6 +624,7 @@ def main() -> int:
     monitor: ConnectionMonitor | None = None
     try:
         summary["source_commit"] = assert_clean_source()
+        run_command([str(ROOT / "scripts/dev/bootstrap.sh")], timeout=900)
         quality = run_command(
             [sys.executable, str(ROOT / "scripts/reliability/quality_audit.py")], timeout=1800
         )
