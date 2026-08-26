@@ -524,7 +524,7 @@ def file_sha256(path: Path) -> str:
 
 
 def assert_logs_clean(
-    result_dir: Path, baseline: dict[str, str], started_at: datetime
+    result_dir: Path, baseline: dict[str, int], started_at: datetime
 ) -> dict[str, dict[str, Any]]:
     pattern_text = (
         r"\ufffd|锟斤拷|Ã|Â|\?\?\?|OutOfMemoryError|Traceback|Unhandled|"
@@ -539,8 +539,7 @@ def assert_logs_clean(
             secret_values.append(value)
     candidates = []
     for path in sorted(LOG_ROOT.glob("*.log")):
-        current_hash = file_sha256(path)
-        if baseline.get(path.name) != current_hash:
+        if baseline.get(path.name) != path.stat().st_mtime_ns:
             candidates.append(path)
     docker = shutil.which("docker") or shutil.which("docker.exe")
     if docker:
@@ -556,11 +555,15 @@ def assert_logs_clean(
             timeout=30,
             check=False,
         )
-        if result.returncode == 0:
-            postgres_log.write_text(result.stdout + result.stderr, encoding="utf-8")
-            candidates.append(postgres_log)
-    if not candidates:
-        raise ReliabilityError("没有本轮新产生或变化的受管服务日志。")
+        if result.returncode != 0:
+            raise ReliabilityError("无法读取本轮 PostgreSQL 容器日志。")
+        postgres_log.write_text(result.stdout + result.stderr, encoding="utf-8")
+        candidates.append(postgres_log)
+    required_logs = {"backend.log", "algorithm.log", "postgres.log"}
+    actual_logs = {path.name for path in candidates}
+    missing_logs = sorted(required_logs - actual_logs)
+    if missing_logs:
+        raise ReliabilityError(f"缺少本轮必要服务日志：{missing_logs}")
     saved_root = result_dir / "service-logs"
     saved_root.mkdir()
     metadata: dict[str, dict[str, Any]] = {}
@@ -626,13 +629,26 @@ def main() -> int:
         summary["source_commit"] = assert_clean_source()
         run_command([str(ROOT / "scripts/dev/bootstrap.sh")], timeout=900)
         quality = run_command(
-            [sys.executable, str(ROOT / "scripts/reliability/quality_audit.py")], timeout=1800
+            [sys.executable, str(ROOT / "scripts/reliability/quality_audit.py")],
+            timeout=1800,
+            check=False,
         )
-        summary["quality"] = {"status": "PASS", "output_sha256": hashlib.sha256(
-            (quality.stdout + quality.stderr).encode("utf-8")
-        ).hexdigest()}
+        quality_log = result_dir / "quality-audit.log"
+        quality_log.write_text(quality.stdout + quality.stderr, encoding="utf-8")
+        summary["quality"] = {
+            "status": "PASS" if quality.returncode == 0 else "FAIL",
+            "evidence": quality_log.name,
+            "bytes": quality_log.stat().st_size,
+            "sha256": file_sha256(quality_log),
+        }
+        if quality.returncode != 0:
+            raise ReliabilityError(
+                f"质量与依赖审计失败，详见 {quality_log}（退出码 {quality.returncode}）。"
+            )
         ensure_stopped()
-        log_baseline = {path.name: file_sha256(path) for path in LOG_ROOT.glob("*.log")}
+        log_baseline = {
+            path.name: path.stat().st_mtime_ns for path in LOG_ROOT.glob("*.log")
+        }
         run_command([str(ROOT / "scripts/dev/start.sh")], timeout=900)
         started = True
         summary["environment"] = capture_environment()

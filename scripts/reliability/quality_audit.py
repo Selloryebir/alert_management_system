@@ -186,28 +186,24 @@ def check_script_syntax(paths: Iterable[Path]) -> None:
     windows_powershell = Path(powershell).name.lower() == "powershell.exe"
     for path in powershell_scripts:
         parser_path = str(path)
-        if windows_powershell:
-            try:
-                converted = subprocess.run(
-                    ["wslpath", "-w", parser_path],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-                parser_path = converted.stdout.strip()
-            except (OSError, subprocess.SubprocessError) as error:
-                raise AuditFailure(f"无法转换 PowerShell 脚本路径：{path}") from error
         parser_command = (
             "$errors=$null;"
             "[void][System.Management.Automation.Language.Parser]::ParseFile("
-            "$args[0],[ref]$null,[ref]$errors);"
+            "$env:ALERT_SCRIPT_PATH,[ref]$null,[ref]$errors);"
             "if($errors.Count -gt 0){$errors|ForEach-Object{$_.ToString()};exit 1}"
         )
+        environment = os.environ.copy()
+        environment["ALERT_SCRIPT_PATH"] = parser_path
+        if windows_powershell:
+            wslenv = environment.get("WSLENV", "")
+            entries = [entry for entry in wslenv.split(":") if entry]
+            entries.append("ALERT_SCRIPT_PATH/p")
+            environment["WSLENV"] = ":".join(entries)
         run_command(
             f"PowerShell 脚本语法：{path.relative_to(REPOSITORY_ROOT)}",
-            [powershell, "-NoProfile", "-Command", parser_command, parser_path],
+            [powershell, "-NoProfile", "-Command", parser_command],
             timeout=30,
+            env=environment,
         )
 
 
