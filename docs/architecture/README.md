@@ -93,8 +93,9 @@ alert-management-system/
   runtime/postgresql/   # 锁定版本的 Windows PostgreSQL 运行时
   config/               # 本机演示配置
   samples/              # smoke、demo、invalid
-  scripts/              # preflight/start/stop/reset-demo/backup
+  scripts/              # 预检、启停、复位、备份、计划任务、隔离恢复和精确清理
   data/                  # 首次启动创建，含数据库和上传文件
+  backups/               # 恢复点及来源/大小/SHA-256 元数据
   logs/                  # 统一日志
 ```
 
@@ -104,6 +105,7 @@ alert-management-system/
 - `preflight` 检查端口、磁盘空间、目录可写性及运行时完整性；检查失败必须给出具体修复建议。
 - `start` 按 PostgreSQL → Python → Java 顺序启动并等待健康；任何步骤失败即返回非零并保留日志。
 - `stop` 只停止本发布包记录的进程；`reset-demo` 仅复位明确的本地演示实例并要求交互确认或显式 `-Force`。
+- 备份、恢复和清理使用同一实例维护锁；清理默认保留可复制到新实例验证的恢复点，只处理身份、路径和进程均匹配的当前发布实例。
 - 当前默认运行配置只服务本机合成示例；非本机部署必须使用 M11 定义的安全配置。
 
 ## 6. Docker 次级交付

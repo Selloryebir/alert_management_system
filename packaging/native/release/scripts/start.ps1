@@ -145,6 +145,7 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($preflightOutput)) {
         Write-Host $preflightOutput
     }
+    Initialize-InstanceIdentity $context
     Initialize-InstanceSecrets $context
 
     $workingRoot = Initialize-PostgresWorkingRoot $context
@@ -188,7 +189,7 @@ try {
     $backendError = Join-Path $context.Logs ("backend-" + $stamp + ".err.log")
     $databaseUrl = "jdbc:postgresql://127.0.0.1:" + [string]$context.Config.ports.postgres + "/" +
         [string]$context.Config.database.name
-    $jarArgument = '-jar "' + $backendJar + '"'
+    $jarArgument = '-Xms128m -Xmx768m -jar "' + $backendJar + '"'
     $backendProcess = Start-BundledProcess $backendJava $jarArgument $workingRoot $backendOut $backendError @{
         SERVER_PORT = [string]$context.Config.ports.backend
         SERVER_ADDRESS = "127.0.0.1"
@@ -197,6 +198,7 @@ try {
         DB_PASSWORD = Get-SecretValue $context.DatabasePasswordFile
         APP_IDENTITY = [string]$context.Config.identity
         APP_DEPLOYMENT_MODE = [string]$context.Config.deployment_mode
+        APP_BACKUP_DIRECTORY = $context.Backups
         APP_BOOTSTRAP_ADMIN_USERNAME = [string]$context.Config.bootstrap_admin.username
         APP_BOOTSTRAP_ADMIN_PASSWORD_FILE = $context.BootstrapAdminPasswordFile
         SESSION_COOKIE_SECURE = "false"

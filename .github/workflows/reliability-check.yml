@@ -1,0 +1,82 @@
+name: M12 恢复质量与可靠性检查
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/reliability-check.yml"
+      - "compose*.yaml"
+      - "packaging/native/**"
+      - "scripts/dev/**"
+      - "scripts/native/**"
+      - "scripts/reliability/**"
+      - "samples/**"
+      - "src/**"
+      - "tests/e2e/package*.json"
+      - "tests/reliability/**"
+      - "tests/smoke/**"
+      - "tools/document-extraction/package*.json"
+      - "mvnw"
+      - "mvnw.cmd"
+      - ".mvn/**"
+  pull_request:
+    paths:
+      - ".github/workflows/reliability-check.yml"
+      - "compose*.yaml"
+      - "packaging/native/**"
+      - "scripts/dev/**"
+      - "scripts/native/**"
+      - "scripts/reliability/**"
+      - "samples/**"
+      - "src/**"
+      - "tests/e2e/package*.json"
+      - "tests/reliability/**"
+      - "tests/smoke/**"
+      - "tools/document-extraction/package*.json"
+      - "mvnw"
+      - "mvnw.cmd"
+      - ".mvn/**"
+
+permissions:
+  contents: read
+
+jobs:
+  finite-reliability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: 检出完整历史
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 准备 Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: 准备 Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: src/algorithm/requirements.lock
+      - name: 准备 Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - name: 运行有限可靠性验收
+        run: python3 tests/reliability/run.py
+      - name: 保存可靠性证据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m12-reliability-evidence
+          path: .runtime/reliability/results/**
+          if-no-files-found: error
+          retention-days: 14
+      - name: 停止测试进程
+        if: always()
+        run: scripts/dev/stop.sh

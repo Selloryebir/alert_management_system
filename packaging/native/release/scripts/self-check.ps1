@@ -16,8 +16,9 @@ try {
         throw "runtime.json 固定端口不符合 M6 契约。"
     }
 
-    $required = @("common.ps1", "preflight.ps1", "start.ps1", "stop.ps1", "backup.ps1", "reset-demo.ps1",
-        "self-check.ps1")
+    $required = @("common.ps1", "preflight.ps1", "start.ps1", "stop.ps1", "backup.ps1",
+        "backup-status.ps1", "backup-schedule.ps1", "restore-verify.ps1", "cleanup-instance.ps1",
+        "reset-demo.ps1", "self-check.ps1")
     foreach ($name in $required) {
         $path = Join-Path $PSScriptRoot $name
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -37,15 +38,46 @@ try {
 
     $start = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "start.ps1"), [Text.Encoding]::UTF8)
     foreach ($marker in @("initdb", "pg_ctl", "algorithm-service", "api/v1/health", "Save-RunningProcess",
-            "SERVER_ADDRESS", "APP_BOOTSTRAP_ADMIN_PASSWORD_FILE", "Initialize-InstanceSecrets")) {
+            "SERVER_ADDRESS", "APP_BOOTSTRAP_ADMIN_PASSWORD_FILE", "Initialize-InstanceIdentity",
+            "Initialize-InstanceSecrets")) {
         if ($start.IndexOf($marker, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
             throw "start.ps1 缺少必要运行标记：$marker"
         }
     }
+    $restore = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "restore-verify.ps1"), [Text.Encoding]::UTF8)
+    foreach ($marker in @("initdb", "pg_ctl", "pg_restore", "127.0.0.1", "criticalTables",
+            "Get-DatabaseFacts", "Assert-FactsEqual", "RequireCurrentMatch", "database_facts",
+            "Enter-InstanceMaintenanceLock", "restore-verification")) {
+        if ($restore.IndexOf($marker, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            throw "restore-verify.ps1 缺少隔离恢复或逐表对账标记：$marker"
+        }
+    }
+    $cleanup = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "cleanup-instance.ps1"), [Text.Encoding]::UTF8)
+    foreach ($marker in @("Assert-InstanceIdentity", "Assert-OwnedMutableDirectory", "Assert-NoReparsePoints",
+            "RemoveBackups", "backup-schedule.ps1", "stop.ps1")) {
+        if ($cleanup.IndexOf($marker, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            throw "cleanup-instance.ps1 缺少精确实例清理标记：$marker"
+        }
+    }
     $backup = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "backup.ps1"), [Text.Encoding]::UTF8)
-    foreach ($marker in @("--format=custom", "pg_restore", "[IO.File]::Move")) {
+    foreach ($marker in @("--format=custom", "pg_restore", "[IO.File]::Move", "RetentionCount",
+            "sha256", "origin_instance_id", "Enter-InstanceMaintenanceLock",
+            "Invoke-RecoveryPointRetention")) {
         if ($backup.IndexOf($marker, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
             throw "backup.ps1 缺少必要备份标记：$marker"
+        }
+    }
+    $backupStatus = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "backup-status.ps1"), [Text.Encoding]::UTF8)
+    foreach ($marker in @("Get-RecoveryPoint", "VerifyHash", "total_dump_bytes", "latest_success_at")) {
+        if ($backupStatus.IndexOf($marker, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            throw "backup-status.ps1 缺少恢复点状态标记：$marker"
+        }
+    }
+    $backupSchedule = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "backup-schedule.ps1"), [Text.Encoding]::UTF8)
+    foreach ($marker in @("Get-InstanceBackupTaskName", "Register-ScheduledTask", "Unregister-ScheduledTask",
+            "Interactive", "-Scheduled")) {
+        if ($backupSchedule.IndexOf($marker, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            throw "backup-schedule.ps1 缺少当前用户计划任务标记：$marker"
         }
     }
     $reset = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "reset-demo.ps1"), [Text.Encoding]::UTF8)

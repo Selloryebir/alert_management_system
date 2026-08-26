@@ -109,7 +109,8 @@ h1 {
 .manual-panel,
 .login-panel,
 .account-panel,
-.access-panel {
+.access-panel,
+.data-backup-panel {
   margin-top: 3rem;
   border: 1px solid #d8e0e7;
   border-radius: 1rem;
@@ -131,7 +132,8 @@ h1 {
 .manual-panel,
 .login-panel,
 .account-panel,
-.access-panel {
+.access-panel,
+.data-backup-panel {
   margin-top: 1.5rem;
 }
 
@@ -181,8 +183,78 @@ h1 {
   color: #536678;
 }
 
-.access-panel > summary {
+.access-panel > summary,
+.data-backup-panel > summary {
   cursor: pointer;
+}
+
+.data-backup-panel .panel-heading {
+  margin-top: 1.5rem;
+}
+
+.backup-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+.backup-summary div,
+.backup-operations dl div {
+  border: 1px solid #d8e0e7;
+  border-radius: 0.7rem;
+  padding: 0.85rem;
+  background: #f7fafc;
+}
+
+.backup-summary dd {
+  color: #0f5b66;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.backup-runtime {
+  color: #394d60;
+}
+
+.backup-hash-status {
+  border-left: 0.3rem solid #b67511;
+  padding: 0.75rem 1rem;
+  background: #fff5d7;
+}
+
+.backup-hash-status.hash-ok {
+  border-color: #2f7d4a;
+  color: #1d5b34;
+  background: #e7f6ec;
+}
+
+.backup-hash-status.hash-failed {
+  border-color: #a72f36;
+  color: #721f25;
+  background: #fdebed;
+}
+
+.backup-instructions li {
+  margin-bottom: 0.45rem;
+  line-height: 1.5;
+}
+
+.backup-operations {
+  margin-top: 1.5rem;
+  border-top: 1px solid #d8e0e7;
+  padding-top: 1.25rem;
+}
+
+.backup-operations dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.backup-operations code {
+  color: #0f5b66;
+  font-weight: 800;
 }
 
 .access-panel section + section {
@@ -1060,6 +1132,11 @@ dd {
   .detail-columns,
   .operations-grid,
   .reset-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .backup-summary,
+  .backup-operations dl {
     grid-template-columns: 1fr;
   }
 
