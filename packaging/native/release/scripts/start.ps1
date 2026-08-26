@@ -145,6 +145,7 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($preflightOutput)) {
         Write-Host $preflightOutput
     }
+    Initialize-InstanceIdentity $context
     Initialize-InstanceSecrets $context
 
     $workingRoot = Initialize-PostgresWorkingRoot $context
@@ -197,6 +198,7 @@ try {
         DB_PASSWORD = Get-SecretValue $context.DatabasePasswordFile
         APP_IDENTITY = [string]$context.Config.identity
         APP_DEPLOYMENT_MODE = [string]$context.Config.deployment_mode
+        APP_BACKUP_DIRECTORY = $context.Backups
         APP_BOOTSTRAP_ADMIN_USERNAME = [string]$context.Config.bootstrap_admin.username
         APP_BOOTSTRAP_ADMIN_PASSWORD_FILE = $context.BootstrapAdminPasswordFile
         SESSION_COOKIE_SECURE = "false"

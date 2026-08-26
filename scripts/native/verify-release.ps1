@@ -508,7 +508,7 @@ function Invoke-E2e {
 }
 
 function Invoke-BackupCheck {
-    param([string]$ReleaseRoot, [string]$ReleaseAlias)
+    param([string]$ReleaseRoot, [string]$ReleaseAlias, [string]$ResultRoot)
     $before = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "backups") -Filter "*.dump" -File -ErrorAction SilentlyContinue)
     $beforeNames = @($before | ForEach-Object { $_.FullName })
     Invoke-ReleaseScript $ReleaseRoot "backup.ps1" | Out-Null
@@ -526,7 +526,73 @@ function Invoke-BackupCheck {
     Assert-True (Test-Path -LiteralPath $backupArgument -PathType Leaf) "受控路径下看不到新备份。"
     Assert-True ((Get-Item -LiteralPath $backupArgument).Length -eq $newBackup[0].Length) "受控路径下的新备份大小不一致。"
     Invoke-CheckedCommand $pgRestore @("--list", $backupArgument) "包内 pg_restore 无法读取备份"
-    return $newBackup[0].FullName
+    $metadataPath = $newBackup[0].FullName + ".meta.json"
+    Assert-True (Test-Path -LiteralPath $metadataPath -PathType Leaf) "backup.ps1 未生成恢复点元数据。"
+    $metadata = Get-Content -LiteralPath $metadataPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $instance = Get-Content -LiteralPath (Join-Path $ReleaseRoot "data\instance.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $manifest = Get-Content -LiteralPath (Join-Path $ReleaseRoot "release-manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    Assert-True ($metadata.origin_instance_id -eq $instance.instance_id -and
+        $metadata.origin_source_commit -eq $manifest.source_commit -and
+        [Int64]$metadata.size_bytes -eq [Int64]$newBackup[0].Length -and
+        $metadata.sha256 -eq (Get-FileHash -LiteralPath $newBackup[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()) `
+        "恢复点元数据未正确绑定实例、源提交、大小和 SHA-256。"
+    Invoke-ReleaseScript $ReleaseRoot "backup-status.ps1" | Out-Null
+
+    $negativeDump = Join-Path $ReleaseRoot "backups\negative-hash.dump"
+    $negativeMetadata = $negativeDump + ".meta.json"
+    try {
+        Copy-Item -LiteralPath $newBackup[0].FullName -Destination $negativeDump
+        $negativePayload = Get-Content -LiteralPath $metadataPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $negativePayload.backup_file = [IO.Path]::GetFileName($negativeDump)
+        $negativePayload | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $negativeMetadata -Encoding UTF8
+        $stream = [IO.File]::Open($negativeDump, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite,
+            [IO.FileShare]::None)
+        try {
+            $first = $stream.ReadByte()
+            $stream.Position = 0
+            $stream.WriteByte(($first -bxor 0xFF))
+        } finally {
+            $stream.Dispose()
+        }
+        Invoke-ReleaseScript $ReleaseRoot "backup-status.ps1" -ExpectFailure | Out-Null
+    } finally {
+        Remove-Item -LiteralPath $negativeDump, $negativeMetadata -Force -ErrorAction SilentlyContinue
+    }
+    Invoke-ReleaseScript $ReleaseRoot "backup-status.ps1" | Out-Null
+    $restoreBefore = @(
+        Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "logs") `
+            -Filter "restore-verification-*.json" -File -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.FullName }
+    )
+    Invoke-ReleaseScript $ReleaseRoot "restore-verify.ps1" @(
+        "-BackupPath", $newBackup[0].FullName, "-RequireCurrentMatch") | Out-Null
+    $restoreEvidence = @(
+        Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "logs") `
+            -Filter "restore-verification-*.json" -File |
+            Where-Object { $restoreBefore -notcontains $_.FullName }
+    )
+    Assert-True ($restoreEvidence.Count -eq 1) "隔离恢复未生成唯一结果证据。"
+    $restorePayload = Get-Content -LiteralPath $restoreEvidence[0].FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+    Assert-True ([bool]$restorePayload.restored_to_isolated_instance) "隔离恢复结果没有确认独立实例。"
+    Assert-True (@($restorePayload.database_facts.PSObject.Properties).Count -ge 17) `
+        "隔离恢复结果缺少迁移、业务表或序列对账事实。"
+    $savedEvidence = Join-Path $ResultRoot "restore-verification.json"
+    Copy-Item -LiteralPath $restoreEvidence[0].FullName -Destination $savedEvidence
+    Invoke-ReleaseScript $ReleaseRoot "backup.ps1" @("-RetentionCount", "2") | Out-Null
+    Invoke-ReleaseScript $ReleaseRoot "backup.ps1" @("-RetentionCount", "2") | Out-Null
+    $retainedDumps = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "backups") -Filter "*.dump" -File)
+    $retainedMetadata = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "backups") `
+        -Filter "*.dump.meta.json" -File)
+    Assert-True ($retainedDumps.Count -eq 2 -and $retainedMetadata.Count -eq 2) `
+        "RetentionCount=2 未精确保留两个恢复点。"
+    Invoke-ReleaseScript $ReleaseRoot "backup-status.ps1" | Out-Null
+    $latestBackup = @($retainedDumps | Sort-Object LastWriteTimeUtc -Descending)[0]
+    return [PSCustomObject]@{
+        BackupPath = $latestBackup.FullName
+        EvidencePath = $savedEvidence
+        EvidenceSha256 = (Get-FileHash -LiteralPath $savedEvidence -Algorithm SHA256).Hash.ToLowerInvariant()
+        FactCount = @($restorePayload.database_facts.PSObject.Properties).Count
+    }
 }
 
 function Invoke-ResetCheck {
@@ -598,6 +664,16 @@ function Assert-ServiceLogsClean {
 
 function Stop-ReleaseSafely {
     param([string]$ReleaseRoot)
+    $scheduleScript = Join-Path $ReleaseRoot "scripts\backup-schedule.ps1"
+    if (Test-Path -LiteralPath $scheduleScript -PathType Leaf) {
+        try {
+            [void](Invoke-NativeProcess $powerShellExe @(
+                "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scheduleScript,
+                "-Action", "Remove") $ReleaseRoot)
+        } catch {
+            Write-Warning "清理时移除每日备份任务失败：$($_.Exception.Message)"
+        }
+    }
     $stopScript = Join-Path $ReleaseRoot "scripts\stop.ps1"
     if (Test-Path -LiteralPath $stopScript -PathType Leaf) {
         try {
@@ -723,6 +799,7 @@ try {
         (Join-Path $runRoot "中文 空格 发布目录")
     )
     $roundSummaries = @()
+    $maintenanceSummaries = @()
 
     for ($index = 0; $index -lt $destinations.Count; $index += 1) {
         $round = $index + 1
@@ -758,6 +835,12 @@ try {
         Invoke-ReleaseScript $releaseRoot "preflight.ps1" | Out-Null
         Invoke-ReleaseScript $releaseRoot "start.ps1" | Out-Null
         Assert-HealthUp
+        $instanceIdentity = Get-Content -LiteralPath (Join-Path $releaseRoot "data\instance.json") `
+            -Raw -Encoding UTF8 | ConvertFrom-Json
+        $backupTaskName = "AlertManagementSystem-Backup-" + [string]$instanceIdentity.instance_id
+        Invoke-ReleaseScript $releaseRoot "backup-schedule.ps1" @(
+            "-Action", "Configure", "-DailyAt", "23:59", "-RetentionCount", "2") | Out-Null
+        Invoke-ReleaseScript $releaseRoot "backup-schedule.ps1" @("-Action", "Status") | Out-Null
         $adminPasswordFile = Initialize-AdminCredential $releaseRoot
         $processInventory = Assert-ProcessInventory $releaseRoot
         $startedPids = @($processInventory.Pids)
@@ -771,9 +854,12 @@ try {
         Assert-True (Test-Path -LiteralPath $demoDataset -PathType Leaf) "发布包缺少 20k 样例。"
 
         Invoke-E2e $e2eRoot $npm $releaseRoot "smoke" $smokeDataset 300 "test:smoke" $roundResultRoot
-        $backupPath = Invoke-BackupCheck $releaseRoot $postgresAlias
+        $backupCheck = Invoke-BackupCheck $releaseRoot $postgresAlias $roundResultRoot
+        $backupPath = [string]$backupCheck.BackupPath
         Invoke-ResetCheck $releaseRoot $adminPasswordFile
         Assert-True (Test-Path -LiteralPath $backupPath -PathType Leaf) "演示复位越界删除了备份。"
+        Invoke-ReleaseScript $releaseRoot "restore-verify.ps1" @(
+            "-BackupPath", $backupPath) | Out-Null
 
         Invoke-E2e $e2eRoot $npm $releaseRoot "demo" $demoDataset 20000 "test:smoke" $roundResultRoot
         Invoke-ResetCheck $releaseRoot $adminPasswordFile
@@ -781,6 +867,18 @@ try {
         Invoke-E2e $e2eRoot $npm $releaseRoot "demo" $demoDataset 20000 "test:m5" $roundResultRoot
 
         $roundSummary = Get-NormalizedRoundSummary $roundResultRoot
+        $roundSummary["restore_verification"] = [ordered]@{
+            fact_count = [int]$backupCheck.FactCount
+        }
+        $maintenanceSummaries += ,[ordered]@{
+            round = $round
+            restore_evidence = [IO.Path]::GetFullPath([string]$backupCheck.EvidencePath).Substring(
+                [IO.Path]::GetFullPath($runRoot).TrimEnd('\').Length + 1)
+            restore_evidence_sha256 = [string]$backupCheck.EvidenceSha256
+            restore_fact_count = [int]$backupCheck.FactCount
+            cleanup = "PASS"
+            backups_preserved = $true
+        }
         $roundSummaryPath = Join-Path $runRoot "round-$round-summary.json"
         $roundSummary | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $roundSummaryPath -Encoding UTF8
 
@@ -796,6 +894,15 @@ try {
             Assert-True (-not (Test-Path -LiteralPath $postgresAlias)) "stop.ps1 后 PostgreSQL 路径别名仍存在：$postgresAlias"
         }
         Assert-ServiceLogsClean $releaseRoot $observedSecrets.ToArray()
+        Invoke-ReleaseScript $releaseRoot "cleanup-instance.ps1" @("-Force") | Out-Null
+        Assert-True ($null -eq (Get-ScheduledTask -TaskName $backupTaskName -ErrorAction SilentlyContinue)) `
+            "cleanup-instance.ps1 未移除当前实例计划任务。"
+        foreach ($mutableDirectory in @("data", "logs", "pids")) {
+            Assert-True (-not (Test-Path -LiteralPath (Join-Path $releaseRoot $mutableDirectory))) `
+                "cleanup-instance.ps1 未清理当前实例的 $mutableDirectory 目录。"
+        }
+        Assert-True (Test-Path -LiteralPath $backupPath -PathType Leaf) `
+            "cleanup-instance.ps1 默认不应删除备份。"
         $roundSummaries += ,$roundSummary
         Write-Host "第 $round 轮验收通过。"
     }
@@ -810,6 +917,7 @@ try {
         completed_at = (Get-Date).ToUniversalTime().ToString("o")
         rounds = 2
         normalized_summary = $roundSummaries[0]
+        instance_maintenance = $maintenanceSummaries
     } | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath (Join-Path $runRoot "verification-summary.json") -Encoding UTF8
     Write-Host "M6 Windows 原生发布双目录验收通过。"
     Write-Host "NATIVE_VERIFICATION_ROOT=$runRoot"
