@@ -490,6 +490,35 @@ function Invoke-BundledCommand {
     return $result.Output
 }
 
+function Invoke-BundledCommandWithoutCapture {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$Arguments = @(),
+        [string]$WorkingDirectory
+    )
+    $process = New-Object Diagnostics.Process
+    try {
+        $startInfo = New-Object Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $FilePath
+        $startInfo.Arguments = ConvertTo-NativeArgumentLine $Arguments
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+            $startInfo.WorkingDirectory = $WorkingDirectory
+        }
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) {
+            throw "无法启动包内程序：$FilePath"
+        }
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0) {
+            throw "包内程序执行失败（退出码 $($process.ExitCode)）：$FilePath $($Arguments -join ' ')"
+        }
+    } finally {
+        $process.Dispose()
+    }
+}
+
 function Normalize-DirectoryPath {
     param([Parameter(Mandatory = $true)][string]$Path)
     return [IO.Path]::GetFullPath($Path).TrimEnd([IO.Path]::DirectorySeparatorChar,

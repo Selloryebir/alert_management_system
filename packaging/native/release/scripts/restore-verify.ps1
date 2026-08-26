@@ -184,9 +184,9 @@ try {
         throw "隔离恢复端口意外等于正式实例端口，拒绝启动。"
     }
     $temporaryLog = Join-Path $workingRoot ($verificationRelative + "\postgresql.log")
-    Invoke-BundledCommand (Get-PostgresExecutable $context "pg_ctl" $workingRoot) @(
+    Invoke-BundledCommandWithoutCapture (Get-PostgresExecutable $context "pg_ctl" $workingRoot) @(
         "-D", $verificationClusterArgument, "-l", $temporaryLog,
-        "-o", "-p $temporaryPort -h 127.0.0.1", "-w", "-t", "30", "start") $workingRoot | Out-Null
+        "-o", "-p $temporaryPort -h 127.0.0.1", "-w", "-t", "30", "start") $workingRoot
     $temporaryStarted = $true
 
     $databaseName = [string]$context.Config.database.name
