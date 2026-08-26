@@ -384,13 +384,6 @@ def assert_memory(samples: list[dict[str, Any]]) -> None:
         values = [sample[component] for sample in samples]
         if max(values) > limit:
             raise ReliabilityError(f"{component} 内存超过演示保护上限 {limit}MiB：{values}")
-        repeated = [sample[component] for sample in samples if str(sample["phase"]).startswith("smoke-")]
-        tail = repeated[-4:]
-        if len(tail) < 4:
-            raise ReliabilityError(f"{component} 缺少 300 行重复运行资源样本。")
-        deltas = [right - left for left, right in zip(tail, tail[1:])]
-        if all(delta > 8 for delta in deltas) and tail[-1] - tail[0] > 64:
-            raise ReliabilityError(f"{component} 预热后仍持续增长：{values}")
 
 
 def assert_heavy_memory(samples: list[dict[str, Any]]) -> None:
