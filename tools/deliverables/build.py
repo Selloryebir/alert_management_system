@@ -120,9 +120,9 @@ def _load_modules() -> tuple[Any, ...]:
         missing = error.name or "未知依赖"
         raise BuildError(
             f"缺少 Python 依赖 {missing}。请执行：\n"
-            "  python3 -m venv .venv-deliverables\n"
-            "  . .venv-deliverables/bin/activate\n"
-            "  python3 -m pip install --only-binary=:all: -r tools/deliverables/requirements.lock\n"
+            "  python3 -m venv .runtime/deliverables-venv\n"
+            "  . .runtime/deliverables-venv/bin/activate\n"
+            "  python3 -m pip install --require-hashes --only-binary=:all: -r tools/deliverables/requirements.lock\n"
             "如果 WSL 无法创建虚拟环境，请先安装 python3-venv 和 python3-pip。"
         ) from error
     return load_source, render_docx, render_pdf, verify_docx, verify_pdf, SourceError, ArtifactError

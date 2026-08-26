@@ -1,7 +1,8 @@
 ﻿[CmdletBinding()]
 param(
     [string]$OutputRoot = "",
-    [string]$ReleaseVersion = "0.2.0-m9",
+    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$')]
+    [string]$ReleaseVersion = "0.8.0+m13",
     [switch]$AllowDirty
 )
 

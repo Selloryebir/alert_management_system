@@ -58,7 +58,7 @@ Get-ChildItem -LiteralPath $installParent
 ZIP 内含一个发布根目录。进入同时包含 `README.txt`、`scripts`、`app`、`runtime` 和 `samples` 的目录。例如：
 
 ```powershell
-Set-Location 'C:\报警管理系统\alert-management-system'
+Set-Location 'C:\报警管理系统\alert-management-system-windows-x64'
 ```
 
 不要只复制脚本或程序文件，也不要把两个不同版本解压到同一目录相互覆盖。
@@ -78,7 +78,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\preflight.ps1
 - 包内 Java、PostgreSQL 和算法程序；
 - 目录可写性和磁盘空间；
 - 固定端口可用性；
-- 演示样例完整性。
+- `samples` 目录存在且至少包含一个演示样例；具体样例在业务验收中实际读取。
 
 只有看到“预检通过”后才启动。预检失败时按输出的中文修复建议处理，不要编辑 `release-manifest.json`、删除校验项或手工替换运行时来绕过。
 
@@ -308,7 +308,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\cleanup-instance
 - 默认保留 `backups`；
 - 保留程序文件，不删除发布根或父目录。
 
-完成后可手工删除当前解压目录。默认保留的恢复点也可复制到新安装的 `backups` 目录，再运行状态检查和隔离恢复验证。
+`cleanup-instance.ps1` 的“默认保留”只表示脚本不删除发布根内的 `backups`，不表示随后删除整个解压目录时备份仍会存在。如需保留恢复点，必须先把成对的 `.dump` 与 `.dump.meta.json` 复制到发布根之外的组织受控目录，并保留一份状态检查成功记录；将其放入新安装的 `backups` 后还要重新运行状态检查和隔离恢复验证。确认外部副本有效后，才可手工删除当前精确解压目录。
 
 ### 12.2 删除备份
 
@@ -322,7 +322,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\cleanup-instance
 
 | 提示 | 处理 |
 |---|---|
-| 发布文件缺失或哈希不一致 | 删除本次不完整解压目录，重新取得并完整解压 ZIP。 |
+| 发布文件缺失或哈希不一致 | 若该目录从未成功启动且没有 `data\instance.json`、业务数据或恢复点，可删除本次不完整解压目录后重新取得 ZIP；否则先由部署人员保全数据和备份，再处理程序文件。 |
 | 剩余空间不足 2 GB | 清理目标磁盘或选择新的固定安装目录后重新解压。 |
 | 固定端口被占用 | 先尝试停止本实例；无法确认占用者时交由电脑管理员核对，切勿结束未知进程。 |
 | 目录不可写 | 改用当前用户明确有写权限的固定目录，不通过关闭校验或修改脚本绕过。 |

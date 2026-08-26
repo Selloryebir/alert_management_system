@@ -64,6 +64,12 @@ SECRET_PATTERNS = (
     re.compile(r"\bgithub_pat_[A-Za-z0-9_]{40,255}\b"),
     re.compile(r"\bBearer\s+eyJ[A-Za-z0-9_-]+[.]eyJ[A-Za-z0-9_-]+[.][A-Za-z0-9_-]+\b", re.IGNORECASE),
 )
+CREDENTIAL_ASSIGNMENT = re.compile(
+    r"\b(?P<key>[A-Z][A-Z0-9_]*(?:PASSWORD|SECRET|TOKEN|API_KEY)[A-Z0-9_]*)\s*[:=]\s*(?P<value>\S+)",
+    re.IGNORECASE,
+)
+SAFE_CREDENTIAL_KEY_SUFFIXES = ("_FILE", "_PATH", "_DIR")
+SAFE_CREDENTIAL_VALUE_PREFIXES = ("$", "%", "<", "[", "{{")
 
 
 @dataclass(frozen=True)
@@ -142,13 +148,32 @@ def _validate_sensitive_content(source_path: Path, text: str) -> None:
         if pattern.search(text):
             raise SourceError(f"{source_path} 含疑似真实秘密：{pattern.pattern}")
     for line_number, line in enumerate(text.splitlines(), start=1):
-        if any(pattern.search(line) for pattern in RISK_PATTERNS) and not any(
-            qualifier in line for qualifier in RISK_QUALIFIERS
-        ):
-            raise SourceError(
-                f"{source_path}:{line_number} 将高风险历史指标写成当前声明；"
-                "请明确标注历史、未验证、拒绝或外部条件"
-            )
+        table_cells = [cell.strip() for cell in line.strip().strip("|").split("|")] if line.lstrip().startswith("|") else []
+        segments = table_cells if table_cells else re.split(r"[，,。！？!?；;]", line)
+        for index, segment in enumerate(segments):
+            if any(pattern.search(segment) for pattern in RISK_PATTERNS) and not any(
+                qualifier in segment for qualifier in RISK_QUALIFIERS
+            ):
+                is_scoped_capability_name = bool(
+                    table_cells
+                    and index == 1
+                    and any(
+                        cell in {"明确拒绝", "外部条件后重启", "外部输入后才可重启"}
+                        for cell in table_cells
+                    )
+                )
+                if is_scoped_capability_name:
+                    continue
+                raise SourceError(
+                    f"{source_path}:{line_number} 将高风险历史指标写成当前声明；"
+                    "限定词必须与指标位于同一短句或表格单元格"
+                )
+        for match in CREDENTIAL_ASSIGNMENT.finditer(line):
+            key = match.group("key").upper()
+            value = match.group("value").strip('"\'')
+            if key.endswith(SAFE_CREDENTIAL_KEY_SUFFIXES) or value.startswith(SAFE_CREDENTIAL_VALUE_PREFIXES):
+                continue
+            raise SourceError(f"{source_path}:{line_number} 含疑似字面凭据赋值：{key}")
 
 
 def _validate_gap_coverage(source_path: Path, text: str) -> None:

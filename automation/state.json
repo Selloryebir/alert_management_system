@@ -34,15 +34,16 @@
     ],
     "checks": [
       "阶段启动前：validate_automation.py、validate_repository.py、validate_formal_baseline.py 均 PASS",
-      "M13 三路只读预审：业务操作入口、历史声明边界、DOCX/PDF 生成方案均已完成"
+      "M13 三路只读预审：业务操作入口、历史声明边界、DOCX/PDF 生成方案均已完成",
+      "第一候选 922108cf：M13 三条本机门槛和 Windows 原生双目录全链通过，但独立复审及远端工作流解析发现阻断，未作为检查点"
     ],
     "failures": [
-      "待修复：README、产品入口和来源覆盖矩阵仍含 M10/M11 前的状态描述。",
-      "待实现：tools/deliverables/build.py、正式手册、六类过程文件及可重复 DOCX/PDF 尚不存在。",
-      "待闭合：责任人输入提示、正式手册随 Windows 包交付及 57 项来源能力逐项差距响应。"
+      "第一候选 922108cf：repository-check.yml 的 pip 命令未使用 YAML 块标量，远端工作流无法解析。",
+      "第一候选 922108cf：部署路径、备份外置、人工补录/项目生命周期说明和发布版本存在可达事实差距。",
+      "第一候选 922108cf：高风险声明与字面凭据守卫不足，交付环境路径会制造未忽略目录。"
     ],
     "decision": "以 Markdown 为唯一事实源，直接生成并验证中文 DOCX/PDF；正式材料只采用当前 Git、产品契约和固定提交证据，历史人员、预算、试点、准确率、合规及长稳陈述不继承。业务正文优先 Windows 原生包，Docker/HTTPS 放部署管理员说明；恢复仅表述为隔离恢复验证。",
-    "next_action": "并行编写业务与运维手册、项目过程文档和确定性交付物生成器，再由控制器修正共享事实源并完成打包集成。",
+    "next_action": "完成第一候选复审缺陷的最小修复，重新生成 DOCX/PDF，在新固定提交执行本机、Windows、独立复审和远端门槛。",
     "resume_status": null
   },
   "stages": {
@@ -195,8 +196,8 @@
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "实现正式手册、项目过程文件和可重复 DOCX/PDF 生成链。",
-      "note": "文档必须从最终事实源生成，避免提前编写后漂移。"
+      "next_action": "修复第一候选复审问题并在新固定提交重跑生成、原生包、独立复审和远端门槛。",
+      "note": "正式手册、过程文件和确定性生成链已形成候选；922108cf 因 CI 解析和说明可达性缺陷被拒绝，不作为阶段检查点。"
     },
     "M14": {
       "status": "blocked",

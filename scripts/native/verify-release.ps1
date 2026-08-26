@@ -1,6 +1,8 @@
 ﻿param(
     [string]$ArchivePath,
     [string]$OutputRoot,
+    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$')]
+    [string]$ReleaseVersion = "0.8.0+m13",
     [switch]$AllowDirty
 )
 
@@ -219,7 +221,7 @@ function Resolve-Archive {
     Assert-True (Test-Path -LiteralPath $buildScript -PathType Leaf) "构建脚本不存在：$buildScript"
     $arguments = @(
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $buildScript,
-        "-OutputRoot", $artifactRoot
+        "-OutputRoot", $artifactRoot, "-ReleaseVersion", $ReleaseVersion
     )
     if ($AllowDirty) {
         $arguments += "-AllowDirty"
@@ -258,10 +260,11 @@ function Expand-FreshRelease {
 }
 
 function Assert-ReleaseManifest {
-    param([string]$ReleaseRoot, [string]$ExpectedCommit)
+    param([string]$ReleaseRoot, [string]$ExpectedCommit, [string]$ExpectedReleaseVersion)
     $manifestPath = Join-Path $ReleaseRoot "release-manifest.json"
     $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ($manifest.source_commit -eq $ExpectedCommit) "发布 manifest 源提交与当前提交不一致。"
+    Assert-True ($manifest.release_version -eq $ExpectedReleaseVersion) "发布 manifest 版本与验收目标不一致。"
     Assert-True ($manifest.PSObject.Properties.Name -contains "source_dirty") "发布 manifest 缺少 source_dirty。"
     Assert-True (-not [bool]$manifest.source_dirty -or $AllowDirty) "正式验收拒绝 source_dirty=true 的发布包。"
     $entries = @($manifest.files)
@@ -819,7 +822,7 @@ try {
         Write-Host "开始第 $round 轮全新目录验收：$($destinations[$index])"
         $releaseRoot = Expand-FreshRelease $archive $destinations[$index]
         [void]$releaseRoots.Add($releaseRoot)
-        Assert-ReleaseManifest $releaseRoot $sourceCommit
+        Assert-ReleaseManifest $releaseRoot $sourceCommit $ReleaseVersion
 
         $restrictedPath = @(
             (Join-Path $releaseRoot "runtime\jre\bin"),

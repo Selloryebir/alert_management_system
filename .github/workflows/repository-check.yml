@@ -23,7 +23,8 @@ jobs:
           cache: pip
           cache-dependency-path: tools/deliverables/requirements.lock
       - name: 安装交付物生成依赖
-        run: python3 -m pip install --only-binary=:all: -r tools/deliverables/requirements.lock
+        run: |
+          python3 -m pip install --require-hashes --only-binary=:all: -r tools/deliverables/requirements.lock
       - name: 验证结构与文档链接
         run: python3 scripts/validate_repository.py
       - name: 验证自动化工作流与状态
@@ -31,4 +32,6 @@ jobs:
       - name: 验证正式产品基线
         run: python3 scripts/validate_formal_baseline.py
       - name: 验证正式 DOCX 和 PDF
-        run: python3 tools/deliverables/build.py --check
+        run: |
+          python3 -m unittest discover -s tools/deliverables -p "test_*.py"
+          python3 tools/deliverables/build.py --check

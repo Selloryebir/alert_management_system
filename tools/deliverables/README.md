@@ -4,15 +4,15 @@
 
 ## 准备环境
 
-推荐使用 Python 3.12–3.14 的独立虚拟环境：
+生成链固定支持 Python 3.12 的 Windows x64 或 Linux/WSL x64 独立虚拟环境：
 
 ```bash
-python3 -m venv .venv-deliverables
-. .venv-deliverables/bin/activate
-python3 -m pip install --only-binary=:all: -r tools/deliverables/requirements.lock
+python3 -m venv .runtime/deliverables-venv
+. .runtime/deliverables-venv/bin/activate
+python3 -m pip install --require-hashes --only-binary=:all: -r tools/deliverables/requirements.lock
 ```
 
-如果 WSL 提示缺少 `venv` 或 `pip`，先安装对应发行版的 `python3-venv` 和 `python3-pip` 软件包。Windows 原生 PowerShell 可用 `py -3.12 -m venv .venv-deliverables` 创建环境。
+如果 WSL 提示缺少 `venv` 或 `pip`，先安装对应发行版的 `python3-venv` 和 `python3-pip` 软件包。Windows 原生 PowerShell 可用 `py -3.12 -m venv .runtime\deliverables-venv` 创建环境。`.runtime/` 已由仓库忽略，不会污染正式发布构建的干净工作树判断。
 
 ## 构建与验收
 

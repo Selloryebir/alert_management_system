@@ -11,35 +11,35 @@
   "documents": [
     {
       "source": "docs/guides/business-user-manual.md",
-      "source_sha256": "39f5723e2145b46ba24b5718c5f96a015a8e507b3feeb0c9c572e43f179ec824",
+      "source_sha256": "6cebb5e07d062a9016b5df6ac62707ecc98f46c40b4687beaad505b884a50843",
       "title": "报警管理系统业务使用手册",
       "outputs": {
         "docx": {
           "path": "deliverables/business-user-manual.docx",
-          "sha256": "47918e21617063dc23ed2ff48c5374344896b31a8bed1b839dc45c2939e3bac6",
-          "size": 889144
+          "sha256": "f708f103fac0c056298b55e0719278121a197942f4a69fbf09b3bb989d67ec62",
+          "size": 891892
         },
         "pdf": {
           "path": "deliverables/business-user-manual.pdf",
-          "sha256": "176387fdae05d941eceb25ac672264abebbcaf4398f51d77dbe570f668d55635",
-          "size": 246033
+          "sha256": "dea4bc230997b67ad9526e445cb73aa60acfb430cf6693a09f87711465c7ee9f",
+          "size": 259828
         }
       }
     },
     {
       "source": "docs/guides/windows-deployment-operations.md",
-      "source_sha256": "235b9b3bda38bb2a73b43a8184929cb8a01f7d9093357fa0e6c7ca4fe3bb2115",
+      "source_sha256": "00b2534281c1a1e88e11cec847b4fd1c871f880758bb6274b38b97e3f1c3d661",
       "title": "报警管理系统 Windows 部署与运维手册",
       "outputs": {
         "docx": {
           "path": "deliverables/windows-deployment-operations.docx",
-          "sha256": "0d4c93c2d85c50efe54ae7d1d112e45fb45a935a8c18a7966c11d6a472dde0ce",
-          "size": 915461
+          "sha256": "4558606c9ae9719218a01ba1920909d0bc6596160390ba29882a43f0d80a85b9",
+          "size": 917830
         },
         "pdf": {
           "path": "deliverables/windows-deployment-operations.pdf",
-          "sha256": "ea8ac0de73f51ae402a8d3cfa09ab5c07fd636cee9ef66323b505974fe21113b",
-          "size": 262531
+          "sha256": "fd5d5baf840e19c2567d460bbc73d09a100af2043adc04fc11c2d0a7e6f007cd",
+          "size": 266657
         }
       }
     },
