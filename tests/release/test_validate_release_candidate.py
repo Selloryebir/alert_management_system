@@ -49,6 +49,23 @@ class ReleaseCandidateValidatorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "不得预填"):
             validator.validate_human_acceptance("candidate", state, "a" * 40)
 
+    def test_post_acceptance_product_change_is_rejected(self) -> None:
+        result = SimpleNamespace(
+            returncode=0,
+            stdout="services/core-api/src/main/java/com/example/AlarmService.java\n",
+        )
+        with patch.object(validator, "run", return_value=result):
+            with self.assertRaisesRegex(ValueError, "必须重建候选"):
+                validator.validate_post_acceptance_changes("a" * 40, "b" * 40)
+
+    def test_post_acceptance_governance_closure_is_allowed(self) -> None:
+        result = SimpleNamespace(
+            returncode=0,
+            stdout="automation/state.json\ndocs/verification/evidence/M14.md\n",
+        )
+        with patch.object(validator, "run", return_value=result):
+            validator.validate_post_acceptance_changes("a" * 40, "b" * 40)
+
     def test_approved_acceptance_is_bound_to_evidence(self) -> None:
         candidate = "a" * 40
         archive_hash = "b" * 64
@@ -95,7 +112,7 @@ class ReleaseCandidateValidatorTests(unittest.TestCase):
                 }
             }
             with patch.object(validator, "ROOT", root), patch.object(
-                validator, "run", return_value=SimpleNamespace(returncode=0)
+                validator, "run", return_value=SimpleNamespace(returncode=0, stdout="")
             ):
                 validator.validate_human_acceptance("approved", state, candidate)
 

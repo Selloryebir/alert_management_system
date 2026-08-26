@@ -42,7 +42,8 @@
       "阶段启动前：M13 检查点 4be7ea5 的本机 G13 与五条远端流水线均 PASS",
       "M13 状态提交 bd7598d 的仓库基础检查 run 33003556046 为 SUCCESS",
       "M14 实现工作区：发布校验器 4 项单测、PowerShell 解析、Playwright 用例发现、仓库/自动化/正式基线和交付物确定性检查 PASS",
-      "M14 实现工作区：本机 HTTP 与 HTTPS 双空卷固定命令连续两次 PASS；最新摘要 .runtime/m7/20260827-033510-535069-2fc28d60/verification-summary.json"
+      "M14 实现工作区：本机 HTTP 与 HTTPS 双空卷固定命令连续两次 PASS；最新摘要 .runtime/m7/20260827-033510-535069-2fc28d60/verification-summary.json",
+      "固定提交 27a2fa1 的 Docker 全新卷命令 PASS：本机与 HTTPS 双路径、三格式导入、固定分析、处置审计和精确资源清理通过；摘要 .runtime/m7/20260827-055423-564837-f5ff8194/verification-summary.json；该结果早于最终审计修正，不作为最终候选证据"
     ],
     "failures": [
       "首次 M14 Docker 实跑在 Maven Central 下载 byte-buddy-1.17.8.jar 时发生外部网络截断；退出 1，隔离资源和临时秘密清理 PASS，使用缓存重试后连续两次完整 PASS",
@@ -59,10 +60,13 @@
       "固定提交 541745e 在全新 GUID staging 完成全部构建后，Compress-Archive 首次读取 core-api.jar 时遇到 Windows 瞬时文件占用而失败，尚未进入业务验收；压缩阶段增加最多 3 次、间隔 1 秒的有限重试，每次只清理同一未完成 ZIP，持续占用仍阻断",
       "固定提交 17ffac9 成功构建 ZIP，第 1 轮完整通过，第 2 轮正确保留 1 个外来迁移点和 2 个当前实例点，但浏览器备份面板仍被传入总数 2；改为按轮次传入真实页面总数 2/3，当前实例恰为 2 继续由来源分组断言独立核验",
       "固定提交 2b7751f 两轮全部业务、容量、备份和恢复断言通过；正常 cleanup-instance 已移除身份文件后，增强的 finally 又重复调用依赖身份的计划任务和停止脚本，误报清理失败。身份不存在时跳过这两个不可重复入口，同时用运行期记录的精确任务名独立清理复验，PID、端口和 Junction 复验保持不变",
-      "固定提交 48cc05e 两轮业务和最终清理完整通过；总入口读取唯一 verification-summary.json 时再次把 FileInfo 隐式转换为文件名而非完整路径，在写总摘要前失败。仅读取位置改用 FullName，其他验收行为不变"
+      "固定提交 48cc05e 两轮业务和最终清理完整通过；总入口读取唯一 verification-summary.json 时再次把 FileInfo 隐式转换为文件名而非完整路径，在写总摘要前失败。仅读取位置改用 FullName，其他验收行为不变",
+      "固定提交 27a2fa1 独立后端审查发现：正式输出根及删除目标未拒绝 Windows ReparsePoint，PID 记录被 stop.ps1 移除后 finally 可能失去 PostgreSQL Junction 身份；新增逐段重解析点拒绝和外部哨兵负例，并在运行期缓存已验证别名作兜底精确清理",
+      "固定提交 27a2fa1 对抗审查发现：AC-022 只校验候选为 HEAD 祖先，人工 PASS 后产品代码仍可变化；新增候选到发布树的治理收口文件精确白名单，任何源码、脚本、配置、样例或手册变化均要求废弃原验收并重建候选",
+      "固定提交 27a2fa1 对抗审查发现：post-main/released 未在远端显式拒绝 v1.0.0；四种生命周期模式统一查询并拒绝远端正式标签，候选/批准模式继续拒绝本地及远端 RC 标签"
     ],
     "decision": "Windows 11 原生自包含包是首要业务终验路径，HTTPS Docker Compose 是次级部署路径；自动化验证失败必须阻断，最终真实业务人员终验和 main 正式发布保留人工门禁；发布标签只绑定已验证的 main 提交。",
-    "next_action": "关闭发布生命周期、输出目录和失败清理边界，在新干净提交串行重跑 Windows、Docker、候选校验和远端检查。",
+    "next_action": "固定审计修正提交，串行重跑候选校验、Windows、Docker、远端检查与独立复审；全部通过后冻结 ZIP/SHA-256 并进入 AC-022 人工终验。",
     "resume_status": null
   },
   "stages": {

@@ -43,6 +43,31 @@ HUMAN_ACCEPTANCE_STEPS = {
     "manual_without_oral_supplement",
     "chinese_display_and_system_stability",
 }
+POST_ACCEPTANCE_ALLOWED_PATHS = {
+    "README.md",
+    "automation/state.json",
+    "docs/verification/evidence/M14.md",
+    "docs/product/source-coverage.md",
+    "docs/deliverables/project-proposal.md",
+    "docs/deliverables/midterm-report.md",
+    "docs/deliverables/test-report.md",
+    "docs/deliverables/closure-report.md",
+    "docs/deliverables/development-process.md",
+    "docs/deliverables/source-gap-analysis.md",
+    "deliverables/manifest.json",
+    "deliverables/project-proposal.docx",
+    "deliverables/project-proposal.pdf",
+    "deliverables/midterm-report.docx",
+    "deliverables/midterm-report.pdf",
+    "deliverables/test-report.docx",
+    "deliverables/test-report.pdf",
+    "deliverables/closure-report.docx",
+    "deliverables/closure-report.pdf",
+    "deliverables/development-process.docx",
+    "deliverables/development-process.pdf",
+    "deliverables/source-gap-analysis.docx",
+    "deliverables/source-gap-analysis.pdf",
+}
 
 
 def run(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -125,19 +150,37 @@ def validate_git(mode: str, expected_commit: str | None) -> str:
     m13 = json.loads((ROOT / "automation/state.json").read_text(encoding="utf-8"))["stages"]["M13"]["checkpoint_commit"]
     if run("git", "merge-base", "--is-ancestor", m13, head, check=False).returncode:
         raise ValueError("M13 检查点不是当前候选的祖先。")
-    for tag in (RC_TAG, FINAL_TAG):
-        exists = run("git", "rev-parse", "--verify", f"refs/tags/{tag}", check=False).returncode == 0
-        if mode in {"candidate", "approved"} and exists:
-            raise ValueError(f"候选阶段禁止提前存在标签：{tag}")
-        if mode == "post-main" and tag == FINAL_TAG and exists:
-            raise ValueError("RC 阶段禁止提前存在正式标签 v1.0.0。")
-    if mode in {"candidate", "approved"}:
-        remote_tags = run(
-            "git", "ls-remote", "--tags", "origin", f"refs/tags/{RC_TAG}", f"refs/tags/{FINAL_TAG}"
-        ).stdout.strip()
-        if remote_tags:
-            raise ValueError("候选阶段远端已存在保留发布标签，拒绝复用标签名。")
+    local_tags = {
+        tag: run("git", "rev-parse", "--verify", f"refs/tags/{tag}", check=False).returncode == 0
+        for tag in (RC_TAG, FINAL_TAG)
+    }
+    if mode in {"candidate", "approved"} and any(local_tags.values()):
+        raise ValueError("候选阶段禁止提前存在 RC 或正式标签。")
+    if mode in {"post-main", "released"} and local_tags[FINAL_TAG]:
+        raise ValueError("RC 生命周期结束前禁止提前存在正式标签 v1.0.0。")
+    remote_tags = run(
+        "git", "ls-remote", "--tags", "origin", f"refs/tags/{RC_TAG}", f"refs/tags/{FINAL_TAG}"
+    ).stdout
+    remote_refs = {line.split("\t", 1)[1] for line in remote_tags.splitlines() if "\t" in line}
+    if f"refs/tags/{FINAL_TAG}" in remote_refs:
+        raise ValueError("远端已提前存在正式标签 v1.0.0。")
+    if mode in {"candidate", "approved"} and f"refs/tags/{RC_TAG}" in remote_refs:
+        raise ValueError("候选阶段远端已存在 RC 标签，拒绝复用标签名。")
     return head
+
+
+def validate_post_acceptance_changes(candidate: str, head: str) -> None:
+    changed = {
+        line.strip()
+        for line in run("git", "diff", "--name-only", candidate, head).stdout.splitlines()
+        if line.strip()
+    }
+    unexpected = sorted(changed - POST_ACCEPTANCE_ALLOWED_PATHS)
+    if unexpected:
+        raise ValueError(
+            "AC-022 之后出现产品、脚本、配置或未授权文件变更，必须重建候选并重新人工终验："
+            f"{unexpected}"
+        )
 
 
 def validate_state(mode: str) -> dict[str, object]:
@@ -210,6 +253,7 @@ def validate_human_acceptance(mode: str, state: dict[str, object], head: str) ->
         raise ValueError("AC-022 候选提交必须是完整 SHA。")
     if run("git", "merge-base", "--is-ancestor", candidate, head, check=False).returncode:
         raise ValueError("AC-022 候选提交不是当前发布树的祖先。")
+    validate_post_acceptance_changes(candidate, head)
     if not isinstance(archive_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", archive_hash):
         raise ValueError("AC-022 ZIP SHA-256 格式无效。")
     if not isinstance(archive_path, str) or not archive_path.strip().lower().endswith(".zip"):

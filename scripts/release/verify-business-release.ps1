@@ -39,6 +39,33 @@ function Assert-True {
     if (-not $Condition) { throw $Message }
 }
 
+function Assert-OrdinaryPathIfExists {
+    param([string]$Path, [string]$Description)
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    if ($null -eq $item) { return }
+    Assert-True (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) `
+        "$Description 不得是符号链接、Junction 或其他重解析点：$Path"
+}
+
+function Assert-OrdinaryExistingSegments {
+    param([string]$Path, [string]$Description)
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    $pathRoot = [IO.Path]::GetPathRoot($fullPath)
+    $current = $pathRoot.TrimEnd('\')
+    foreach ($segment in $fullPath.Substring($pathRoot.Length).Split(
+            @([char]'\', [char]'/'), [StringSplitOptions]::RemoveEmptyEntries)) {
+        $current = Join-Path $current $segment
+        Assert-OrdinaryPathIfExists $current $Description
+    }
+}
+
+function Write-BusinessSummary {
+    param([System.Collections.IDictionary]$Summary)
+    Assert-OrdinaryExistingSegments $summaryPath "业务发布摘要路径"
+    Assert-OrdinaryPathIfExists $summaryPath "业务发布摘要"
+    $Summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $summaryPath -Encoding UTF8
+}
+
 function ConvertTo-NativeArgument {
     param([string]$Value)
     if ($null -eq $Value -or $Value.Length -eq 0) { return '""' }
@@ -72,8 +99,11 @@ function Invoke-CapturedPowerShell {
         (@("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $Script) + $Arguments)
 }
 
-New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
 try {
+    Assert-OrdinaryExistingSegments $repositoryRoot "仓库路径"
+    Assert-OrdinaryExistingSegments $OutputRoot "正式验收输出路径"
+    New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
+    Assert-OrdinaryExistingSegments $OutputRoot "正式验收输出路径"
     foreach ($required in @($powerShellExe, $buildScript, $verifyScript, $standardUserScript)) {
         Assert-True (Test-Path -LiteralPath $required -PathType Leaf) "发布候选验收缺少文件：$required"
     }
@@ -88,6 +118,8 @@ try {
     $sourceCommit = (($commitResult.Output -join "`n").Trim())
     Assert-True ($commitResult.ExitCode -eq 0 -and $sourceCommit -match '^[0-9a-f]{40}$') "无法读取完整源提交。"
 
+    Assert-OrdinaryPathIfExists $ownershipMarkerPath "正式验收输出目录身份标记"
+    Assert-OrdinaryPathIfExists $summaryPath "业务发布摘要"
     if (Test-Path -LiteralPath $ownershipMarkerPath -PathType Leaf) {
         $ownership = Get-Content -LiteralPath $ownershipMarkerPath -Raw -Encoding UTF8 | ConvertFrom-Json
         Assert-True ($ownership.product -eq "alert-management-system-business-release" -and
@@ -116,11 +148,50 @@ try {
             [StringComparison]::OrdinalIgnoreCase)) `
         "仅允许清理固定的验收生成目录：$verificationRoot"
     foreach ($generatedDirectory in @($artifactDirectory, $verificationRoot)) {
+        Assert-OrdinaryExistingSegments $generatedDirectory "验收生成目录"
+        Assert-OrdinaryPathIfExists $generatedDirectory "验收生成目录"
         if (Test-Path -LiteralPath $generatedDirectory) {
             Remove-Item -LiteralPath $generatedDirectory -Recurse -Force
         }
     }
     New-Item -ItemType Directory -Path $artifactRoot, $verificationRoot, $negativeRoot -Force | Out-Null
+    foreach ($generatedDirectory in @($artifactRoot, $verificationRoot, $negativeRoot)) {
+        Assert-OrdinaryExistingSegments $generatedDirectory "验收生成目录"
+    }
+
+    $junctionExternal = Join-Path ([IO.Path]::GetTempPath()) (
+        "ams-release-boundary-" + [Guid]::NewGuid().ToString("N"))
+    $junctionPath = Join-Path $negativeRoot "reparse-boundary"
+    New-Item -ItemType Directory -Path $junctionExternal | Out-Null
+    Set-Content -LiteralPath (Join-Path $junctionExternal "sentinel.txt") -Value "KEEP" -Encoding ASCII
+    try {
+        $junctionResult = Invoke-CapturedProcess $env:ComSpec @(
+            "/d", "/c", "mklink", "/J", $junctionPath, $junctionExternal)
+        Assert-True ($junctionResult.ExitCode -eq 0) `
+            "无法建立发布目录重解析点负例：$($junctionResult.Output -join ' | ')"
+        $reparseRejected = $false
+        try {
+            Assert-OrdinaryPathIfExists $junctionPath "发布目录重解析点负例"
+        } catch {
+            $reparseRejected = $true
+        }
+        Assert-True $reparseRejected "正式验收边界未拒绝发布目录内的 Junction。"
+        Assert-True (Test-Path -LiteralPath (Join-Path $junctionExternal "sentinel.txt") -PathType Leaf) `
+            "重解析点负例越界损坏了外部哨兵文件。"
+    } finally {
+        $junctionItem = Get-Item -LiteralPath $junctionPath -Force -ErrorAction SilentlyContinue
+        if ($null -ne $junctionItem) {
+            Assert-True (($junctionItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) `
+                "只允许以非递归方式删除已验证的负例 Junction：$junctionPath"
+            [IO.Directory]::Delete($junctionPath, $false)
+        }
+        Assert-OrdinaryExistingSegments $junctionExternal "重解析点负例外部目录"
+        Assert-OrdinaryPathIfExists $junctionExternal "重解析点负例外部目录"
+        if (Test-Path -LiteralPath $junctionExternal) {
+            Remove-Item -LiteralPath $junctionExternal -Recurse -Force
+        }
+    }
+
     $build = Invoke-CapturedPowerShell $buildScript @(
         "-OutputRoot", $artifactRoot, "-ReleaseVersion", $ReleaseVersion)
     $build.Output | ForEach-Object { Write-Host $_ }
@@ -128,6 +199,8 @@ try {
     $markers = @($build.Output | Where-Object { [string]$_ -like "NATIVE_RELEASE_ZIP=*" })
     Assert-True ($markers.Count -eq 1) "构建脚本未输出唯一 NATIVE_RELEASE_ZIP。"
     $archive = [IO.Path]::GetFullPath(([string]$markers[0]).Substring("NATIVE_RELEASE_ZIP=".Length).Trim())
+    Assert-OrdinaryExistingSegments $archive "发布候选 ZIP"
+    Assert-OrdinaryPathIfExists $archive "发布候选 ZIP"
     Assert-True (Test-Path -LiteralPath $archive -PathType Leaf) "发布候选 ZIP 不存在：$archive"
     $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
 
@@ -164,7 +237,7 @@ try {
         "业务发布预检查必须由 Windows 标准用户执行。"
     Assert-True ($null -ne $technical.cross_instance_restore) "技术验收摘要缺少跨实例恢复证据。"
 
-    [ordered]@{
+    Write-BusinessSummary ([ordered]@{
         schema_version = 1
         product = "alert-management-system"
         status = "PASS"
@@ -177,26 +250,37 @@ try {
         technical_summary = $summaries[0].FullName
         human_business_acceptance = "REQUIRED"
         completed_at = [DateTimeOffset]::UtcNow.ToString("o")
-    } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $summaryPath -Encoding UTF8
+    })
     Write-Host "M14 Windows 业务发布候选自动预检查通过；仍需非技术业务人员人工终验。"
     Write-Host "BUSINESS_RELEASE_ZIP=$archive"
     Write-Host "BUSINESS_RELEASE_SHA256=$archiveHash"
     Write-Host "BUSINESS_RELEASE_SUMMARY=$summaryPath"
 } catch {
-    [ordered]@{
-        schema_version = 1
-        product = "alert-management-system"
-        status = "FAILED"
-        release_version = $ReleaseVersion
-        source_commit = $sourceCommit
-        archive = $archive
-        archive_sha256 = $archiveHash
-        error = $_.Exception.Message
-        completed_at = [DateTimeOffset]::UtcNow.ToString("o")
-    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $summaryPath -Encoding UTF8
-    throw
+    $primaryError = $_
+    try {
+        Write-BusinessSummary ([ordered]@{
+                schema_version = 1
+                product = "alert-management-system"
+                status = "FAILED"
+                release_version = $ReleaseVersion
+                source_commit = $sourceCommit
+                archive = $archive
+                archive_sha256 = $archiveHash
+                error = $primaryError.Exception.Message
+                completed_at = [DateTimeOffset]::UtcNow.ToString("o")
+            })
+    } catch {
+        Write-Warning "失败摘要未写入不可信的输出路径：$($_.Exception.Message)"
+    }
+    throw $primaryError
 } finally {
     if (Test-Path -LiteralPath $negativeRoot) {
-        Remove-Item -LiteralPath $negativeRoot -Recurse -Force -ErrorAction SilentlyContinue
+        try {
+            Assert-OrdinaryExistingSegments $negativeRoot "验收负例目录"
+            Assert-OrdinaryPathIfExists $negativeRoot "验收负例目录"
+            Remove-Item -LiteralPath $negativeRoot -Recurse -Force -ErrorAction Stop
+        } catch {
+            Write-Warning "验收负例目录未清理：$($_.Exception.Message)"
+        }
     }
 }

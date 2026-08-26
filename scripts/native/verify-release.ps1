@@ -23,6 +23,7 @@ $originalPathExt = $env:PATHEXT
 $releaseRoots = New-Object System.Collections.ArrayList
 $observedSecrets = New-Object System.Collections.Generic.List[string]
 $managedBackupTasks = New-Object System.Collections.Generic.List[string]
+$managedPostgresAliases = New-Object System.Collections.ArrayList
 $credentialRoot = $null
 $cleanupFailures = New-Object System.Collections.Generic.List[string]
 $primaryFailure = $null
@@ -1065,6 +1066,12 @@ try {
         $processInventory = Assert-ProcessInventory $releaseRoot
         $startedPids = @($processInventory.Pids)
         $postgresAlias = [string]$processInventory.PostgresAlias
+        if (-not [string]::IsNullOrWhiteSpace($postgresAlias)) {
+            [void]$managedPostgresAliases.Add([pscustomobject]@{
+                    Alias = $postgresAlias
+                    ReleaseRoot = $releaseRoot
+                })
+        }
 
         Invoke-ResetCheck $releaseRoot $adminPasswordFile
         if ($BusinessRelease -and $round -eq 2) {
@@ -1190,6 +1197,19 @@ try {
     for ($index = $releaseRoots.Count - 1; $index -ge 0; $index -= 1) {
         foreach ($failure in @(Stop-ReleaseSafely ([string]$releaseRoots[$index]))) {
             [void]$cleanupFailures.Add([string]$failure)
+        }
+    }
+    foreach ($managedAlias in @($managedPostgresAliases)) {
+        $aliasPath = [string]$managedAlias.Alias
+        $managedReleaseRoot = [string]$managedAlias.ReleaseRoot
+        if (-not (Test-Path -LiteralPath $aliasPath)) { continue }
+        try {
+            Assert-JunctionTargetsRelease $aliasPath $managedReleaseRoot
+            [IO.Directory]::Delete($aliasPath, $false)
+            Assert-True (-not (Test-Path -LiteralPath $aliasPath)) `
+                "兜底清理后受控 Junction 仍存在：$aliasPath"
+        } catch {
+            [void]$cleanupFailures.Add("兜底清理受控 Junction 失败：$aliasPath：$($_.Exception.Message)")
         }
     }
     foreach ($taskName in @($managedBackupTasks | Select-Object -Unique)) {
