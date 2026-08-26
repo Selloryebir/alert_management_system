@@ -22,6 +22,7 @@ $originalPath = $env:PATH
 $originalPathExt = $env:PATHEXT
 $releaseRoots = New-Object System.Collections.ArrayList
 $observedSecrets = New-Object System.Collections.Generic.List[string]
+$managedBackupTasks = New-Object System.Collections.Generic.List[string]
 $credentialRoot = $null
 $cleanupFailures = New-Object System.Collections.Generic.List[string]
 $primaryFailure = $null
@@ -809,8 +810,10 @@ function Assert-ServiceLogsClean {
 function Stop-ReleaseSafely {
     param([string]$ReleaseRoot)
     $failures = New-Object System.Collections.Generic.List[string]
+    $instanceIdentityPath = Join-Path $ReleaseRoot "data\instance.json"
+    $instanceIdentityExists = Test-Path -LiteralPath $instanceIdentityPath -PathType Leaf
     $scheduleScript = Join-Path $ReleaseRoot "scripts\backup-schedule.ps1"
-    if (Test-Path -LiteralPath $scheduleScript -PathType Leaf) {
+    if ($instanceIdentityExists -and (Test-Path -LiteralPath $scheduleScript -PathType Leaf)) {
         try {
             $scheduleResult = Invoke-NativeProcess $powerShellExe @(
                 "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scheduleScript,
@@ -823,7 +826,7 @@ function Stop-ReleaseSafely {
         }
     }
     $stopScript = Join-Path $ReleaseRoot "scripts\stop.ps1"
-    if (Test-Path -LiteralPath $stopScript -PathType Leaf) {
+    if ($instanceIdentityExists -and (Test-Path -LiteralPath $stopScript -PathType Leaf)) {
         try {
             $stopResult = Invoke-NativeProcess $powerShellExe @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $stopScript) $ReleaseRoot
             foreach ($line in $stopResult.Output) {
@@ -1032,6 +1035,7 @@ try {
         $instanceIdentity = Get-Content -LiteralPath (Join-Path $releaseRoot "data\instance.json") `
             -Raw -Encoding UTF8 | ConvertFrom-Json
         $backupTaskName = "AlertManagementSystem-Backup-" + [string]$instanceIdentity.instance_id
+        [void]$managedBackupTasks.Add($backupTaskName)
         Invoke-ReleaseScript $releaseRoot "backup-schedule.ps1" @(
             "-Action", "Configure", "-DailyAt", "23:59", "-RetentionCount", "2") | Out-Null
         Invoke-ReleaseScript $releaseRoot "backup-schedule.ps1" @("-Action", "Status") | Out-Null
@@ -1186,6 +1190,18 @@ try {
     for ($index = $releaseRoots.Count - 1; $index -ge 0; $index -= 1) {
         foreach ($failure in @(Stop-ReleaseSafely ([string]$releaseRoots[$index]))) {
             [void]$cleanupFailures.Add([string]$failure)
+        }
+    }
+    foreach ($taskName in @($managedBackupTasks | Select-Object -Unique)) {
+        try {
+            if ($null -ne (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) {
+                Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction Stop
+            }
+            if ($null -ne (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) {
+                throw "计划任务在清理后仍存在：$taskName"
+            }
+        } catch {
+            [void]$cleanupFailures.Add("清理精确计划任务失败：$taskName：$($_.Exception.Message)")
         }
     }
     if ($null -ne $credentialRoot -and (Test-Path -LiteralPath $credentialRoot)) {
