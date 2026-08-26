@@ -25,6 +25,8 @@ async function responseJson<T>(response: APIResponse | Response): Promise<T> {
 }
 
 async function importAndAnalyze(page: Page): Promise<{ batchId: string; runId: string }> {
+  await page.getByTestId("select-project-DEFAULT-DEMO").click();
+  await expect(page.getByTestId("file-input")).toBeEnabled();
   await page.getByTestId("file-input").setInputFiles(dataset);
   const previewResponse = page.waitForResponse(
     (response) => response.url().endsWith("/api/v1/imports/preview") && response.request().method() === "POST",
@@ -111,19 +113,21 @@ test("浏览器完成导入、分析、详情、事件链和人工处置闭环",
   await expect(page.getByTestId("event-chain")).toContainText("222 → 223 → 224 → 225 → 226");
 
   const operator = "SYNTHETIC_E2E_OPERATOR";
+  const assignee = "SYNTHETIC_E2E_ASSIGNEE";
   const startedNote = "[SYNTHETIC] E2E 开始处置";
   const closedNote = "[SYNTHETIC] E2E 审核完成";
+  await page.getByTestId("disposition-assignee").fill(assignee);
   await page.getByTestId("disposition-operator").fill(operator);
   await page.getByTestId("disposition-note").fill(startedNote);
   await page.getByTestId("disposition-start").click();
-  await expect(page.getByTestId("disposition-history")).toContainText("OPEN");
-  await expect(page.getByTestId("disposition-history")).toContainText("IN_PROGRESS");
+  await expect(page.getByTestId("disposition-history")).toContainText("待处理 → 处理中");
+  await expect(page.getByTestId("disposition-history")).toContainText(assignee);
   await expect(page.getByTestId("disposition-history")).toContainText(startedNote);
 
   await page.getByTestId("disposition-note").fill(closedNote);
   await page.getByTestId("disposition-close").click();
   const history = page.getByTestId("disposition-history");
-  await expect(history).toContainText("CLOSED");
+  await expect(history).toContainText("处理中 → 已关闭");
   await expect(history).toContainText(operator);
   await expect(history).toContainText(closedNote);
   await expect(history).toContainText(/20\d{2}[-/]\d{2}[-/]\d{2}/);
@@ -142,6 +146,8 @@ test("页面显示算法不可用的可重试提示", async ({ page }) => {
     message: "算法服务不可用，可重试",
   });
 
+  await page.getByTestId("select-project-DEFAULT-DEMO").click();
+  await expect(page.getByTestId("file-input")).toBeEnabled();
   await page.getByTestId("file-input").setInputFiles(dataset);
   await page.getByTestId("preview-button").click();
   await expect(page.getByTestId("preview-summary")).toContainText("300");

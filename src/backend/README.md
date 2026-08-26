@@ -59,16 +59,16 @@ GET http://127.0.0.1:8080/api/v1/health
 ```text
 POST /api/v1/imports/preview
 POST /api/v1/imports/{batchId}/confirm
-GET  /api/v1/imports?limit=20
+GET  /api/v1/imports?project_id={projectId}&limit=20
 GET  /api/v1/imports/{batchId}
 GET  /api/v1/imports/{batchId}/records?page=0&size=20
 ```
 
-`preview` 使用 `multipart/form-data`，必填字段 `file`，可选字段 `mapping`。`mapping` 是“目标字段到源表头”的 JSON 对象，例如 `{"event_time":"报警时间","tag":"位号"}`。系统支持 UTF-8（含 BOM）及 GB18030 CSV、制表符 TXT，并读取 XLSX 的首个可见工作表；公式仅作为原始文本读取，不执行。
+`preview` 使用 `multipart/form-data`，必填字段为 `project_id` 和 `file`，可选字段为 `mapping`、`corrections`。`mapping` 是“目标字段到源表头”的 JSON 对象，例如 `{"event_time":"报警时间","tag":"位号"}`；`corrections` 是“源行号到目标字段修正文本”的 JSON 对象，例如 `{"2":{"priority":"P1"}}`。系统支持 UTF-8（含 BOM）及 GB18030 CSV、制表符 TXT，并读取 XLSX 的首个可见工作表；公式仅作为原始文本读取，不执行。
 
 预览会校验全文件并把批次置为 `READY` 或 `REJECTED`。错误包含 `source_row`、`field`、稳定错误码和中文说明。只有 `READY` 批次可确认；确认在单一 PostgreSQL 事务中把全部暂存记录写入 `alarm_record`。重复确认返回 HTTP 409，不会重复写入。
 
-批次列表 `limit` 默认为 20、最大为 100。记录追溯接口按 `source_row` 排序，响应为 `{items,total,page,size}`；`page` 从 0 开始，`size` 默认为 20、最大为 200，`items` 同时包含规范化字段和 `raw_payload`。
+批次列表必须传 `project_id`，`limit` 默认为 20、最大为 100。记录追溯接口按 `source_row` 排序，响应为 `{items,total,page,size}`；`page` 从 0 开始，`size` 默认为 20、最大为 200，`items` 同时包含规范化字段和 `raw_payload`。
 
 业务 API 的 HTTP 失败响应包含稳定的 `code`、中文 `message` 和 `trace_id`；例如重复确认使用 `IMPORT_STATUS_CONFLICT`，不得把英文框架错误直接交给界面。
 

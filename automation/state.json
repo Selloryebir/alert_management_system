@@ -31,13 +31,15 @@
       "scripts/dev/m2-import-smoke.sh: PASS（含 20,000 行导入）",
       "scripts/dev/m3-analysis-smoke.sh: PASS（含 20,000 行分析）",
       "python3 tests/smoke/run.py --target docker --fresh-volume: PASS（42.888 秒并完成资源清理）",
+      "scripts/dev/m4-browser-smoke.sh: PASS（300 与 20,000 行浏览器业务闭环）",
+      "scripts/dev/m5-report-audit-reset-smoke.sh: PASS（300/20,000 行报告、审计、复位与项目化文件名）",
       "python3 scripts/validate_repository.py: PASS",
       "python3 scripts/validate_automation.py: PASS",
       "python3 scripts/validate_formal_baseline.py: PASS",
       "git diff --check: PASS"
     ],
     "failures": [
-      "固定候选 d5f730e 的远端 M1、Docker 与 Windows 流水线返回 HTTP 400：M2/M3/Docker 黑盒和原生复位后的空批次查询未传 M10 新增的必填 project_id；修复过程中还发现成功预览无条件返回全部 source_rows 会放大大批次响应。第二候选将同时验证显式默认项目和仅返回可修正原始行。"
+      "固定候选 d5f730e 的远端 M1、Docker 与 Windows 流水线返回 HTTP 400：M2/M3/Docker 黑盒和原生复位后的空批次查询未传 M10 新增的必填 project_id；修复过程中还发现成功预览无条件返回全部 source_rows 会放大大批次响应。第二候选 85f60e0 修复上述问题后，Docker/仓库远端已通过，但本机原生验收发现既有 Playwright 未等待项目就绪、未填写新增必填责任人且仍断言英文处置状态；需更新真实浏览器契约后固定第三候选。"
     ],
     "decision": "以项目作为导入、分析、处置和报告的统一业务作用域；在现有单体架构内补齐最小项目生命周期、图形化字段映射、全中文界面和首次使用引导，不引入通用工作流或任意模板引擎。",
     "next_action": "提交并推送固定候选，由独立审查者在该提交上复跑 G10、检查实际差异和阻断/严重问题。",
@@ -156,12 +158,12 @@
     },
     "M10": {
       "status": "review",
-      "attempt": 2,
+      "attempt": 3,
       "evidence_files": [],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "固定第二候选，在干净提交上执行 Windows 原生验收、独立 G10 复审和四条远端流水线。",
-      "note": "第一候选远端失败已按最小范围修复；第二增量的全量 G10、旧 M2/M3 和 Docker 空卷回归通过，待固定提交验证 Windows 原生包及远端恢复性。"
+      "next_action": "固定第三候选，串行执行 Windows 原生验收、独立 G10 复审和四条远端流水线。",
+      "note": "第二候选的产品实现有效；旧 M4/M5 验收已显式选择默认项目、填写责任人并按中文 UI/项目化报告名断言，两个浏览器门槛均通过，待第三固定提交恢复性复核。"
     },
     "M11": {
       "status": "blocked",
