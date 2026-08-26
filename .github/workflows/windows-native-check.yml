@@ -1,4 +1,4 @@
-name: M6 Windows 原生发布检查
+name: Windows 原生业务发布检查
 
 on:
   workflow_dispatch:
@@ -7,9 +7,13 @@ on:
       - ".github/workflows/windows-native-check.yml"
       - "packaging/native/**"
       - "scripts/native/**"
+      - "scripts/release/**"
       - "src/**"
       - "samples/**"
       - "tests/e2e/**"
+      - "docs/guides/**"
+      - "docs/deliverables/**"
+      - "deliverables/**"
       - "mvnw"
       - "mvnw.cmd"
       - ".mvn/**"
@@ -18,9 +22,13 @@ on:
       - ".github/workflows/windows-native-check.yml"
       - "packaging/native/**"
       - "scripts/native/**"
+      - "scripts/release/**"
       - "src/**"
       - "samples/**"
       - "tests/e2e/**"
+      - "docs/guides/**"
+      - "docs/deliverables/**"
+      - "deliverables/**"
       - "mvnw"
       - "mvnw.cmd"
       - ".mvn/**"
@@ -34,59 +42,44 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: 检出完整历史
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: 缓存锁定运行时和 Chromium
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             .runtime/native/cache
             .runtime/native/tools
-          key: m6-native-v1-${{ runner.os }}-${{ hashFiles('scripts/native/build-release.ps1', 'packaging/native/runtime-lock.json', 'packaging/native/pyinstaller.lock', 'packaging/native/algorithm-service.spec', 'src/algorithm/requirements.lock', 'src/frontend/package-lock.json', 'tests/e2e/package-lock.json') }}
+          key: m14-native-v1-${{ runner.os }}-${{ hashFiles('scripts/native/build-release.ps1', 'packaging/native/runtime-lock.json', 'packaging/native/pyinstaller.lock', 'packaging/native/algorithm-service.spec', 'src/algorithm/requirements.lock', 'src/frontend/package-lock.json', 'tests/e2e/package-lock.json') }}
 
-      - name: 构建正式原生发布包
-        id: build
+      - name: 构建并以标准用户执行业务发布预检查
         shell: powershell
-        run: |
-          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native/build-release.ps1
-          $output | ForEach-Object { Write-Host $_ }
-          $markers = @($output | Where-Object { [string]$_ -like "NATIVE_RELEASE_ZIP=*" })
-          if ($markers.Count -ne 1) {
-            throw "build-release.ps1 did not emit exactly one NATIVE_RELEASE_ZIP marker."
-          }
-          $archive = ([string]$markers[0]).Substring("NATIVE_RELEASE_ZIP=".Length).Trim()
-          [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "archive=$archive`n", (New-Object Text.UTF8Encoding($false)))
-
-      - name: 使用标准用户执行双目录正式验收
-        shell: powershell
-        run: |
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native/verify-release-as-standard-user.ps1 `
-            -ArchivePath "${{ steps.build.outputs.archive }}"
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release/verify-business-release.ps1
 
       - name: 保存原生发布包
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: alert-management-system-windows-x64
           path: |
-            .runtime/native/artifacts/**/*.zip
-            .runtime/native/artifacts/**/*.zip.sha256
+            .runtime/release/artifacts/**/*.zip
+            .runtime/release/artifacts/**/*.zip.sha256
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
 
       - name: 保存验收摘要和失败日志
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: m6-native-verification-evidence
+          name: m14-native-verification-evidence
           path: |
-            .runtime/native/verification/**/verification-summary.json
-            .runtime/native/verification/**/round-*-summary.json
-            .runtime/native/verification/**/logs/*.log
-            .runtime/native/verification/**/test-results/**
+            .runtime/release/business-release-summary.json
+            .runtime/release/verification/**/verification-summary.json
+            .runtime/release/verification/**/round-*-summary.json
+            .runtime/release/verification/**/round-*-results/**
             .runtime/native/standard-user-verification/*.log
           if-no-files-found: warn
           retention-days: 14

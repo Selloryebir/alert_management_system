@@ -18,7 +18,8 @@ export const test = base.extend<BrowserErrorFixtures>({
     });
 
     const passwordFile = process.env.E2E_ADMIN_PASSWORD_FILE;
-    if (passwordFile) {
+    const requiresUiLogin = testInfo.file.endsWith("release-business.spec.ts");
+    if (passwordFile && !requiresUiLogin) {
       const username = process.env.E2E_ADMIN_USERNAME ?? "admin";
       const password = readFileSync(passwordFile, "utf8").trim();
       expect(password, "E2E 管理员密码文件不能为空").not.toBe("");

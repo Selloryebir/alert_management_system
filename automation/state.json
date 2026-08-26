@@ -22,6 +22,7 @@
       "automation/state.json",
       "compose.yaml",
       "deliverables/",
+      "docs/deliverables/",
       "docs/guides/",
       "docs/planning/",
       "docs/product/source-coverage.md",
@@ -33,15 +34,20 @@
       "scripts/release/",
       "scripts/validate_release_candidate.py",
       "tests/release/",
+      "tests/e2e/",
       "tests/smoke/"
     ],
     "checks": [
       "阶段启动前：M13 检查点 4be7ea5 的本机 G13 与五条远端流水线均 PASS",
-      "M13 状态提交 bd7598d 的仓库基础检查 run 33003556046 为 SUCCESS"
+      "M13 状态提交 bd7598d 的仓库基础检查 run 33003556046 为 SUCCESS",
+      "M14 实现工作区：发布校验器 4 项单测、PowerShell 解析、Playwright 用例发现、仓库/自动化/正式基线和交付物确定性检查 PASS",
+      "M14 实现工作区：本机 HTTP 与 HTTPS 双空卷固定命令连续两次 PASS；最新摘要 .runtime/m7/20260827-033510-535069-2fc28d60/verification-summary.json"
     ],
-    "failures": [],
+    "failures": [
+      "首次 M14 Docker 实跑在 Maven Central 下载 byte-buddy-1.17.8.jar 时发生外部网络截断；退出 1，隔离资源和临时秘密清理 PASS，使用缓存重试后连续两次完整 PASS"
+    ],
     "decision": "Windows 11 原生自包含包是首要业务终验路径，HTTPS Docker Compose 是次级部署路径；自动化验证失败必须阻断，最终真实业务人员终验和 main 正式发布保留人工门禁；发布标签只绑定已验证的 main 提交。",
-    "next_action": "并行核对 Windows 业务验收、HTTPS Docker 和发布候选验证缺口，形成最小 M14 实施。",
+    "next_action": "提交 M14 功能检查点，在干净提交依次执行发布候选校验、HTTPS Docker 和 Windows 11 标准用户业务预检查。",
     "resume_status": null
   },
   "stages": {

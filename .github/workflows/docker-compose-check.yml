@@ -1,4 +1,4 @@
-name: M7 Docker Compose 检查
+name: Docker Compose 本机与 HTTPS 检查
 
 on:
   workflow_dispatch:
@@ -37,25 +37,25 @@ permissions:
   contents: read
 
 jobs:
-  g7:
+  business-compose:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: 检出完整历史
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: 准备 Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: 从空项目卷执行 G7
+      - name: 从双空项目卷执行本机与 HTTPS 业务闭环
         run: python3 tests/smoke/run.py --target docker --fresh-volume
       - name: 保存 G7 摘要和失败日志
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: m7-docker-evidence-${{ github.sha }}
+          name: m14-docker-evidence-${{ github.sha }}
           path: .runtime/m7/
           if-no-files-found: error
           retention-days: 14

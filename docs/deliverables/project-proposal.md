@@ -23,7 +23,7 @@
 - [系统架构](../architecture/README.md)和架构决策记录约束组件职责。
 - [M7 证据](../verification/evidence/M7.md)是本项目中期截止的不可变检查点。
 - [M9](../verification/evidence/M9.md)、[M10](../verification/evidence/M10.md)、[M11](../verification/evidence/M11.md)、[M12](../verification/evidence/M12.md)记录正式产品化、算法、业务、安全与可靠性结果。
-- 当前已发布技术基线为 `v0.8.0`；M13 文档交付和 M14 业务用户终验仍须分别通过其门槛。
+- 当前已发布技术基线为 `v0.8.0`；M13 文档交付已经通过，M14 业务发布候选和用户终验仍须通过其自动、人工门槛。
 
 原始材料只作为需求来源和历史证据，不直接证明当前实现、性能、合规或验收结论。
 

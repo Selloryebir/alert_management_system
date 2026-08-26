@@ -13,11 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 检出仓库
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: 准备交付物生成环境
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -31,7 +31,9 @@ jobs:
         run: python3 scripts/validate_automation.py
       - name: 验证正式产品基线
         run: python3 scripts/validate_formal_baseline.py
-      - name: 验证正式 DOCX 和 PDF
+      - name: 验证 M14 发布候选契约
         run: |
-          python3 -m unittest discover -s tools/deliverables -p "test_*.py"
-          python3 tools/deliverables/build.py --check
+          python3 -m unittest discover -s tests/release -p "test_*.py"
+          python3 scripts/validate_release_candidate.py
+      - name: 验证正式交付物生成器单元契约
+        run: python3 -m unittest discover -s tools/deliverables -p "test_*.py"

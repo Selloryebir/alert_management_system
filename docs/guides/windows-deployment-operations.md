@@ -353,7 +353,7 @@ logs\backend-*.err.log
 
 ## 14. Docker Compose 本机模式管理员附录
 
-Docker 是次级交付方式，不属于 Windows 自包含原生包。以下命令要求在仓库源码根目录的 Bash 环境运行，并已安装 Docker Desktop 或 Docker Engine、Docker Compose、Bash 和 OpenSSL。
+Docker 是次级交付方式，不属于 Windows 自包含原生包。以下命令要求在仓库源码根目录的 Bash 环境运行，并已安装 Docker Desktop 或 Docker Engine、Docker Compose 2.24.4 或更高版本、Bash 和 OpenSSL；该 Compose 最低版本用于支持 HTTPS 覆盖文件中的 `!override` 合并语义。
 
 ### 14.1 准备本机秘密并启动
 

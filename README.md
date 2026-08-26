@@ -1,6 +1,6 @@
 # 报警管理系统
 
-本仓库提供报警文件导入、规范化、可解释分析、统计看板、人工处置、审计、报告和备份恢复验证的一体化应用。`v0.8.0` 已通过 Windows 11 x64 自包含运行包、Docker Compose、身份权限、HTTPS 边界和有限可靠性验收；当前 `dev` 在编制正式说明书和项目过程文件，最终业务用户终验仍以 `automation/state.json` 为准。
+本仓库提供报警文件导入、规范化、可解释分析、统计看板、人工处置、审计、报告和备份恢复验证的一体化应用。`v0.8.0` 已通过 Windows 11 x64 自包含运行包、Docker Compose、身份权限、HTTPS 边界和有限可靠性验收；M13 正式说明书和项目过程文件已通过，当前 M14 正在固定 `1.0.0-rc.1` 业务发布候选，最终业务用户终验仍以 `automation/state.json` 为准。
 
 产品北极星是让业务人员仅按中文说明即可部署并完成“导入校验 → 分析 → 查看 → 处置 → 报告 → 备份恢复”。实现与验收以稳定、可解释、可复现为优先，不把历史材料中未经验证的指标直接作为承诺。仓库内置数据均为合成示例数据。
 
@@ -69,6 +69,7 @@ python3 scripts/validate_automation.py
 
 ```bash
 python3 tools/deliverables/build.py --check
+python3 scripts/validate_release_candidate.py
 ```
 
 ## 开发启动与阶段验证
@@ -121,7 +122,7 @@ scripts/dev/m5-report-audit-reset-smoke.sh
 
 ## Docker Compose 次级交付
 
-Docker Desktop 或 Docker Engine 可用时，从仓库根目录启动同一套 Java、Python 和 PostgreSQL 17 实现：
+Docker Desktop 或 Docker Engine 可用且 Docker Compose 版本不低于 2.24.4 时，从仓库根目录启动同一套 Java、Python 和 PostgreSQL 17 实现；该最低版本用于支持网络覆盖文件中的 `!override` 合并语义：
 
 ```bash
 scripts/security/prepare-local-secrets.sh
@@ -143,14 +144,14 @@ docker compose -p alert-management-m7 up --build --detach --wait
 
 网络部署必须另行提供受信的 PKCS#12 证书及密码文件，并叠加 `compose.network.yaml`；该模式只发布 HTTPS 8443，不发布明文 8080、PostgreSQL 或算法端口。缺少 TLS 或实例密钥时会拒绝启动，不能把本机模式端口直接暴露到局域网。
 
-正式 G7 验收会使用隔离的临时 project，从空卷完成健康、CSV/TXT/XLSX 导入、固定分析、处置审计和清理闭环：
+正式容器验收会使用隔离的临时 project，先从空卷完成本机业务闭环，再用全新卷、临时自签证书和显式测试信任完成 HTTPS 网络业务闭环：
 
 ```bash
 python3 tests/smoke/run.py --target docker --fresh-volume
 ```
 
-Compose 只向本机发布 Java 的 8080 端口；PostgreSQL 与算法服务仅在项目网络内可达。不要使用全局容器或卷清理命令。
+本机阶段只向回环发布 Java 的 8080 端口；网络阶段只发布 HTTPS 8443，明文 8080、PostgreSQL 与算法服务均不对宿主开放。不要使用全局容器或卷清理命令。
 
 ## 版本与当前状态
 
-`v0.8.0` 精确指向 `main` 的安全部署与可靠性发布提交，包含 M0–M12。M13 正在生成正式说明书和过程文件；M14 将按最终说明在 Windows 11 上执行业务用户终验。版本标签和发布门槛见 [`docs/releases/versioning.md`](docs/releases/versioning.md)，实时状态以 `automation/state.json` 和提交绑定的验收证据为准。
+`v0.8.0` 精确指向 `main` 的安全部署与可靠性发布提交，包含 M0–M12；M13 正式交付物已在 `dev` 检查点通过。M14 正在执行自动业务预检，之后必须由非技术业务人员对精确 ZIP/SHA-256 人工终验；通过前不会合入 `main` 或创建 `v1.0.0-rc.1`。版本标签和发布门槛见 [`docs/releases/versioning.md`](docs/releases/versioning.md)，实时状态以 `automation/state.json` 和提交绑定的验收证据为准。

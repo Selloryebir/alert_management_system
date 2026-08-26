@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""从空项目卷执行 Docker Compose G7 验收。"""
+"""从空项目卷执行本机与 HTTPS Docker Compose 验收。"""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ import re
 import secrets
 import shutil
 import socket
+import ssl
 import subprocess
 import sys
 import time
@@ -26,13 +27,13 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILE = ROOT / "compose.yaml"
+COMPOSE_NETWORK_FILE = ROOT / "compose.network.yaml"
 BASE_URL = "http://127.0.0.1:8080"
 EXPECTED_PATH = ROOT / "samples/expected/analysis-smoke-expected.json"
 SERVICES = ("postgres", "algorithm", "backend")
-HTTP_OPENER = urllib.request.build_opener(
-    urllib.request.ProxyHandler({}),
-    urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
-)
+COOKIE_JAR = http.cookiejar.CookieJar()
+HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}),
+                                           urllib.request.HTTPCookieProcessor(COOKIE_JAR))
 CSRF_HEADER: str | None = None
 CSRF_TOKEN: str | None = None
 BOOTSTRAP_PASSWORD: str | None = None
@@ -42,17 +43,18 @@ class VerificationError(RuntimeError):
     """G7 验收失败。"""
 
 
-def assert_host_port_free() -> None:
+def assert_host_port_free(port: int) -> None:
     try:
-        with socket.create_connection(("127.0.0.1", 8080), timeout=1):
+        with socket.create_connection(("127.0.0.1", port), timeout=1):
             pass
     except OSError:
         return
-    raise VerificationError("验收端口 127.0.0.1:8080 已被其他进程占用，请先停止现有服务。")
+    raise VerificationError(f"验收端口 127.0.0.1:{port} 已被其他进程占用，请先停止现有服务。")
 
 
 def run_command(
-    command: list[str], *, timeout: int = 1200, check: bool = True
+    command: list[str], *, timeout: int = 1200, check: bool = True,
+    environment: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         command,
@@ -63,6 +65,7 @@ def run_command(
         encoding="utf-8",
         errors="replace",
         timeout=timeout,
+        env=environment,
     )
     if check and result.returncode != 0:
         raise VerificationError(
@@ -115,25 +118,44 @@ def docker_path(docker: str, path: Path) -> str:
 
 
 class Compose:
-    def __init__(self, docker: str, project: str) -> None:
+    def __init__(
+        self,
+        docker: str,
+        project: str,
+        secret_root: Path,
+        *,
+        network: bool = False,
+    ) -> None:
         self.docker = docker
         self.project = project
-        self.prefix = [
-            docker,
-            "compose",
-            "--file",
-            docker_path(docker, COMPOSE_FILE),
-            "--project-name",
-            project,
-            "--project-directory",
-            docker_path(docker, ROOT),
-        ]
+        compose_files = [COMPOSE_FILE]
+        if network:
+            compose_files.append(COMPOSE_NETWORK_FILE)
+        self.prefix = [docker, "compose"]
+        for compose_file in compose_files:
+            self.prefix.extend(("--file", docker_path(docker, compose_file)))
+        self.prefix.extend((
+            "--project-name", project,
+            "--project-directory", docker_path(docker, ROOT),
+        ))
+        self.environment = os.environ.copy()
+        self.environment["APP_SECRETS_DIR"] = docker_path(docker, secret_root)
+        if network:
+            self.environment["NETWORK_BIND_ADDRESS"] = "127.0.0.1"
+        if docker.lower().endswith(".exe"):
+            wslenv = self.environment.get("WSLENV", "")
+            names = [name for name in wslenv.split(":") if name]
+            for name in ("APP_SECRETS_DIR", "NETWORK_BIND_ADDRESS"):
+                if name not in names:
+                    names.append(name)
+            self.environment["WSLENV"] = ":".join(names)
 
     def run(
         self, *arguments: str, timeout: int = 1200, check: bool = True
     ) -> subprocess.CompletedProcess[str]:
         return run_command(
-            [*self.prefix, *arguments], timeout=timeout, check=check
+            [*self.prefix, *arguments], timeout=timeout, check=check,
+            environment=self.environment,
         )
 
     def resource_ids(self, resource: str) -> list[str]:
@@ -177,6 +199,29 @@ class Compose:
             "status": state["Status"],
             "health": state.get("Health", {}).get("Status"),
         }
+
+    def service_ports(self, service: str) -> dict[str, Any]:
+        container_id = self.run("ps", "--quiet", service, timeout=30).stdout.strip()
+        if not container_id:
+            raise VerificationError(f"服务没有容器：{service}")
+        payload = json.loads(
+            run_command([self.docker, "inspect", container_id], timeout=30).stdout
+        )[0]
+        return payload["NetworkSettings"].get("Ports", {})
+
+
+def reset_http_client(base_url: str, ca_certificate: Path | None = None) -> None:
+    global BASE_URL, COOKIE_JAR, HTTP_OPENER, CSRF_HEADER, CSRF_TOKEN
+    BASE_URL = base_url
+    COOKIE_JAR = http.cookiejar.CookieJar()
+    handlers: list[Any] = [urllib.request.ProxyHandler({})]
+    if ca_certificate is not None:
+        context = ssl.create_default_context(cafile=str(ca_certificate))
+        handlers.append(urllib.request.HTTPSHandler(context=context))
+    handlers.append(urllib.request.HTTPCookieProcessor(COOKIE_JAR))
+    HTTP_OPENER = urllib.request.build_opener(*handlers)
+    CSRF_HEADER = None
+    CSRF_TOKEN = None
 
 
 def http_request(
@@ -222,14 +267,11 @@ def json_request(path: str, method: str, value: dict[str, Any]) -> Any:
     )
 
 
-def prepare_compose_secrets() -> Path:
+def prepare_compose_secrets(secret_root: Path) -> Path:
     global BOOTSTRAP_PASSWORD
-    configured = os.environ.get("APP_SECRETS_DIR", "").strip()
-    secret_root = Path(configured) if configured else ROOT / ".runtime/compose-secrets"
     secret_root.mkdir(parents=True, exist_ok=True)
     if os.name != "nt":
         secret_root.chmod(0o700)
-    os.environ["APP_SECRETS_DIR"] = str(secret_root.resolve())
     for name in ("database-password.txt", "bootstrap-admin-password.txt"):
         path = secret_root / name
         if path.exists() and (not path.is_file() or not path.read_text(encoding="utf-8").strip()):
@@ -245,6 +287,46 @@ def prepare_compose_secrets() -> Path:
         encoding="utf-8"
     ).strip()
     return secret_root
+
+
+def prepare_test_tls(secret_root: Path) -> tuple[Path, list[str]]:
+    certificate = secret_root / "tls-test-cert.pem"
+    private_key = secret_root / "tls-test-key.pem"
+    password_file = secret_root / "tls-keystore-password.txt"
+    key_store = secret_root / "tls-keystore.p12"
+    for path in (certificate, private_key, password_file, key_store):
+        if path.exists():
+            raise VerificationError(f"TLS 验收文件在生成前已存在：{path.name}")
+    openssl = shutil.which("openssl")
+    if not openssl:
+        raise VerificationError("HTTPS 验收需要 OpenSSL 生成本轮受信测试证书。")
+    run_command(
+        [
+            openssl, "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes",
+            "-days", "1", "-subj", "/CN=localhost",
+            "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1",
+            "-keyout", str(private_key), "-out", str(certificate),
+        ],
+        timeout=60,
+    )
+    password_file.write_text(secrets.token_urlsafe(32), encoding="utf-8")
+    run_command(
+        [
+            openssl, "pkcs12", "-export", "-out", str(key_store),
+            "-inkey", str(private_key), "-in", str(certificate),
+            "-passout", f"file:{password_file}",
+        ],
+        timeout=60,
+    )
+    if os.name != "nt":
+        for path in (certificate, private_key, password_file, key_store):
+            path.chmod(0o644)
+    protect_secret_permissions(secret_root)
+    return certificate, [
+        (secret_root / "database-password.txt").read_text(encoding="utf-8").strip(),
+        (secret_root / "bootstrap-admin-password.txt").read_text(encoding="utf-8").strip(),
+        password_file.read_text(encoding="utf-8").strip(),
+    ]
 
 
 def protect_secret_permissions(secret_root: Path) -> None:
@@ -311,6 +393,68 @@ def login_as_bootstrap_admin() -> dict[str, Any]:
             {"username": "admin", "password": new_password},
         )
     return current
+
+
+def assert_secure_session_cookie() -> None:
+    session_cookies = [cookie for cookie in COOKIE_JAR if cookie.name == "JSESSIONID"]
+    if len(session_cookies) != 1 or not session_cookies[0].secure:
+        raise VerificationError("HTTPS 会话 Cookie 未设置 Secure 属性。")
+
+
+def assert_plain_http_closed() -> None:
+    request = urllib.request.Request("http://127.0.0.1:8080/api/v1/health")
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(request, timeout=3):
+            pass
+    except urllib.error.HTTPError as exc:
+        raise VerificationError(
+            f"NETWORK 模式的明文 HTTP 8080 返回了响应：{exc.code}"
+        ) from exc
+    except (OSError, urllib.error.URLError):
+        return
+    raise VerificationError("NETWORK 模式仍可通过明文 HTTP 8080 访问。")
+
+
+def assert_network_boundaries(compose: Compose) -> dict[str, Any]:
+    backend_ports = compose.service_ports("backend")
+    https_bindings = backend_ports.get("8443/tcp")
+    if (
+        not isinstance(https_bindings, list)
+        or len(https_bindings) != 1
+        or https_bindings[0].get("HostIp") != "127.0.0.1"
+        or https_bindings[0].get("HostPort") != "8443"
+        or backend_ports.get("8080/tcp") not in (None, [])
+    ):
+        raise VerificationError(f"NETWORK 后端发布端口不符合预期：{backend_ports}")
+    for service in ("postgres", "algorithm"):
+        ports = compose.service_ports(service)
+        if any(bindings for bindings in ports.values()):
+            raise VerificationError(f"NETWORK 模式错误发布了 {service} 端口：{ports}")
+    assert_plain_http_closed()
+    return {
+        "https": "127.0.0.1:8443",
+        "http_8080": "closed",
+        "postgres": "internal",
+        "algorithm": "internal",
+    }
+
+
+def assert_secrets_not_exposed(compose: Compose, secret_values: list[str]) -> None:
+    captured: list[str] = []
+    for service in SERVICES:
+        container_id = compose.run("ps", "--quiet", service, timeout=30).stdout.strip()
+        if not container_id:
+            raise VerificationError(f"服务没有容器：{service}")
+        payload = json.loads(
+            run_command([compose.docker, "inspect", container_id], timeout=30).stdout
+        )[0]
+        captured.extend(payload.get("Config", {}).get("Env", []))
+    logs = compose.run("logs", "--no-color", timeout=120, check=False)
+    captured.extend((logs.stdout, logs.stderr))
+    searchable = "\n".join(captured)
+    if any(value and value in searchable for value in secret_values):
+        raise VerificationError("容器环境或服务日志泄露了部署秘密。")
 
 
 def assert_system_up() -> dict[str, Any]:
@@ -458,7 +602,7 @@ def canonical_digest(value: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def verify_equivalent_imports() -> str:
+def verify_equivalent_imports(*, reset_demo: bool) -> str:
     paths = [
         ROOT / "samples/smoke/synthetic_smoke_utf8.csv",
         ROOT / "samples/smoke/synthetic_smoke_utf8.txt",
@@ -470,13 +614,14 @@ def verify_equivalent_imports() -> str:
     if records_by_format[1:] != [records_by_format[0], records_by_format[0]]:
         raise VerificationError("CSV/TXT/XLSX 的 300 条规范化结果不一致。")
     digest = canonical_digest(records_by_format[0])
-    reset = json_request(
-        "/api/v1/demo/reset",
-        "POST",
-        {"operator": "SYNTHETIC_G7_REVIEWER", "confirmation": "RESET_DEMO"},
-    )
-    if reset.get("business_state") != "EMPTY":
-        raise VerificationError(f"AC-003 后复位未返回 EMPTY：{reset}")
+    if reset_demo:
+        reset = json_request(
+            "/api/v1/demo/reset",
+            "POST",
+            {"operator": "SYNTHETIC_G7_REVIEWER", "confirmation": "RESET_DEMO"},
+        )
+        if reset.get("business_state") != "EMPTY":
+            raise VerificationError(f"AC-003 后复位未返回 EMPTY：{reset}")
     return digest
 
 
@@ -639,43 +784,82 @@ def git_metadata() -> tuple[str | None, bool | None]:
     )
 
 
-def save_diagnostics(compose: Compose, output: Path) -> None:
+def redact_secrets(value: str, secret_values: list[str] | None) -> str:
+    redacted = value
+    for secret_value in secret_values or []:
+        if secret_value:
+            redacted = redacted.replace(secret_value, "[REDACTED]")
+    return redacted
+
+
+def save_diagnostics(
+    compose: Compose, output: Path, secret_values: list[str] | None = None
+) -> None:
     output.mkdir(parents=True, exist_ok=True)
     for name, arguments in (
         ("compose-ps.txt", ("ps", "--all")),
         ("compose-logs.txt", ("logs", "--no-color", "--timestamps")),
     ):
         result = compose.run(*arguments, timeout=120, check=False)
+        content = result.stdout + ("\nSTDERR:\n" + result.stderr if result.stderr else "")
         (output / name).write_text(
-            result.stdout + ("\nSTDERR:\n" + result.stderr if result.stderr else ""),
-            encoding="utf-8",
+            redact_secrets(content, secret_values), encoding="utf-8"
         )
 
 
-def verify_docker(fresh_volume: bool) -> dict[str, Any]:
-    if not fresh_volume:
-        raise VerificationError("G7 正式验收必须显式使用 --fresh-volume。")
-    assert_host_port_free()
-    secret_root = prepare_compose_secrets()
-    docker = discover_docker()
-    project = f"alert-management-g7-{os.getpid()}-{uuid.uuid4().hex[:8]}".lower()
-    compose = Compose(docker, project)
-    started = time.monotonic()
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    output = ROOT / ".runtime/m7" / f"{timestamp}-{project}"
-    output.mkdir(parents=True, exist_ok=True)
-    source_commit, source_dirty = git_metadata()
-    summary: dict[str, Any] = {
-        "status": "FAILED",
-        "source_commit": source_commit,
-        "source_dirty": source_dirty,
-        "compose_project": project,
-        "fresh_volume": True,
-        "secret_root": str(secret_root),
+def execute_business_closure(compose: Compose, *, network_mode: bool) -> dict[str, Any]:
+    states = {service: compose.service_state(service) for service in SERVICES}
+    for service, state in states.items():
+        if state["status"] != "running" or state["health"] != "healthy":
+            raise VerificationError(f"容器未健康运行：{service}={state}")
+    if len(compose.resource_ids("volume")) != 1:
+        raise VerificationError("项目启动后必须且只能有一个项目卷。")
+    assert_system_up()
+    assert_frontend()
+    login_as_bootstrap_admin()
+    if network_mode:
+        assert_secure_session_cookie()
+
+    compose.run("stop", "algorithm", timeout=60)
+    degraded = wait_for_health("DEGRADED", timeout=60)
+    if degraded.get("components", {}).get("algorithm", {}).get("status") != "DOWN":
+        raise VerificationError(f"算法停止后未显示 DOWN：{degraded}")
+    try:
+        assert_system_up()
+    except VerificationError:
+        pass
+    else:
+        raise VerificationError("正向健康断言错误接受了 DEGRADED 状态。")
+    wait_for_service_health(compose, "backend", "unhealthy", timeout=60)
+    compose.run("start", "algorithm", timeout=60)
+    wait_for_health("UP", timeout=120)
+    states = wait_for_services_healthy(compose)
+
+    normalized_digest = verify_equivalent_imports(reset_demo=not network_mode)
+    run_id, analysis_summary = verify_analysis()
+    disposition_summary = verify_disposition(run_id)
+    return {
+        "images": states,
+        "normalized_records_sha256": normalized_digest,
+        "analysis_summary": analysis_summary,
+        "disposition_counts": disposition_summary,
+        "health_failure_injection": "PASS",
     }
+
+
+def run_clean_deployment(
+    compose: Compose,
+    output: Path,
+    *,
+    base_url: str,
+    ca_certificate: Path | None = None,
+    require_secure_cookie: bool = False,
+    secret_values: list[str] | None = None,
+) -> dict[str, Any]:
     primary_error: Exception | None = None
     diagnostic_error: Exception | None = None
     cleanup_error: Exception | None = None
+    result: dict[str, Any] = {}
     try:
         compose.run("config", "--quiet", timeout=60)
         compose.run("down", "--volumes", "--remove-orphans", timeout=120)
@@ -683,71 +867,173 @@ def verify_docker(fresh_volume: bool) -> dict[str, Any]:
         compose.run(
             "up", "--build", "--detach", "--wait", "--wait-timeout", "240", timeout=1800
         )
-        states = {service: compose.service_state(service) for service in SERVICES}
-        for service, state in states.items():
-            if state["status"] != "running" or state["health"] != "healthy":
-                raise VerificationError(f"容器未健康运行：{service}={state}")
-        if len(compose.resource_ids("volume")) != 1:
-            raise VerificationError("项目启动后必须且只能有一个项目卷。")
-        assert_system_up()
-        assert_frontend()
-        login_as_bootstrap_admin()
-
-        compose.run("stop", "algorithm", timeout=60)
-        degraded = wait_for_health("DEGRADED", timeout=60)
-        if degraded.get("components", {}).get("algorithm", {}).get("status") != "DOWN":
-            raise VerificationError(f"算法停止后未显示 DOWN：{degraded}")
-        try:
-            assert_system_up()
-        except VerificationError:
-            pass
-        else:
-            raise VerificationError("正向健康断言错误接受了 DEGRADED 状态。")
-        wait_for_service_health(compose, "backend", "unhealthy", timeout=60)
-        compose.run("start", "algorithm", timeout=60)
-        wait_for_health("UP", timeout=120)
-        states = wait_for_services_healthy(compose)
-
-        normalized_digest = verify_equivalent_imports()
-        run_id, analysis_summary = verify_analysis()
-        disposition_summary = verify_disposition(run_id)
-        summary.update(
-            {
-                "images": states,
-                "normalized_records_sha256": normalized_digest,
-                "analysis_summary": analysis_summary,
-                "disposition_counts": disposition_summary,
-                "health_failure_injection": "PASS",
-            }
+        reset_http_client(base_url, ca_certificate)
+        result = execute_business_closure(
+            compose, network_mode=require_secure_cookie
         )
+        if require_secure_cookie:
+            result["network_boundary"] = assert_network_boundaries(compose)
+        if secret_values is not None:
+            assert_secrets_not_exposed(compose, secret_values)
     except Exception as exc:  # 保存原始失败后仍执行限定项目清理
         primary_error = exc
         try:
-            save_diagnostics(compose, output)
+            save_diagnostics(compose, output, secret_values)
         except Exception as diagnostic_exc:
             diagnostic_error = diagnostic_exc
     finally:
         try:
-            result = compose.run(
+            cleanup = compose.run(
                 "down", "--volumes", "--remove-orphans", timeout=180, check=False
             )
-            if result.returncode != 0:
-                raise VerificationError(f"Compose 清理失败：{result.stderr}")
+            if cleanup.returncode != 0:
+                raise VerificationError(f"Compose 清理失败：{cleanup.stderr}")
             compose.assert_no_resources()
         except Exception as exc:
             cleanup_error = exc
             if primary_error is None:
                 try:
-                    save_diagnostics(compose, output)
+                    save_diagnostics(compose, output, secret_values)
                 except Exception as diagnostic_exc:
                     diagnostic_error = diagnostic_exc
-    summary["duration_seconds"] = round(time.monotonic() - started, 3)
-    summary["cleanup"] = "PASS" if cleanup_error is None else "FAILED"
     errors = [
-        str(error)
+        redact_secrets(str(error), secret_values)
         for error in (primary_error, diagnostic_error, cleanup_error)
         if error is not None
     ]
+    if errors:
+        raise VerificationError("；".join(errors))
+    result["cleanup"] = "PASS"
+    return result
+
+
+def verify_missing_tls(compose: Compose, secret_root: Path) -> None:
+    compose.run("down", "--volumes", "--remove-orphans", timeout=120, check=False)
+    compose.assert_no_resources()
+    attempted = compose.run(
+        "up", "--detach", "--wait", "--wait-timeout", "90", timeout=300, check=False
+    )
+    cleanup = compose.run(
+        "down", "--volumes", "--remove-orphans", timeout=180, check=False
+    )
+    if cleanup.returncode != 0:
+        raise VerificationError(f"缺 TLS 负控清理失败：{cleanup.stderr}")
+    compose.assert_no_resources()
+    if attempted.returncode == 0:
+        raise VerificationError("缺少 TLS 文件时 NETWORK 模式错误启动成功。")
+    diagnostic = (attempted.stdout + "\n" + attempted.stderr).lower()
+    if not any(marker in diagnostic for marker in ("tls-keystore", "tls_keystore", "secret", "file")):
+        raise VerificationError("缺少 TLS 的失败信息没有指向秘密文件。")
+    for path in (
+        secret_root / "tls-keystore.p12",
+        secret_root / "tls-keystore-password.txt",
+    ):
+        if path.is_dir():
+            path.rmdir()
+        elif path.exists():
+            raise VerificationError(f"缺 TLS 负控产生了意外文件：{path.name}")
+
+
+def verify_docker(fresh_volume: bool) -> dict[str, Any]:
+    if not fresh_volume:
+        raise VerificationError("G7/M14 正式验收必须显式使用 --fresh-volume。")
+    for port in (8080, 8443):
+        assert_host_port_free(port)
+    docker = discover_docker()
+    run_id = f"{os.getpid()}-{uuid.uuid4().hex[:8]}".lower()
+    local_project = f"alert-management-g7-local-{run_id}"
+    network_project = f"alert-management-m14-network-{run_id}"
+    started = time.monotonic()
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    output = ROOT / ".runtime/m7" / f"{timestamp}-{run_id}"
+    output.mkdir(parents=True, exist_ok=True)
+    secret_parent = ROOT / ".runtime/m7-secrets"
+    secret_root = secret_parent / run_id
+    source_commit, source_dirty = git_metadata()
+    summary: dict[str, Any] = {
+        "status": "FAILED",
+        "source_commit": source_commit,
+        "source_dirty": source_dirty,
+        "compose_project": local_project,
+        "fresh_volume": True,
+        "secrets": "ephemeral",
+    }
+    errors: list[str] = []
+    try:
+        prepare_compose_secrets(secret_root)
+        local_secret_values = [
+            (secret_root / name).read_text(encoding="utf-8").strip()
+            for name in ("database-password.txt", "bootstrap-admin-password.txt")
+        ]
+        local_compose = Compose(docker, local_project, secret_root)
+        local = run_clean_deployment(
+            local_compose,
+            output / "local",
+            base_url="http://127.0.0.1:8080",
+            secret_values=local_secret_values,
+        )
+        summary.update({key: value for key, value in local.items() if key != "cleanup"})
+        summary["local_container"] = {
+            "compose_project": local_project,
+            "base_url": "http://127.0.0.1:8080",
+            **local,
+        }
+
+        network_compose = Compose(
+            docker, network_project, secret_root, network=True
+        )
+        verify_missing_tls(network_compose, secret_root)
+        certificate, secret_values = prepare_test_tls(secret_root)
+        network = run_clean_deployment(
+            network_compose,
+            output / "network",
+            base_url="https://localhost:8443",
+            ca_certificate=certificate,
+            require_secure_cookie=True,
+            secret_values=secret_values,
+        )
+        network["missing_tls_rejected"] = True
+        network["tls_trust"] = "PASS"
+        comparable_keys = (
+            "normalized_records_sha256",
+            "analysis_summary",
+            "disposition_counts",
+        )
+        local_projection = {key: local[key] for key in comparable_keys}
+        network_projection = {key: network[key] for key in comparable_keys}
+        if local_projection != network_projection:
+            raise VerificationError(
+                f"本机与 HTTPS 业务摘要不一致：local={local_projection}, network={network_projection}"
+            )
+        summary["network_https"] = {
+            "compose_project": network_project,
+            "base_url": "https://localhost:8443",
+            **network,
+        }
+        summary["local_https_summary_consistency"] = "PASS"
+    except Exception as exc:
+        errors.append(str(exc))
+    finally:
+        for project, network in ((local_project, False), (network_project, True)):
+            try:
+                compose = Compose(docker, project, secret_root, network=network)
+                cleanup = compose.run(
+                    "down", "--volumes", "--remove-orphans", timeout=180, check=False
+                )
+                if cleanup.returncode != 0:
+                    raise VerificationError(f"Compose 最终清理失败：{project}: {cleanup.stderr}")
+                compose.assert_no_resources()
+            except Exception as exc:
+                errors.append(str(exc))
+        try:
+            if secret_root.exists():
+                shutil.rmtree(secret_root)
+            if secret_parent.exists() and not any(secret_parent.iterdir()):
+                secret_parent.rmdir()
+        except Exception as exc:
+            errors.append(f"临时秘密清理失败：{exc}")
+    summary["duration_seconds"] = round(time.monotonic() - started, 3)
+    summary["cleanup"] = "PASS" if not errors else "FAILED"
     if errors:
         summary["errors"] = errors
     else:
@@ -756,7 +1042,7 @@ def verify_docker(fresh_volume: bool) -> dict[str, Any]:
     summary_path.write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
-    print(f"G7 验收摘要：{summary_path}")
+    print(f"G7/M14 验收摘要：{summary_path}")
     if errors:
         raise VerificationError("；".join(errors))
     return summary
@@ -777,7 +1063,8 @@ def main() -> int:
         print(f"G7 验收失败：{exc}", file=sys.stderr)
         return 1
     print(
-        "G7 验收通过：空卷启动、健康失败注入、三格式导入、固定分析、处置审计和资源清理均成功；"
+        "G7/M14 验收通过：本机与 HTTPS 均从空卷完成健康失败注入、三格式导入、"
+        "固定分析、处置审计和资源清理，HTTPS 边界与摘要一致性均成功；"
         f"耗时 {summary['duration_seconds']} 秒。"
     )
     return 0

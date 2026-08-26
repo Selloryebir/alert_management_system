@@ -73,7 +73,7 @@ M7 固定候选从空 Compose 项目卷启动 PostgreSQL、算法和后端，三
 
 为便于当前读者理解，M8–M12 后续已经形成正式产品基线、hybrid-v2、项目化全中文 UX、身份安全和恢复可靠性证据，并发布 `v0.8.0`。这些是中期截止后的事实，详情见 [M9](../verification/evidence/M9.md)、[M10](../verification/evidence/M10.md)、[M11](../verification/evidence/M11.md)和 [M12](../verification/evidence/M12.md)，不改变本报告的中期判断时间。
 
-M13 文档交付和 M14 业务用户终验仍需按当前阶段执行。
+截至本报告定稿，M13 文档交付已经通过；M14 业务发布候选和非技术业务人员终验仍需按当前阶段执行。
 
 ## 9. 风险与建议
 

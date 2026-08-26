@@ -2,8 +2,9 @@
     [string]$ArchivePath,
     [string]$OutputRoot,
     [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$')]
-    [string]$ReleaseVersion = "0.8.0+m13",
-    [switch]$AllowDirty
+    [string]$ReleaseVersion = "1.0.0-rc.1",
+    [switch]$AllowDirty,
+    [switch]$BusinessRelease
 )
 
 Set-StrictMode -Version Latest
@@ -19,6 +20,7 @@ $originalPath = $env:PATH
 $originalPathExt = $env:PATHEXT
 $releaseRoots = New-Object System.Collections.ArrayList
 $observedSecrets = New-Object System.Collections.Generic.List[string]
+$credentialRoot = $null
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $runtimeRoot "verification"
@@ -289,6 +291,13 @@ function Assert-ReleaseManifest {
             "manuals/windows-deployment-operations.docx",
             "manuals/windows-deployment-operations.pdf")) {
         Assert-True ($seen.ContainsKey($requiredManual)) "发布包缺少正式使用手册：$requiredManual"
+        $packagedManual = Join-Path $ReleaseRoot ($requiredManual.Replace('/', '\'))
+        $repositoryManual = Join-Path $repositoryRoot ("deliverables\" + [IO.Path]::GetFileName($requiredManual))
+        Assert-True (Test-Path -LiteralPath $repositoryManual -PathType Leaf) `
+            "仓库缺少与发布包对照的正式使用手册：$repositoryManual"
+        Assert-True ((Get-FileHash -LiteralPath $packagedManual -Algorithm SHA256).Hash -eq
+            (Get-FileHash -LiteralPath $repositoryManual -Algorithm SHA256).Hash) `
+            "发布包手册与当前已提交正式交付物不一致：$requiredManual"
     }
     $actualFiles = @(
         Get-ChildItem -LiteralPath $ReleaseRoot -File -Recurse |
@@ -502,7 +511,10 @@ function Invoke-E2e {
         [string]$Dataset,
         [int]$ExpectedTotal,
         [string]$Script,
-        [string]$ResultRoot
+        [string]$ResultRoot,
+        [string]$NewPasswordFile = "",
+        [string]$ProjectCode = "",
+        [int]$ExpectedRecoveryPoints = 0
     )
     $savedPath = $env:PATH
     try {
@@ -516,10 +528,92 @@ function Invoke-E2e {
         $env:E2E_CYCLES = "1"
         $env:M5_OUTPUT_DIR = $ResultRoot
         $env:PLAYWRIGHT_BROWSERS_PATH = $playwrightBrowsers
+        if (-not [string]::IsNullOrWhiteSpace($NewPasswordFile)) {
+            $env:E2E_ADMIN_NEW_PASSWORD_FILE = $NewPasswordFile
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ProjectCode)) {
+            $env:E2E_PROJECT_CODE = $ProjectCode
+        }
+        if ($ExpectedRecoveryPoints -gt 0) {
+            $env:E2E_EXPECTED_RECOVERY_POINTS = [string]$ExpectedRecoveryPoints
+        }
         Invoke-CheckedCommand $Npm @("--prefix", $E2eRoot, "run", $Script) "Playwright $Script/$Mode 验收失败"
     } finally {
         $env:PATH = $savedPath
-        Remove-Item Env:E2E_ADMIN_USERNAME, Env:E2E_ADMIN_PASSWORD_FILE -ErrorAction SilentlyContinue
+        Remove-Item Env:E2E_ADMIN_USERNAME, Env:E2E_ADMIN_PASSWORD_FILE, `
+            Env:E2E_ADMIN_NEW_PASSWORD_FILE, Env:E2E_PROJECT_CODE, `
+            Env:E2E_EXPECTED_RECOVERY_POINTS -ErrorAction SilentlyContinue
+    }
+}
+
+function New-ReleasePasswordFile {
+    param([string]$Path)
+    $bytes = New-Object byte[] 24
+    $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $generator.GetBytes($bytes)
+    } finally {
+        $generator.Dispose()
+    }
+    $password = "Release-RC-" + [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+    $observedSecrets.Add($password)
+    [IO.File]::WriteAllText($Path, $password, (New-Object Text.UTF8Encoding($false)))
+    return $password
+}
+
+function Set-AdminPasswordFile {
+    param([string]$Path, [string]$Password)
+    [IO.File]::WriteAllText($Path, $Password, (New-Object Text.UTF8Encoding($false)))
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $security = New-Object Security.AccessControl.FileSecurity
+    $security.SetAccessRuleProtection($true, $false)
+    $rule = New-Object Security.AccessControl.FileSystemAccessRule(
+        $identity, [Security.AccessControl.FileSystemRights]::FullControl,
+        [Security.AccessControl.AccessControlType]::Allow)
+    [void]$security.AddAccessRule($rule)
+    [IO.File]::SetAccessControl($Path, $security)
+}
+
+function Invoke-CrossInstanceRestoreCheck {
+    param(
+        [string]$ReleaseRoot,
+        [string]$ExternalBackup,
+        [string]$ExternalMetadata,
+        [string]$ResultRoot
+    )
+    foreach ($source in @($ExternalBackup, $ExternalMetadata)) {
+        Assert-True (Test-Path -LiteralPath $source -PathType Leaf) "跨实例恢复缺少外部备份文件：$source"
+    }
+    $destinationBackup = Join-Path $ReleaseRoot ("backups\" + [IO.Path]::GetFileName($ExternalBackup))
+    $destinationMetadata = $destinationBackup + ".meta.json"
+    Copy-Item -LiteralPath $ExternalBackup -Destination $destinationBackup
+    Copy-Item -LiteralPath $ExternalMetadata -Destination $destinationMetadata
+    Assert-True ((Get-FileHash -LiteralPath $destinationBackup -Algorithm SHA256).Hash -eq
+        (Get-FileHash -LiteralPath $ExternalBackup -Algorithm SHA256).Hash) "外部备份复制到新实例后哈希变化。"
+    Invoke-ReleaseScript $ReleaseRoot "backup-status.ps1" | Out-Null
+
+    $before = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "logs") `
+        -Filter "restore-verification-*.json" -File -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.FullName })
+    Invoke-ReleaseScript $ReleaseRoot "restore-verify.ps1" @("-BackupPath", $destinationBackup) | Out-Null
+    $created = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "logs") `
+        -Filter "restore-verification-*.json" -File |
+        Where-Object { $before -notcontains $_.FullName })
+    Assert-True ($created.Count -eq 1) "跨实例隔离恢复未生成唯一结果证据。"
+    $payload = Get-Content -LiteralPath $created[0] -Raw -Encoding UTF8 | ConvertFrom-Json
+    $identity = Get-Content -LiteralPath (Join-Path $ReleaseRoot "data\instance.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    Assert-True ([bool]$payload.restored_to_isolated_instance) "跨实例恢复没有使用隔离实例。"
+    Assert-True ([string]$payload.origin_instance_id -ne [string]$identity.instance_id) `
+        "外部备份与新实例 ID 相同，未证明跨实例迁移。"
+    Assert-True (@($payload.database_facts.PSObject.Properties).Count -ge 17) `
+        "跨实例恢复结果缺少数据库对账事实。"
+    $savedEvidence = Join-Path $ResultRoot "cross-instance-restore-verification.json"
+    Copy-Item -LiteralPath $created[0] -Destination $savedEvidence
+    return [ordered]@{
+        origin_instance_id = [string]$payload.origin_instance_id
+        destination_instance_id = [string]$identity.instance_id
+        fact_count = @($payload.database_facts.PSObject.Properties).Count
+        evidence_sha256 = (Get-FileHash -LiteralPath $savedEvidence -Algorithm SHA256).Hash.ToLowerInvariant()
     }
 }
 
@@ -795,6 +889,11 @@ try {
 
     $runRoot = Join-Path $OutputRoot ((Get-Date -Format "yyyyMMdd-HHmmss") + "-" + [Guid]::NewGuid().ToString("N").Substring(0, 8))
     New-Item -ItemType Directory -Path $runRoot | Out-Null
+    $credentialRoot = Join-Path $runRoot ".credentials"
+    $externalBackupRoot = Join-Path $runRoot "external-backup"
+    if ($BusinessRelease) {
+        New-Item -ItemType Directory -Path $credentialRoot, $externalBackupRoot | Out-Null
+    }
     $e2eRoot = Join-Path $runRoot "tools\e2e"
     New-Item -ItemType Directory -Path $e2eRoot -Force | Out-Null
     Copy-Item -Path (Join-Path $repositoryRoot "tests\e2e\*.ts") -Destination $e2eRoot
@@ -816,6 +915,9 @@ try {
     )
     $roundSummaries = @()
     $maintenanceSummaries = @()
+    $externalBackup = $null
+    $externalMetadata = $null
+    $crossInstanceSummary = $null
 
     for ($index = 0; $index -lt $destinations.Count; $index += 1) {
         $round = $index + 1
@@ -857,12 +959,6 @@ try {
         Invoke-ReleaseScript $releaseRoot "backup-schedule.ps1" @(
             "-Action", "Configure", "-DailyAt", "23:59", "-RetentionCount", "2") | Out-Null
         Invoke-ReleaseScript $releaseRoot "backup-schedule.ps1" @("-Action", "Status") | Out-Null
-        $adminPasswordFile = Initialize-AdminCredential $releaseRoot
-        $processInventory = Assert-ProcessInventory $releaseRoot
-        $startedPids = @($processInventory.Pids)
-        $postgresAlias = [string]$processInventory.PostgresAlias
-
-        Invoke-ResetCheck $releaseRoot $adminPasswordFile
         $roundResultRoot = Join-Path $runRoot "round-$round-results"
         New-Item -ItemType Directory -Path $roundResultRoot | Out-Null
         $smokeDataset = Join-Path $releaseRoot "samples\smoke\synthetic_smoke_utf8.csv"
@@ -870,9 +966,48 @@ try {
         Assert-True (Test-Path -LiteralPath $smokeDataset -PathType Leaf) "发布包缺少 300 行样例。"
         Assert-True (Test-Path -LiteralPath $demoDataset -PathType Leaf) "发布包缺少 20k 样例。"
 
+        if ($BusinessRelease) {
+            $adminPasswordFile = Join-Path $releaseRoot "data\secrets\bootstrap-admin-password.txt"
+            Assert-True (Test-Path -LiteralPath $adminPasswordFile -PathType Leaf) "缺少初始管理员密码文件。"
+            $bootstrapPassword = [IO.File]::ReadAllText($adminPasswordFile, [Text.Encoding]::UTF8).Trim()
+            Assert-True (-not [string]::IsNullOrWhiteSpace($bootstrapPassword)) "初始管理员密码为空。"
+            $observedSecrets.Add($bootstrapPassword)
+            $newPasswordFile = Join-Path $credentialRoot "round-$round-new-password.txt"
+            $newPassword = New-ReleasePasswordFile $newPasswordFile
+            $projectCode = "RELEASE-R$round-$($sourceCommit.Substring(0, 8).ToUpperInvariant())"
+            Invoke-E2e $e2eRoot $npm $releaseRoot "release-bootstrap" $smokeDataset 300 `
+                "test:release-bootstrap" $roundResultRoot $newPasswordFile $projectCode
+            Set-AdminPasswordFile $adminPasswordFile $newPassword
+            Remove-Item -LiteralPath $newPasswordFile -Force
+        } else {
+            $adminPasswordFile = Initialize-AdminCredential $releaseRoot
+        }
+        $processInventory = Assert-ProcessInventory $releaseRoot
+        $startedPids = @($processInventory.Pids)
+        $postgresAlias = [string]$processInventory.PostgresAlias
+
+        Invoke-ResetCheck $releaseRoot $adminPasswordFile
+        if ($BusinessRelease -and $round -eq 2) {
+            $crossInstanceSummary = Invoke-CrossInstanceRestoreCheck $releaseRoot `
+                $externalBackup $externalMetadata $roundResultRoot
+        }
+
         Invoke-E2e $e2eRoot $npm $releaseRoot "smoke" $smokeDataset 300 "test:smoke" $roundResultRoot
         $backupCheck = Invoke-BackupCheck $releaseRoot $postgresAlias $roundResultRoot
         $backupPath = [string]$backupCheck.BackupPath
+        if ($BusinessRelease) {
+            Invoke-E2e $e2eRoot $npm $releaseRoot "release-backup" $smokeDataset 300 `
+                "test:release-backup-status" $roundResultRoot "" "" 2
+            if ($round -eq 1) {
+                $externalBackup = Join-Path $externalBackupRoot ([IO.Path]::GetFileName($backupPath))
+                $externalMetadata = $externalBackup + ".meta.json"
+                Copy-Item -LiteralPath $backupPath -Destination $externalBackup
+                Copy-Item -LiteralPath ($backupPath + ".meta.json") -Destination $externalMetadata
+                Assert-True ((Get-FileHash -LiteralPath $externalBackup -Algorithm SHA256).Hash -eq
+                    (Get-FileHash -LiteralPath $backupPath -Algorithm SHA256).Hash) `
+                    "导出到发布目录外的备份哈希变化。"
+            }
+        }
         Invoke-ResetCheck $releaseRoot $adminPasswordFile
         Assert-True (Test-Path -LiteralPath $backupPath -PathType Leaf) "演示复位越界删除了备份。"
         Invoke-ReleaseScript $releaseRoot "restore-verify.ps1" @(
@@ -923,6 +1058,18 @@ try {
             "cleanup-instance.ps1 未清理当前实例维护锁文件。"
         Assert-True (Test-Path -LiteralPath $backupPath -PathType Leaf) `
             "cleanup-instance.ps1 默认不应删除备份。"
+        if ($BusinessRelease -and $round -eq 1) {
+            $firstDestination = [IO.Path]::GetFullPath($destinations[0]).TrimEnd('\')
+            $runPrefix = [IO.Path]::GetFullPath($runRoot).TrimEnd('\') + '\'
+            Assert-True ($firstDestination.StartsWith($runPrefix, [StringComparison]::OrdinalIgnoreCase)) `
+                "拒绝清理验收运行根以外的第一实例目录。"
+            Assert-True (Test-Path -LiteralPath $externalBackup -PathType Leaf) `
+                "清理第一实例前缺少外部备份。"
+            Remove-Item -LiteralPath $firstDestination -Recurse -Force
+            Assert-True (-not (Test-Path -LiteralPath $firstDestination)) "第一实例目录清理失败。"
+            Assert-True (Test-Path -LiteralPath $externalBackup -PathType Leaf) `
+                "清理第一实例越界删除了外部备份。"
+        }
         $roundSummaries += ,$roundSummary
         Write-Host "第 $round 轮验收通过。"
     }
@@ -936,15 +1083,25 @@ try {
         archive_sha256 = $archiveHash
         completed_at = (Get-Date).ToUniversalTime().ToString("o")
         rounds = 2
+        business_release = [bool]$BusinessRelease
         normalized_summary = $roundSummaries[0]
         instance_maintenance = $maintenanceSummaries
+        cross_instance_restore = $crossInstanceSummary
     } | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath (Join-Path $runRoot "verification-summary.json") -Encoding UTF8
-    Write-Host "M6 Windows 原生发布双目录验收通过。"
+    if ($BusinessRelease) {
+        Assert-True ($null -ne $crossInstanceSummary) "发布候选缺少跨实例恢复结果。"
+        Write-Host "M14 Windows 原生发布业务终验预检查通过。"
+    } else {
+        Write-Host "M6 Windows 原生发布双目录验收通过。"
+    }
     Write-Host "NATIVE_VERIFICATION_ROOT=$runRoot"
 } finally {
     $env:PATH = $originalPath
     $env:PATHEXT = $originalPathExt
     for ($index = $releaseRoots.Count - 1; $index -ge 0; $index -= 1) {
         Stop-ReleaseSafely ([string]$releaseRoots[$index])
+    }
+    if ($null -ne $credentialRoot -and (Test-Path -LiteralPath $credentialRoot)) {
+        Remove-Item -LiteralPath $credentialRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
 }

@@ -1,7 +1,10 @@
 ﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$ArchivePath,
-    [string]$OutputRoot = ""
+    [string]$OutputRoot = "",
+    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$')]
+    [string]$ReleaseVersion = "1.0.0-rc.1",
+    [switch]$BusinessRelease
 )
 
 Set-StrictMode -Version Latest
@@ -40,6 +43,7 @@ $childEnvironment = @{
     TMP = $temporaryRoot
 }
 $previousEnvironment = @{}
+$repositoryAclBackup = Join-Path $captureRoot "repository-acl.txt"
 
 function Quote-NativeArgument {
     param([Parameter(Mandatory = $true)][string]$Value)
@@ -48,6 +52,10 @@ function Quote-NativeArgument {
 
 try {
     New-Item -ItemType Directory -Path $captureRoot, $temporaryRoot -Force | Out-Null
+    & (Join-Path $env:SystemRoot "System32\icacls.exe") $repositoryRoot /save $repositoryAclBackup /Q | Out-Null
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $repositoryAclBackup -PathType Leaf)) {
+        throw "无法保存仓库目录原始 ACL，拒绝创建临时标准用户。"
+    }
     New-LocalUser -Name $userName -Password $securePassword -AccountNeverExpires `
         -PasswordNeverExpires -UserMayNotChangePassword | Out-Null
     $userCreated = $true
@@ -63,8 +71,12 @@ try {
 
     $arguments = @(
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $verificationScript,
-        "-ArchivePath", $archive, "-OutputRoot", $OutputRoot
+        "-ArchivePath", $archive, "-OutputRoot", $OutputRoot,
+        "-ReleaseVersion", $ReleaseVersion
     )
+    if ($BusinessRelease) {
+        $arguments += "-BusinessRelease"
+    }
     $argumentLine = ($arguments | ForEach-Object { Quote-NativeArgument ([string]$_) }) -join " "
     foreach ($name in $childEnvironment.Keys) {
         $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
@@ -91,7 +103,31 @@ try {
     }
 }
 finally {
+    $cleanupFailure = $null
+    try {
+        if (Test-Path -LiteralPath $repositoryAclBackup -PathType Leaf) {
+            $repositoryParent = Split-Path -Parent $repositoryRoot
+            $aclRestore = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\icacls.exe") `
+                -ArgumentList ((Quote-NativeArgument $repositoryParent) + " /restore " +
+                    (Quote-NativeArgument $repositoryAclBackup) + " /Q") `
+                -Wait -PassThru -WindowStyle Hidden
+            if ($aclRestore.ExitCode -ne 0) {
+                $cleanupFailure = "无法恢复仓库 ACL，icacls 退出码：$($aclRestore.ExitCode)"
+            }
+        }
+    } catch {
+        $cleanupFailure = "恢复仓库 ACL 失败：$($_.Exception.Message)"
+    }
     if ($userCreated) {
-        Remove-LocalUser -Name $userName -ErrorAction SilentlyContinue
+        try {
+            Remove-LocalUser -Name $userName -ErrorAction Stop
+        } catch {
+            $cleanupFailure = (($cleanupFailure, "删除临时标准用户失败：$($_.Exception.Message)") `
+                | Where-Object { $_ }) -join "；"
+        }
+    }
+    Remove-Item -LiteralPath $repositoryAclBackup -Force -ErrorAction SilentlyContinue
+    if (-not [string]::IsNullOrWhiteSpace($cleanupFailure)) {
+        throw $cleanupFailure
     }
 }
