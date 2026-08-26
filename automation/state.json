@@ -44,7 +44,8 @@
       "M14 实现工作区：发布校验器 4 项单测、PowerShell 解析、Playwright 用例发现、仓库/自动化/正式基线和交付物确定性检查 PASS",
       "M14 实现工作区：本机 HTTP 与 HTTPS 双空卷固定命令连续两次 PASS；最新摘要 .runtime/m7/20260827-033510-535069-2fc28d60/verification-summary.json",
       "固定提交 27a2fa1 的 Docker 全新卷命令 PASS：本机与 HTTPS 双路径、三格式导入、固定分析、处置审计和精确资源清理通过；摘要 .runtime/m7/20260827-055423-564837-f5ff8194/verification-summary.json；该结果早于最终审计修正，不作为最终候选证据",
-      "固定提交 3e1ddb9 的候选校验、Windows 标准用户正式业务预检和 Docker 全新卷命令均 PASS；Docker 摘要 .runtime/m7/20260827-063306-576222-42cb2c82/verification-summary.json；独立复核随后发现早期清理窄窗口，故该提交不作为最终候选"
+      "固定提交 3e1ddb9 的候选校验、Windows 标准用户正式业务预检和 Docker 全新卷命令均 PASS；Docker 摘要 .runtime/m7/20260827-063306-576222-42cb2c82/verification-summary.json；独立复核随后发现早期清理窄窗口，故该提交不作为最终候选",
+      "固定提交 2dd3d484a5ed03e51ffdc56f612e0855027fa470 的候选校验、Windows 标准用户正式业务预检和 Docker 全新卷命令均 PASS；ZIP SHA-256 为 6fe819c7fa11a8b98c24bd7d4517ccd60277927f2c23dae7cf3d30912c1278e0；四条适用远端流水线 SUCCESS；三路独立复审最终均 PASS"
     ],
     "failures": [
       "首次 M14 Docker 实跑在 Maven Central 下载 byte-buddy-1.17.8.jar 时发生外部网络截断；退出 1，隔离资源和临时秘密清理 PASS，使用缓存重试后连续两次完整 PASS",
@@ -68,8 +69,8 @@
       "固定提交 3e1ddb9 后端复核发现：Junction 运行期缓存晚于计划任务和首次登录 E2E；若前置步骤先失败且 stop 同时删除 PID 记录却未删除 Junction，finally 仍可能失去别名。把现有 PID、进程和 Junction 身份验证整体前移到任何 stop 调用之前，正常路径语义不变"
     ],
     "decision": "Windows 11 原生自包含包是首要业务终验路径，HTTPS Docker Compose 是次级部署路径；自动化验证失败必须阻断，最终真实业务人员终验和 main 正式发布保留人工门禁；发布标签只绑定已验证的 main 提交。",
-    "next_action": "固定审计修正提交，串行重跑候选校验、Windows、Docker、远端检查与独立复审；全部通过后冻结 ZIP/SHA-256 并进入 AC-022 人工终验。",
-    "resume_status": null
+    "next_action": "由未参与候选开发的业务人员仅使用固定 ZIP、同名 .sha256 和包内手册，在 Windows 11 x64 完成 AC-022 十三项独立终验并提交原始签署记录；返回前不得修改候选产品树或进入发布合并。",
+    "resume_status": "review"
   },
   "stages": {
     "M0": {
@@ -227,14 +228,16 @@
       "note": "第三固定候选经独立复审和 PR #13 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、可靠性、Windows 原生和 Docker 五条远端流水线全部成功。"
     },
     "M14": {
-      "status": "in_progress",
+      "status": "awaiting_human",
       "attempt": 1,
-      "evidence_files": [],
+      "evidence_files": [
+        "docs/verification/evidence/M14.md"
+      ],
       "checkpoint_commit": null,
       "remote_verified": false,
       "human_acceptance": null,
-      "next_action": "在最终固定提交完成自动门槛与独立复审，通过后冻结 ZIP/SHA-256 并暂停等待 AC-022 人工终验。",
-      "note": "M14 已从 bd7598d 创建 feat/m14-business-release；最终阶段自动门槛通过后仍停在人工正式发布门禁。"
+      "next_action": "等待独立业务人员按固定 ZIP/SHA-256 和包内手册完成 AC-022 十三项 Windows 11 x64 终验；不得由智能体代填，结果返回后恢复 review。",
+      "note": "固定候选 2dd3d48 已通过候选、Windows、Docker、适用远端 CI 和三路独立复审；阶段暂停在 AC-022 人工可理解性与独立操作终验。"
     }
   }
 }
