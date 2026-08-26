@@ -19,13 +19,18 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +41,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -61,6 +67,9 @@ class AnalysisIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private DataSource dataSource;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -197,6 +206,41 @@ class AnalysisIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM analysis_run WHERE batch_id = ?", Integer.class, batchId)).isEqualTo(2);
         assertZeroResults(failedRunId);
+    }
+
+    @Test
+    void completionAndFailureWaitForTheDemoResetTransactionGate() throws Exception {
+        for (boolean fail : List.of(false, true)) {
+            UUID batchId = importedBatch();
+            CountDownLatch algorithmEntered = new CountDownLatch(1);
+            CountDownLatch releaseAlgorithm = new CountDownLatch(1);
+            RESPONDER.set(request -> {
+                algorithmEntered.countDown();
+                await(releaseAlgorithm);
+                return fail ? new StubResponse(503, "unavailable") : successResponse(request);
+            });
+
+            try (Connection blocker = dataSource.getConnection();
+                    var executor = new DelegatingSecurityContextExecutorService(
+                            Executors.newSingleThreadExecutor())) {
+                var result = executor.submit(() -> mockMvc.perform(
+                        post("/api/v1/imports/{batchId}/analyses", batchId)).andReturn());
+                assertThat(algorithmEntered.await(10, TimeUnit.SECONDS)).isTrue();
+
+                blocker.setAutoCommit(false);
+                blocker.createStatement().execute(
+                        "SELECT pg_advisory_xact_lock(1095517522, 1297040468)");
+                releaseAlgorithm.countDown();
+
+                awaitAdvisoryWaiter();
+                assertThat(result).isNotDone();
+                blocker.commit();
+
+                JsonNode response = objectMapper.readTree(
+                        result.get(15, TimeUnit.SECONDS).getResponse().getContentAsString());
+                assertThat(response.path("status").asText()).isEqualTo(fail ? "FAILED" : "COMPLETED");
+            }
+        }
     }
 
     @Test
@@ -620,6 +664,30 @@ class AnalysisIntegrationTest {
             return EmbeddedPostgres.start();
         } catch (IOException exception) {
             throw new ExceptionInInitializerError(exception);
+        }
+    }
+
+    private void awaitAdvisoryWaiter() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            Integer waiters = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM pg_locks WHERE locktype='advisory' AND NOT granted", Integer.class);
+            if (waiters != null && waiters > 0) {
+                return;
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("分析状态事务未等待共享 advisory lock");
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("算法测试屏障等待超时");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("算法测试屏障被中断", exception);
         }
     }
 

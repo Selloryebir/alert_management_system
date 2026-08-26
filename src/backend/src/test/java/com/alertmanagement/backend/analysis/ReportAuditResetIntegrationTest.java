@@ -17,10 +17,14 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -35,6 +39,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -56,6 +61,9 @@ class ReportAuditResetIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private DataSource dataSource;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -333,6 +341,29 @@ class ReportAuditResetIntegrationTest {
                 .andExpect(jsonPath("$.deleted_counts.business_project").value(0));
     }
 
+    @Test
+    void resetWaitsForTheSharedAnalysisTransactionGateBeforeTakingTableLocks() throws Exception {
+        seedCompletedRun();
+
+        try (Connection blocker = dataSource.getConnection();
+                var executor = new DelegatingSecurityContextExecutorService(
+                        Executors.newSingleThreadExecutor())) {
+            blocker.setAutoCommit(false);
+            blocker.createStatement().execute(
+                    "SELECT pg_advisory_xact_lock(1095517522, 1297040468)");
+
+            var result = executor.submit(() -> mockMvc.perform(post("/api/v1/demo/reset")
+                    .contentType(MediaType.APPLICATION_JSON).content(resetRequest())).andReturn());
+
+            awaitAdvisoryWaiter();
+            assertThat(result).isNotDone();
+            blocker.commit();
+
+            assertThat(result.get(15, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(200);
+            assertThat(count("alarm_record")).isZero();
+        }
+    }
+
     private void disposition(UUID runId, UUID recordId, String statusValue, String note) throws Exception {
         mockMvc.perform(patch("/api/v1/analyses/{runId}/alarms/{recordId}/disposition", runId, recordId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -403,6 +434,19 @@ class ReportAuditResetIntegrationTest {
 
     private String resetRequest() {
         return "{\"operator\":\"demo-reviewer\",\"confirmation\":\"RESET_DEMO\"}";
+    }
+
+    private void awaitAdvisoryWaiter() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            Integer waiters = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM pg_locks WHERE locktype='advisory' AND NOT granted", Integer.class);
+            if (waiters != null && waiters > 0) {
+                return;
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("演示复位事务未等待共享 advisory lock");
     }
 
     private static EmbeddedPostgres startPostgres() {

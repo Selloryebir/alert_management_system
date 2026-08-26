@@ -1,6 +1,7 @@
 package com.alertmanagement.backend.analysis;
 
 import com.alertmanagement.backend.audit.AuditService;
+import com.alertmanagement.backend.persistence.BusinessDataTransactionLock;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,6 +40,7 @@ class AnalysisPersistenceService {
     @Transactional
     public StartedAnalysis begin(UUID batchId, String contractVersion, String algorithmVersion,
             Map<String, Object> parameters) {
+        BusinessDataTransactionLock.acquire(jdbcTemplate);
         BatchState batchState;
         try {
             batchState = jdbcTemplate.queryForObject("""
@@ -108,6 +110,7 @@ class AnalysisPersistenceService {
 
     @Transactional
     public void complete(StartedAnalysis started, ValidatedAnalysis analysis) {
+        BusinessDataTransactionLock.acquire(jdbcTemplate);
         UUID runId = started.request().analysisRunId();
         UUID batchId = started.request().records().getFirst().batchId();
         requireState(runId, batchId);
@@ -157,6 +160,7 @@ class AnalysisPersistenceService {
 
     @Transactional
     public void fail(UUID runId, UUID batchId, String reason) {
+        BusinessDataTransactionLock.acquire(jdbcTemplate);
         jdbcTemplate.update("DELETE FROM event_chain_member WHERE run_id = ?", runId);
         jdbcTemplate.update("DELETE FROM event_chain WHERE run_id = ?", runId);
         jdbcTemplate.update("DELETE FROM analysis_result WHERE run_id = ?", runId);

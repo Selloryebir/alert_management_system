@@ -2,6 +2,7 @@ package com.alertmanagement.backend.demo;
 
 import com.alertmanagement.backend.api.BusinessApiException;
 import com.alertmanagement.backend.audit.AuditService;
+import com.alertmanagement.backend.persistence.BusinessDataTransactionLock;
 import com.alertmanagement.backend.security.ProjectAccessService;
 import com.alertmanagement.backend.security.SecurityProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -69,6 +70,7 @@ class DemoResetService {
         if (request == null || !CONFIRMATION.equals(request.confirmation())) {
             throw badRequest("confirmation 必须是 RESET_DEMO");
         }
+        BusinessDataTransactionLock.acquire(jdbcTemplate);
         jdbcTemplate.execute("LOCK TABLE " + String.join(", ", RESET_LOCK_TABLES)
                 + " IN ACCESS EXCLUSIVE MODE");
         int analyzing = jdbcTemplate.queryForObject(
