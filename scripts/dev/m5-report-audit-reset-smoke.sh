@@ -37,6 +37,7 @@ verify_sentinel() {
 
 prepare_e2e_browser_runtime
 "$REPOSITORY_ROOT/scripts/dev/start.sh"
+dev_admin_login "$M5_RUNTIME"
 "$REPOSITORY_ROOT/scripts/dev/backup.sh"
 
 docker_run exec "$POSTGRES_CONTAINER" psql \
@@ -47,7 +48,7 @@ docker_run exec "$POSTGRES_CONTAINER" psql \
   --command "TRUNCATE TABLE $SENTINEL_TABLE" \
   --command "INSERT INTO $SENTINEL_TABLE(marker) VALUES ('$SENTINEL_VALUE')" >/dev/null
 
-curl --noproxy '*' --fail --silent --show-error \
+curl "${DEV_AUTH_CURL_ARGS[@]}" "${DEV_AUTH_CSRF_ARGS[@]}" \
   --header 'Content-Type: application/json' \
   --data '{"operator":"demo-reviewer","confirmation":"RESET_DEMO"}' \
   http://127.0.0.1:8080/api/v1/demo/reset > "$M5_RUNTIME/initial-reset.json"
@@ -66,6 +67,7 @@ smoke_started=$(monotonic_ms)
 env \
   E2E_BASE_URL=http://127.0.0.1:8080 \
   E2E_MODE=smoke \
+  E2E_ADMIN_PASSWORD_FILE="$DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE" \
   E2E_DATASET="$REPOSITORY_ROOT/samples/smoke/synthetic_smoke_utf8.csv" \
   E2E_EXPECTED_TOTAL=300 \
   M5_OUTPUT_DIR="$M5_OUTPUT" \
@@ -80,6 +82,7 @@ demo_started=$(monotonic_ms)
 env \
   E2E_BASE_URL=http://127.0.0.1:8080 \
   E2E_MODE=demo \
+  E2E_ADMIN_PASSWORD_FILE="$DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE" \
   E2E_DATASET="$demo_file" \
   E2E_EXPECTED_TOTAL=20000 \
   M5_OUTPUT_DIR="$M5_OUTPUT" \

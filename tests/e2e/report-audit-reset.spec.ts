@@ -265,10 +265,12 @@ test("报告、审计、人工修订和明确复位结果一致", async ({ page 
   expect(Number.isInteger(cycles) && cycles > 0, "E2E_CYCLES 必须是正整数").toBeTruthy();
   mkdirSync(outputRoot, { recursive: true });
   const summaries: Array<Record<string, unknown>> = [];
+  await page.goto("/");
+  await resetDemo(page, false);
 
   for (let cycle = 1; cycle <= cycles; cycle += 1) {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "报警管理系统" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "报警管理系统", exact: true })).toBeVisible();
     await expect(page.getByText("admin · 系统管理员", { exact: false }).first()).toBeVisible();
     const runId = await importAndAnalyze(page);
     await openSyntheticChainAlarm(page);
@@ -329,6 +331,7 @@ test("20000 行完成两类报告并记录可下载指标", async ({ page }) => 
   test.skip(mode !== "demo", "仅 Demo 模式执行 20000 行报告门槛");
   mkdirSync(outputRoot, { recursive: true });
   await page.goto("/");
+  await resetDemo(page, false);
   const runId = await importAndAnalyze(page);
   const dashboard = await responseJson<DashboardResponse>(
     await page.request.get(`/api/v1/analyses/${runId}/dashboard`),
