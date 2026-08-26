@@ -22,8 +22,7 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 }
 $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
 $artifactRoot = Join-Path $OutputRoot "artifacts"
-$verificationBase = Join-Path $OutputRoot "verification"
-$verificationRoot = $null
+$verificationRoot = Join-Path $OutputRoot "verification"
 $negativeRoot = Join-Path $OutputRoot ("negative-" + [Guid]::NewGuid().ToString("N"))
 $summaryPath = Join-Path $OutputRoot "business-release-summary.json"
 $sourceCommit = $null
@@ -85,10 +84,16 @@ try {
     Assert-True ($commitResult.ExitCode -eq 0 -and $sourceCommit -match '^[0-9a-f]{40}$') "无法读取完整源提交。"
 
     $artifactDirectory = [IO.Path]::GetFullPath((Join-Path $artifactRoot $sourceCommit))
-    $verificationRoot = [IO.Path]::GetFullPath((Join-Path $verificationBase $sourceCommit))
+    $verificationRoot = [IO.Path]::GetFullPath($verificationRoot)
+    Assert-True ((Split-Path -Leaf $artifactDirectory) -eq $sourceCommit -and
+        (Split-Path -Parent $artifactDirectory).Equals([IO.Path]::GetFullPath($artifactRoot),
+            [StringComparison]::OrdinalIgnoreCase)) `
+        "仅允许清理以当前完整提交命名的产物目录：$artifactDirectory"
+    Assert-True ((Split-Path -Leaf $verificationRoot) -eq "verification" -and
+        (Split-Path -Parent $verificationRoot).Equals($OutputRoot,
+            [StringComparison]::OrdinalIgnoreCase)) `
+        "仅允许清理固定的验收生成目录：$verificationRoot"
     foreach ($generatedDirectory in @($artifactDirectory, $verificationRoot)) {
-        Assert-True ((Split-Path -Leaf $generatedDirectory) -eq $sourceCommit) `
-            "仅允许清理以当前完整提交命名的生成目录：$generatedDirectory"
         if (Test-Path -LiteralPath $generatedDirectory) {
             Remove-Item -LiteralPath $generatedDirectory -Recurse -Force
         }

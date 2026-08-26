@@ -451,7 +451,11 @@ function Invoke-BundledCommandResult {
     )
     $stdout = [IO.Path]::GetTempFileName()
     $stderr = [IO.Path]::GetTempFileName()
+    $oldLanguage = [Environment]::GetEnvironmentVariable("LANG", "Process")
+    $oldMessageLanguage = [Environment]::GetEnvironmentVariable("LC_MESSAGES", "Process")
     try {
+        [Environment]::SetEnvironmentVariable("LANG", "C", "Process")
+        [Environment]::SetEnvironmentVariable("LC_MESSAGES", "C", "Process")
         $parameters = @{
             FilePath = $FilePath
             Wait = $true
@@ -477,6 +481,8 @@ function Invoke-BundledCommandResult {
             Output = ($standardOutput + $standardError).Trim()
         }
     } finally {
+        [Environment]::SetEnvironmentVariable("LANG", $oldLanguage, "Process")
+        [Environment]::SetEnvironmentVariable("LC_MESSAGES", $oldMessageLanguage, "Process")
         Remove-Item -LiteralPath $stdout, $stderr -Force -ErrorAction SilentlyContinue
     }
 }
