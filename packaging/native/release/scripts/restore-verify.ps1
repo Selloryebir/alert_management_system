@@ -68,34 +68,40 @@ function Get-DatabaseFacts {
         [Parameter(Mandatory = $true)][int]$Port,
         [Parameter(Mandatory = $true)][string]$Database
     )
-    $facts = [ordered]@{}
+    $queries = @()
     foreach ($table in $criticalTables) {
-        $sql = 'SELECT count(*)::text || ''|'' || COALESCE(' +
+        $queries += 'SELECT ''table:' + $table + '|'' || count(*)::text || ''|'' || COALESCE(' +
             'md5(string_agg(row_hash, '''' ORDER BY row_hash)), md5('''')) ' +
             'FROM (SELECT md5(row_to_json(source_row)::text) AS row_hash ' +
-            'FROM public."' + $table + '" AS source_row) AS table_rows;'
-        $output = Invoke-BundledCommand (Get-PostgresExecutable $Context "psql" $WorkingRoot) @(
-            "-X", "-h", "127.0.0.1", "-p", [string]$Port,
-            "-U", [string]$Context.Config.database.user, "-d", $Database,
-            "-v", "ON_ERROR_STOP=1", "-A", "-t", "-c", $sql) $WorkingRoot
-        $value = $output.Trim()
-        if ($value -notmatch '^\d+\|[0-9a-f]{32}$') {
-            throw "无法读取表 $table 的行数与内容摘要：$output"
-        }
-        $facts["table:$table"] = $value
+            'FROM public."' + $table + '" AS source_row) AS table_rows'
     }
     foreach ($sequence in $criticalSequences) {
-        $sql = 'SELECT last_value::text || ''|'' || is_called::text FROM public."' +
-            $sequence + '";'
-        $output = Invoke-BundledCommand (Get-PostgresExecutable $Context "psql" $WorkingRoot) @(
-            "-X", "-h", "127.0.0.1", "-p", [string]$Port,
-            "-U", [string]$Context.Config.database.user, "-d", $Database,
-            "-v", "ON_ERROR_STOP=1", "-A", "-t", "-c", $sql) $WorkingRoot
-        $value = $output.Trim()
-        if ($value -notmatch '^\d+\|(t|f)$') {
-            throw "无法读取序列 $sequence 的恢复状态：$output"
+        $queries += 'SELECT ''sequence:' + $sequence + '|'' || last_value::text || ''|'' || ' +
+            'is_called::text FROM public."' +
+            $sequence + '"'
+    }
+
+    $sql = $queries -join "`nUNION ALL`n"
+    $output = Invoke-BundledCommand (Get-PostgresExecutable $Context "psql" $WorkingRoot) @(
+        "-X", "-h", "127.0.0.1", "-p", [string]$Port,
+        "-U", [string]$Context.Config.database.user, "-d", $Database,
+        "-v", "ON_ERROR_STOP=1", "-A", "-t", "-c", $sql) $WorkingRoot
+    $facts = [ordered]@{}
+    foreach ($line in @([Regex]::Split($output.Trim(), '\r?\n'))) {
+        if ($line -match '^(table:[a-z_]+)\|(\d+\|[0-9a-f]{32})$') {
+            $facts[$Matches[1]] = $Matches[2]
+        } elseif ($line -match '^(sequence:[a-z_]+)\|(\d+\|(t|f))$') {
+            $facts[$Matches[1]] = $Matches[2]
+        } else {
+            throw "数据库事实输出格式无效：$line"
         }
-        $facts["sequence:$sequence"] = $value
+    }
+    $expectedKeys = @($criticalTables | ForEach-Object { "table:$_" }) +
+        @($criticalSequences | ForEach-Object { "sequence:$_" })
+    foreach ($key in $expectedKeys) {
+        if (-not $facts.Contains($key)) {
+            throw "数据库事实输出缺少：$key"
+        }
     }
     return $facts
 }
