@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import AccessManagement from "./AccessManagement.vue";
 import AccountPanel from "./AccountPanel.vue";
 import BusinessWorkflow from "./BusinessWorkflow.vue";
+import DataBackupPanel from "./DataBackupPanel.vue";
 import LoginPanel from "./LoginPanel.vue";
 import ManualAlarmPanel from "./ManualAlarmPanel.vue";
 import ProjectWorkspace from "./ProjectWorkspace.vue";
@@ -275,6 +276,7 @@ onBeforeUnmount(() => setUnauthorizedHandler(undefined));
     <template v-if="!authenticatedUser.must_change_password">
     <ProjectWorkspace ref="projectWorkspace" :system-admin="systemAdmin" @selected="handleProjectSelected" />
     <AccessManagement :user="authenticatedUser" :project="currentProject" />
+    <DataBackupPanel v-if="systemAdmin" :user="authenticatedUser" />
     <p v-if="demoResetMessage" class="import-message" role="status" data-testid="reset-message">{{ demoResetMessage }}</p>
 
     <nav class="onboarding-panel" aria-labelledby="onboarding-title">

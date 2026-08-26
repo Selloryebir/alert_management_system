@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 class DataBackupService {
-    private static final List<String> OPERATOR_INSTRUCTIONS = List.of(
+    private static final List<String> WINDOWS_OPERATOR_INSTRUCTIONS = List.of(
             "运行 scripts\\backup-status.ps1 查看容量并执行完整 SHA-256 校验",
             "运行 scripts\\backup.ps1 创建手动恢复点",
             "运行 scripts\\backup-schedule.ps1 -Action Configure 配置每日备份",
@@ -57,6 +57,9 @@ class DataBackupService {
         int validCount = (int) points.stream().filter(point -> "METADATA_OK".equals(point.status())).count();
         String management = backupDirectory == null || backupDirectory.isBlank()
                 ? "DEPLOYMENT_MANAGED" : "WINDOWS_NATIVE_SCRIPTS";
+        List<String> instructions = "WINDOWS_NATIVE_SCRIPTS".equals(management)
+                ? WINDOWS_OPERATOR_INSTRUCTIONS
+                : List.of("当前部署未向应用开放本机备份目录，请由部署管理员按对应部署说明执行备份和恢复验证");
         return new DataBackupStatusView(
                 databaseSize == null ? 0 : databaseSize,
                 deploymentMode,
@@ -66,7 +69,7 @@ class DataBackupService {
                 totalBytes,
                 null,
                 points,
-                OPERATOR_INSTRUCTIONS);
+                instructions);
     }
 
     private List<RecoveryPointView> readRecoveryPoints(String directory) {
