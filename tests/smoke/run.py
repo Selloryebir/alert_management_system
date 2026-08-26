@@ -240,10 +240,44 @@ def prepare_compose_secrets() -> Path:
             # Compose 的 Linux 绑定文件保留宿主 UID；目录 0700 限制宿主访问，
             # 文件需允许镜像内的非 root 用户 10001 读取。
             path.chmod(0o644)
+    protect_secret_permissions(secret_root)
     BOOTSTRAP_PASSWORD = (secret_root / "bootstrap-admin-password.txt").read_text(
         encoding="utf-8"
     ).strip()
     return secret_root
+
+
+def protect_secret_permissions(secret_root: Path) -> None:
+    powershell = shutil.which("powershell.exe") or shutil.which("powershell")
+    windows_root: str | None = None
+    if os.name == "nt":
+        windows_root = str(secret_root.resolve())
+    elif powershell and shutil.which("wslpath") and str(secret_root).startswith("/mnt/"):
+        windows_root = run_command(
+            ["wslpath", "-w", str(secret_root.resolve())], timeout=10
+        ).stdout.strip()
+    if windows_root is None:
+        return
+    if not powershell:
+        raise VerificationError("Windows 密钥目录需要 PowerShell 才能收敛 NTFS ACL。")
+    script_path = str(ROOT / "scripts/security/protect-windows-secrets.ps1")
+    if os.name != "nt":
+        script_path = run_command(
+            ["wslpath", "-w", script_path], timeout=10
+        ).stdout.strip()
+    run_command(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            script_path,
+            "-SecretRoot",
+            windows_root,
+        ],
+        timeout=30,
+    )
 
 
 def login_as_bootstrap_admin() -> dict[str, Any]:

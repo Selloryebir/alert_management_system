@@ -34,6 +34,14 @@ generate_secret() {
 generate_secret "$secret_root/database-password.txt"
 generate_secret "$secret_root/bootstrap-admin-password.txt"
 
+if [[ "$secret_root" == /mnt/?/* ]] \
+    && command -v powershell.exe >/dev/null 2>&1 \
+    && command -v wslpath >/dev/null 2>&1; then
+  powershell.exe -NoProfile -ExecutionPolicy Bypass \
+    -File "$(wslpath -w "$repository_root/scripts/security/protect-windows-secrets.ps1")" \
+    -SecretRoot "$(wslpath -w "$secret_root")" </dev/null
+fi
+
 echo "本机 Compose 密钥已就绪：$secret_root"
 echo "初始管理员：admin"
 echo "首次登录密码文件：$secret_root/bootstrap-admin-password.txt"
