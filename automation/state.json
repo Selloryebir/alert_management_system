@@ -36,10 +36,23 @@
       "docs/verification/",
       "automation/state.json"
     ],
-    "checks": [],
-    "failures": [],
+    "checks": [
+      "scripts/dev/test.sh：PASS（固定候选 7add6f8；Java 51、算法 36、数据 5、契约 4、前端 35）",
+      "python3 tests/reliability/run.py：PASS（5x300 摘要一致；3x20000 为 7.379/7.145/6.829 秒；资源回落；日志、外联、清理通过）",
+      "scripts/native/verify-release.ps1：PASS（同一 ZIP 在 ASCII/中文空格双目录通过；两轮隔离恢复各对账 17 项事实）",
+      "固定候选远端：仓库、M1、M12、M6 Windows、M7 Docker 五条检查均为 SUCCESS",
+      "独立对抗复审：PASS（无 M12 阻断项）"
+    ],
+    "failures": [
+      "已修复：隔离恢复的 PowerShell 字段别名、布尔文本、进程等待和恢复事实调用错误。",
+      "已修复：发布目录叠加隔离集群路径达到 Windows 260 字符边界；现使用有身份标记且清理边界明确的短 TEMP 路径。",
+      "已修复：五个 JVM 预热样本被误当泄漏趋势；现由三轮 20000 行重载判断持续增长并保留所有样本硬上限。",
+      "已修复：默认 JVM 堆随宿主内存扩张；开发、原生和 Docker 入口统一限制为 128-768 MiB。",
+      "已修复：PostgreSQL 官方镜像首次初始化的受控 fast shutdown 被误报；现只过滤具备精确前后文的一条 FATAL。",
+      "已修复：WSL/Windows 观测通道瞬断被误判为进程退出；现用显式 marker 和最多三次桥接重试，真实命令/进程失败仍立即阻断。"
+    ],
     "decision": "以真实 PostgreSQL 自定义格式备份在隔离实例恢复并逐表对账；以当前发布实例身份约束安装、停止和清理；用有限且可复现的重复业务运行观测内存、进程、端口、外联、乱码和 20000 行退化，不把短测夸大为 7x24 小时工业承诺。质量门槛复用各语言锁定工具链，不引入第二套构建系统。",
-    "next_action": "冻结 M12 恢复、质量和可靠性验收设计，补齐 tests/reliability/run.py，并只修复该门槛真实触发的发布缺陷。",
+    "next_action": "提交 M12 固定候选证据，通过 PR 合入 dev 并建立远端检查点；检查点成立前不解锁 M13。",
     "resume_status": null
   },
   "stages": {
@@ -176,13 +189,15 @@
       "note": "固定候选经独立对抗复审和 PR #9 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、Windows 原生和 Docker 四条远端流水线全部成功。"
     },
     "M12": {
-      "status": "in_progress",
+      "status": "review",
       "attempt": 1,
-      "evidence_files": [],
+      "evidence_files": [
+        "docs/verification/evidence/M12.md"
+      ],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "next_action": "在 feat/m12-reliability-quality 实现隔离恢复对账、精确实例清理、静态质量和有限运行可靠性门槛。",
-      "note": "M12 第一次增量从已远端核验的 M11 dev 检查点启动。"
+      "next_action": "等待固定候选证据通过 PR 合入 dev，并核验合并提交的发布级远端检查。",
+      "note": "固定候选 7add6f8 的三条本机 G12、五条远端检查和独立对抗复审均通过；阶段处于集成复核。"
     },
     "M13": {
       "status": "blocked",
