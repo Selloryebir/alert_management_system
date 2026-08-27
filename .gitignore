@@ -46,3 +46,7 @@ venv/
 # 原生交付产物
 /release/
 /artifacts/
+
+# 仓库外保管的项目档案（不得重新纳入正式源码树）
+/local-archive/
+/docs/local-archive/

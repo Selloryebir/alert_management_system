@@ -147,6 +147,7 @@ try {
     }
     Initialize-InstanceIdentity $context
     Initialize-InstanceSecrets $context
+    Initialize-AlgorithmModel $context
 
     $workingRoot = Initialize-PostgresWorkingRoot $context
     $backendJava = Join-Path $workingRoot "runtime\jre\bin\java.exe"
@@ -174,6 +175,8 @@ try {
     $algorithmProcess = Start-BundledProcess $context.Algorithm "" $context.Root $algorithmOut $algorithmError @{
         ALGORITHM_HOST = "127.0.0.1"
         ALGORITHM_PORT = [string]$context.Config.ports.algorithm
+        ALGORITHM_MODEL_FILE = $context.AlgorithmModel
+        ALGORITHM_MODEL_KEY_FILE = $context.AlgorithmModelKeyFile
     }
     $algorithmStarted = $true
     Save-RunningProcess "algorithm" $algorithmProcess.Id $context.Algorithm $context.Root @(
@@ -227,12 +230,15 @@ try {
     Write-Host "PostgreSQL、算法服务和主程序均为 UP，进程身份已写入 pids 目录。"
     exit 0
 } catch {
-    Write-Error ("启动失败：" + $_.Exception.Message + " 日志已保留在 " + $context.Logs)
+    $startupFailure = $_.Exception.Message
+    $cleanupFailures = New-Object Collections.Generic.List[string]
     if ($backendStarted) {
-        try { Stop-OwnedProcess $context "backend" $backendExpectedExecutables $backendJar } catch { Write-Warning $_.Exception.Message }
+        try { Stop-OwnedProcess $context "backend" $backendExpectedExecutables $backendJar }
+        catch { $cleanupFailures.Add("主程序停止失败：$($_.Exception.Message)") }
     }
     if ($algorithmStarted) {
-        try { Stop-OwnedProcess $context "algorithm" $context.Algorithm } catch { Write-Warning $_.Exception.Message }
+        try { Stop-OwnedProcess $context "algorithm" $context.Algorithm }
+        catch { $cleanupFailures.Add("算法服务停止失败：$($_.Exception.Message)") }
     }
     if ($postgresStarted) {
         try {
@@ -241,10 +247,25 @@ try {
                 "-D", $postgresDataArgument, "-m", "fast", "-w", "stop") $workingRoot | Out-Null
             Remove-PidRecord $context "postgresql"
             $postgresStarted = $false
-        } catch { Write-Warning $_.Exception.Message }
+        } catch { $cleanupFailures.Add("PostgreSQL 停止失败：$($_.Exception.Message)") }
     }
     if (-not $postgresStarted -and $null -ne $workingRoot) {
-        try { Remove-PostgresWorkingRoot $context } catch { Write-Warning $_.Exception.Message }
+        try { Remove-PostgresWorkingRoot $context }
+        catch { $cleanupFailures.Add("PostgreSQL 路径别名清理失败：$($_.Exception.Message)") }
+    }
+    foreach ($name in @("postgresql", "algorithm", "backend")) {
+        if (Test-Path -LiteralPath (Join-Path $context.Pids ($name + ".json")) -PathType Leaf) {
+            $cleanupFailures.Add("清理后仍存在 $name PID 记录。")
+        }
+    }
+    foreach ($port in @(55432, 8001, 8080)) {
+        if (-not (Test-PortAvailable $port)) {
+            $cleanupFailures.Add("清理后端口 $port 仍在监听。")
+        }
+    }
+    [Console]::Error.WriteLine("启动失败：$startupFailure 日志已保留在 $($context.Logs)")
+    if ($cleanupFailures.Count -gt 0) {
+        [Console]::Error.WriteLine("启动失败后清理未完成：" + ($cleanupFailures -join "；"))
     }
     exit 1
 }

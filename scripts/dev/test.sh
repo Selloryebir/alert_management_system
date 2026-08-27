@@ -44,6 +44,14 @@ fi
   cd "$REPOSITORY_ROOT"
   "$PYTHON_VENV/bin/python" -m pytest tests/contract -q -s -p no:cacheprovider
 )
-npm --prefix "$REPOSITORY_ROOT/src/frontend" test -- --run
+if [[ "$REPOSITORY_ROOT" == /mnt/?/* ]]; then
+  frontend_test_root=$(mktemp -d /tmp/alert-management-frontend.XXXXXX)
+  tar --exclude=node_modules --exclude=dist -C "$REPOSITORY_ROOT/src/frontend" -cf - . |
+    tar -C "$frontend_test_root" -xf -
+  npm --prefix "$frontend_test_root" ci --ignore-scripts
+  npm --prefix "$frontend_test_root" test -- --run
+else
+  npm --prefix "$REPOSITORY_ROOT/src/frontend" test -- --run
+fi
 
 echo "仓库、后端、算法、合成数据、跨组件契约和前端测试通过。"

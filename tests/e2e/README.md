@@ -49,3 +49,16 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/native/verify-re
 ```
 
 开发阶段脏工作区试构建可显式增加 `-AllowDirty`；正式验收不使用该参数。也可通过 `-ArchivePath <zip>` 验证已有发布包，但 ZIP 的 SHA-256 和源提交仍必须与当前仓库一致。
+
+# M14 发布候选业务页面验收
+
+M14 的 Windows 编排先运行首次登录阶段，再完成样例业务闭环和包内备份，最后运行备份状态阶段：
+
+```powershell
+npm.cmd --prefix tests\e2e run test:release-bootstrap
+npm.cmd --prefix tests\e2e run test:release-backup-status
+```
+
+首次登录阶段要求 `E2E_ADMIN_PASSWORD_FILE` 指向包内初始密码文件、`E2E_ADMIN_NEW_PASSWORD_FILE` 指向编排器创建的新密码文件，并要求 `E2E_PROJECT_CODE` 为本轮唯一项目编号。备份状态阶段只需把 `E2E_ADMIN_PASSWORD_FILE` 指向改密后的文件；`E2E_EXPECTED_RECOVERY_POINTS` 默认是 `1`。两个阶段均通过真实页面登录，不使用 API 预登录，也不会向控制台输出密码内容。
+
+既有 `test:smoke` 和 `test:m5` 可选传入 `E2E_PROJECT_CODE`；未设置时仍使用 `DEFAULT-DEMO`，保持 M6 兼容。

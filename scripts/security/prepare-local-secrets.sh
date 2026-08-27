@@ -45,3 +45,4 @@ fi
 echo "本机 Compose 密钥已就绪：$secret_root"
 echo "初始管理员：admin"
 echo "首次登录密码文件：$secret_root/bootstrap-admin-password.txt"
+echo "监督模型由 Compose 首次启动程序生成并保存到独立模型卷。"

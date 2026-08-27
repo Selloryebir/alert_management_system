@@ -1,11 +1,16 @@
 ﻿param(
     [string]$ArchivePath,
     [string]$OutputRoot,
-    [switch]$AllowDirty
+    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$')]
+    [string]$ReleaseVersion = "1.0.0",
+    [switch]$AllowDirty,
+    [switch]$BusinessRelease
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)
+$OutputEncoding = [Console]::OutputEncoding
 
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $runtimeRoot = Join-Path $repositoryRoot ".runtime\native"
@@ -17,6 +22,11 @@ $originalPath = $env:PATH
 $originalPathExt = $env:PATHEXT
 $releaseRoots = New-Object System.Collections.ArrayList
 $observedSecrets = New-Object System.Collections.Generic.List[string]
+$managedBackupTasks = New-Object System.Collections.Generic.List[string]
+$managedPostgresAliases = New-Object System.Collections.ArrayList
+$credentialRoot = $null
+$cleanupFailures = New-Object System.Collections.Generic.List[string]
+$primaryFailure = $null
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $runtimeRoot "verification"
@@ -95,10 +105,10 @@ function Invoke-NativeProcess {
         }
         $output = @()
         if (Test-Path -LiteralPath $stdoutPath) {
-            $output += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
+            $output += @(Get-Content -LiteralPath $stdoutPath -Encoding UTF8 -ErrorAction SilentlyContinue)
         }
         if (Test-Path -LiteralPath $stderrPath) {
-            $output += @(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue)
+            $output += @(Get-Content -LiteralPath $stderrPath -Encoding UTF8 -ErrorAction SilentlyContinue)
         }
         return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $output }
     } finally {
@@ -219,7 +229,7 @@ function Resolve-Archive {
     Assert-True (Test-Path -LiteralPath $buildScript -PathType Leaf) "构建脚本不存在：$buildScript"
     $arguments = @(
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $buildScript,
-        "-OutputRoot", $artifactRoot
+        "-OutputRoot", $artifactRoot, "-ReleaseVersion", $ReleaseVersion
     )
     if ($AllowDirty) {
         $arguments += "-AllowDirty"
@@ -258,10 +268,11 @@ function Expand-FreshRelease {
 }
 
 function Assert-ReleaseManifest {
-    param([string]$ReleaseRoot, [string]$ExpectedCommit)
+    param([string]$ReleaseRoot, [string]$ExpectedCommit, [string]$ExpectedReleaseVersion)
     $manifestPath = Join-Path $ReleaseRoot "release-manifest.json"
     $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ($manifest.source_commit -eq $ExpectedCommit) "发布 manifest 源提交与当前提交不一致。"
+    Assert-True ($manifest.release_version -eq $ExpectedReleaseVersion) "发布 manifest 版本与验收目标不一致。"
     Assert-True ($manifest.PSObject.Properties.Name -contains "source_dirty") "发布 manifest 缺少 source_dirty。"
     Assert-True (-not [bool]$manifest.source_dirty -or $AllowDirty) "正式验收拒绝 source_dirty=true 的发布包。"
     $entries = @($manifest.files)
@@ -279,6 +290,29 @@ function Assert-ReleaseManifest {
         Assert-True ((Get-Item -LiteralPath $fullPath).Length -eq [long]$entry.size) "manifest 文件大小不符：$relative"
         $actualHash = (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256).Hash.ToLowerInvariant()
         Assert-True ($actualHash -eq ([string]$entry.sha256).ToLowerInvariant()) "manifest 文件哈希不符：$relative"
+    }
+    foreach ($requiredManual in @(
+            "manuals/business-user-manual.docx",
+            "manuals/business-user-manual.pdf",
+            "manuals/windows-deployment-operations.docx",
+            "manuals/windows-deployment-operations.pdf")) {
+        Assert-True ($seen.ContainsKey($requiredManual)) "发布包缺少正式使用手册：$requiredManual"
+        $packagedManual = Join-Path $ReleaseRoot ($requiredManual.Replace('/', '\'))
+        $repositoryManual = Join-Path $repositoryRoot ("deliverables\" + [IO.Path]::GetFileName($requiredManual))
+        Assert-True (Test-Path -LiteralPath $repositoryManual -PathType Leaf) `
+            "仓库缺少与发布包对照的正式使用手册：$repositoryManual"
+        Assert-True ((Get-FileHash -LiteralPath $packagedManual -Algorithm SHA256).Hash -eq
+            (Get-FileHash -LiteralPath $repositoryManual -Algorithm SHA256).Hash) `
+            "发布包手册与当前已提交正式交付物不一致：$requiredManual"
+    }
+    Assert-True ($seen.ContainsKey("app/model-provisioner/model-provisioner.exe")) `
+        "发布包缺少独立模型准备程序。"
+    foreach ($generatedModelPath in @(
+            "data/model/algorithm-model.enc",
+            "data/model/algorithm-model-report.json",
+            "data/secrets/algorithm-model-key.txt")) {
+        Assert-True (-not $seen.ContainsKey($generatedModelPath)) `
+            "发布包不得预置模型运行文件或密钥：$generatedModelPath"
     }
     $actualFiles = @(
         Get-ChildItem -LiteralPath $ReleaseRoot -File -Recurse |
@@ -492,7 +526,10 @@ function Invoke-E2e {
         [string]$Dataset,
         [int]$ExpectedTotal,
         [string]$Script,
-        [string]$ResultRoot
+        [string]$ResultRoot,
+        [string]$NewPasswordFile = "",
+        [string]$ProjectCode = "",
+        [int]$ExpectedRecoveryPoints = 0
     )
     $savedPath = $env:PATH
     try {
@@ -502,14 +539,127 @@ function Invoke-E2e {
         $env:E2E_BASE_URL = "http://127.0.0.1:8080"
         $env:E2E_MODE = $Mode
         $env:E2E_DATASET = $Dataset
+        $invalidDataset = Join-Path $ReleaseRoot "samples\invalid\invalid_enum.csv"
+        Assert-True (Test-Path -LiteralPath $invalidDataset -PathType Leaf) `
+            "发布包缺少枚举错误样例：$invalidDataset"
+        $env:E2E_INVALID_DATASET = $invalidDataset
         $env:E2E_EXPECTED_TOTAL = [string]$ExpectedTotal
         $env:E2E_CYCLES = "1"
         $env:M5_OUTPUT_DIR = $ResultRoot
+        $env:E2E_SOURCE_COMMIT = $sourceCommit
+        $env:E2E_VISUAL_OUTPUT_DIR = Join-Path $ResultRoot "visual-inventory"
         $env:PLAYWRIGHT_BROWSERS_PATH = $playwrightBrowsers
+        if (-not [string]::IsNullOrWhiteSpace($NewPasswordFile)) {
+            $env:E2E_ADMIN_NEW_PASSWORD_FILE = $NewPasswordFile
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ProjectCode)) {
+            $env:E2E_PROJECT_CODE = $ProjectCode
+        }
+        if ($ExpectedRecoveryPoints -gt 0) {
+            $env:E2E_EXPECTED_RECOVERY_POINTS = [string]$ExpectedRecoveryPoints
+        }
         Invoke-CheckedCommand $Npm @("--prefix", $E2eRoot, "run", $Script) "Playwright $Script/$Mode 验收失败"
     } finally {
         $env:PATH = $savedPath
-        Remove-Item Env:E2E_ADMIN_USERNAME, Env:E2E_ADMIN_PASSWORD_FILE -ErrorAction SilentlyContinue
+        Remove-Item Env:E2E_ADMIN_USERNAME, Env:E2E_ADMIN_PASSWORD_FILE, `
+            Env:E2E_ADMIN_NEW_PASSWORD_FILE, Env:E2E_PROJECT_CODE, `
+            Env:E2E_EXPECTED_RECOVERY_POINTS, Env:E2E_SOURCE_COMMIT, `
+            Env:E2E_VISUAL_OUTPUT_DIR, Env:E2E_INVALID_DATASET -ErrorAction SilentlyContinue
+    }
+}
+
+function Assert-GeneratedModelFiles {
+    param([string]$ReleaseRoot)
+    $modelPath = Join-Path $ReleaseRoot "data\model\algorithm-model.enc"
+    $reportPath = Join-Path $ReleaseRoot "data\model\algorithm-model-report.json"
+    $keyPath = Join-Path $ReleaseRoot "data\secrets\algorithm-model-key.txt"
+    foreach ($path in @($modelPath, $reportPath, $keyPath)) {
+        Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "首次启动未生成模型运行文件：$path"
+        Assert-True ((Get-Item -LiteralPath $path).Length -gt 0) "模型运行文件为空：$path"
+    }
+    $key = [IO.File]::ReadAllText($keyPath, [Text.Encoding]::UTF8).Trim()
+    Assert-True ($key -match '^[A-Za-z0-9_-]{43}=$') "模型密钥格式无效。"
+    $modelText = [IO.File]::ReadAllText($modelPath, [Text.Encoding]::UTF8)
+    Assert-True (-not $modelText.Contains('LinearSVC') -and -not $modelText.Contains('AdaBoost')) `
+        "模型密文意外暴露可识别参数结构。"
+    $acl = Get-Acl -LiteralPath $keyPath
+    Assert-True ([bool]$acl.AreAccessRulesProtected) "模型密钥 ACL 仍继承父目录权限。"
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $allowIdentities = @($acl.Access | Where-Object {
+            $_.AccessControlType -eq [Security.AccessControl.AccessControlType]::Allow
+        } | ForEach-Object { [string]$_.IdentityReference })
+    Assert-True ($allowIdentities.Count -eq 1 -and $allowIdentities[0] -eq $identity) `
+        "模型密钥 ACL 未精确限制为当前部署用户。"
+}
+
+function New-ReleasePasswordFile {
+    param([string]$Path)
+    $bytes = New-Object byte[] 24
+    $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $generator.GetBytes($bytes)
+    } finally {
+        $generator.Dispose()
+    }
+    $password = "Release-RC-" + [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+    $observedSecrets.Add($password)
+    [IO.File]::WriteAllText($Path, $password, (New-Object Text.UTF8Encoding($false)))
+    return $password
+}
+
+function Set-AdminPasswordFile {
+    param([string]$Path, [string]$Password)
+    [IO.File]::WriteAllText($Path, $Password, (New-Object Text.UTF8Encoding($false)))
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $security = New-Object Security.AccessControl.FileSecurity
+    $security.SetAccessRuleProtection($true, $false)
+    $rule = New-Object Security.AccessControl.FileSystemAccessRule(
+        $identity, [Security.AccessControl.FileSystemRights]::FullControl,
+        [Security.AccessControl.AccessControlType]::Allow)
+    [void]$security.AddAccessRule($rule)
+    [IO.File]::SetAccessControl($Path, $security)
+}
+
+function Invoke-CrossInstanceRestoreCheck {
+    param(
+        [string]$ReleaseRoot,
+        [string]$ExternalBackup,
+        [string]$ExternalMetadata,
+        [string]$ResultRoot
+    )
+    foreach ($source in @($ExternalBackup, $ExternalMetadata)) {
+        Assert-True (Test-Path -LiteralPath $source -PathType Leaf) "跨实例恢复缺少外部备份文件：$source"
+    }
+    $destinationBackup = Join-Path $ReleaseRoot ("backups\" + [IO.Path]::GetFileName($ExternalBackup))
+    $destinationMetadata = $destinationBackup + ".meta.json"
+    Copy-Item -LiteralPath $ExternalBackup -Destination $destinationBackup
+    Copy-Item -LiteralPath $ExternalMetadata -Destination $destinationMetadata
+    Assert-True ((Get-FileHash -LiteralPath $destinationBackup -Algorithm SHA256).Hash -eq
+        (Get-FileHash -LiteralPath $ExternalBackup -Algorithm SHA256).Hash) "外部备份复制到新实例后哈希变化。"
+    Invoke-ReleaseScript $ReleaseRoot "backup-status.ps1" | Out-Null
+
+    $before = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "logs") `
+        -Filter "restore-verification-*.json" -File -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.FullName })
+    Invoke-ReleaseScript $ReleaseRoot "restore-verify.ps1" @("-BackupPath", $destinationBackup) | Out-Null
+    $created = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "logs") `
+        -Filter "restore-verification-*.json" -File |
+        Where-Object { $before -notcontains $_.FullName })
+    Assert-True ($created.Count -eq 1) "跨实例隔离恢复未生成唯一结果证据。"
+    $payload = Get-Content -LiteralPath $created[0].FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+    $identity = Get-Content -LiteralPath (Join-Path $ReleaseRoot "data\instance.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    Assert-True ([bool]$payload.restored_to_isolated_instance) "跨实例恢复没有使用隔离实例。"
+    Assert-True ([string]$payload.origin_instance_id -ne [string]$identity.instance_id) `
+        "外部备份与新实例 ID 相同，未证明跨实例迁移。"
+    Assert-True (@($payload.database_facts.PSObject.Properties).Count -ge 17) `
+        "跨实例恢复结果缺少数据库对账事实。"
+    $savedEvidence = Join-Path $ResultRoot "cross-instance-restore-verification.json"
+    Copy-Item -LiteralPath $created[0].FullName -Destination $savedEvidence
+    return [ordered]@{
+        origin_instance_id = [string]$payload.origin_instance_id
+        destination_instance_id = [string]$identity.instance_id
+        fact_count = @($payload.database_facts.PSObject.Properties).Count
+        evidence_sha256 = (Get-FileHash -LiteralPath $savedEvidence -Algorithm SHA256).Hash.ToLowerInvariant()
     }
 }
 
@@ -537,6 +687,16 @@ function Invoke-BackupCheck {
     $metadata = Get-Content -LiteralPath $metadataPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $instance = Get-Content -LiteralPath (Join-Path $ReleaseRoot "data\instance.json") -Raw -Encoding UTF8 | ConvertFrom-Json
     $manifest = Get-Content -LiteralPath (Join-Path $ReleaseRoot "release-manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $preexistingForeignNames = @()
+    foreach ($existingBackup in $before) {
+        $existingMetadataPath = $existingBackup.FullName + ".meta.json"
+        Assert-True (Test-Path -LiteralPath $existingMetadataPath -PathType Leaf) `
+            "既有恢复点缺少元数据：$existingMetadataPath"
+        $existingMetadata = Get-Content -LiteralPath $existingMetadataPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        Assert-True ([string]$existingMetadata.origin_instance_id -ne [string]$instance.instance_id) `
+            "全新验收目录不应预先存在当前实例恢复点：$($existingBackup.Name)"
+        $preexistingForeignNames += $existingBackup.Name
+    }
     Assert-True ($metadata.origin_instance_id -eq $instance.instance_id -and
         $metadata.origin_source_commit -eq $manifest.source_commit -and
         [Int64]$metadata.size_bytes -eq [Int64]$newBackup[0].Length -and
@@ -589,10 +749,30 @@ function Invoke-BackupCheck {
     $retainedDumps = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "backups") -Filter "*.dump" -File)
     $retainedMetadata = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "backups") `
         -Filter "*.dump.meta.json" -File)
-    Assert-True ($retainedDumps.Count -eq 2 -and $retainedMetadata.Count -eq 2) `
-        "RetentionCount=2 未精确保留两个恢复点。"
+    $retainedPoints = @($retainedDumps | ForEach-Object {
+        $pointMetadataPath = $_.FullName + ".meta.json"
+        Assert-True (Test-Path -LiteralPath $pointMetadataPath -PathType Leaf) `
+            "保留后的恢复点缺少元数据：$pointMetadataPath"
+        [PSCustomObject]@{
+            Dump = $_
+            Metadata = (Get-Content -LiteralPath $pointMetadataPath -Raw -Encoding UTF8 | ConvertFrom-Json)
+        }
+    })
+    $currentRetained = @($retainedPoints | Where-Object {
+            [string]$_.Metadata.origin_instance_id -eq [string]$instance.instance_id })
+    $foreignRetained = @($retainedPoints | Where-Object {
+            [string]$_.Metadata.origin_instance_id -ne [string]$instance.instance_id })
+    Assert-True ($currentRetained.Count -eq 2 -and $retainedMetadata.Count -eq $retainedDumps.Count) `
+        "RetentionCount=2 未精确保留两个当前实例恢复点。"
+    Assert-True ($foreignRetained.Count -eq $preexistingForeignNames.Count) `
+        "保留策略改变了外部迁移恢复点数量。"
+    foreach ($foreignName in $preexistingForeignNames) {
+        Assert-True (@($foreignRetained | Where-Object { $_.Dump.Name -eq $foreignName }).Count -eq 1) `
+            "保留策略删除或替换了外部迁移恢复点：$foreignName"
+    }
     Invoke-ReleaseScript $ReleaseRoot "backup-status.ps1" | Out-Null
-    $latestBackup = @($retainedDumps | Sort-Object LastWriteTimeUtc -Descending)[0]
+    $latestCurrentPoint = @($currentRetained | Sort-Object { $_.Dump.LastWriteTimeUtc } -Descending)[0]
+    $latestBackup = $latestCurrentPoint.Dump
     return [PSCustomObject]@{
         BackupPath = $latestBackup.FullName
         EvidencePath = $savedEvidence
@@ -670,27 +850,7 @@ function Assert-ServiceLogsClean {
 
 function Stop-ReleaseSafely {
     param([string]$ReleaseRoot)
-    $scheduleScript = Join-Path $ReleaseRoot "scripts\backup-schedule.ps1"
-    if (Test-Path -LiteralPath $scheduleScript -PathType Leaf) {
-        try {
-            [void](Invoke-NativeProcess $powerShellExe @(
-                "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scheduleScript,
-                "-Action", "Remove") $ReleaseRoot)
-        } catch {
-            Write-Warning "清理时移除每日备份任务失败：$($_.Exception.Message)"
-        }
-    }
-    $stopScript = Join-Path $ReleaseRoot "scripts\stop.ps1"
-    if (Test-Path -LiteralPath $stopScript -PathType Leaf) {
-        try {
-            $stopResult = Invoke-NativeProcess $powerShellExe @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $stopScript) $ReleaseRoot
-            foreach ($line in $stopResult.Output) {
-                Write-Host $line
-            }
-        } catch {
-            Write-Warning "清理时 stop.ps1 失败：$($_.Exception.Message)"
-        }
-    }
+    $failures = New-Object System.Collections.Generic.List[string]
     $cleanupAlias = $null
     $postgresRecordPath = Join-Path $ReleaseRoot "pids\postgresql.json"
     if (Test-Path -LiteralPath $postgresRecordPath -PathType Leaf) {
@@ -718,7 +878,36 @@ function Stop-ReleaseSafely {
                 $cleanupAlias = $recordWorkingRoot
             }
         } catch {
-            Write-Warning "未能验证 PostgreSQL 清理 Junction：$($_.Exception.Message)"
+            [void]$failures.Add("未能验证 PostgreSQL 清理 Junction：$($_.Exception.Message)")
+        }
+    }
+    $instanceIdentityPath = Join-Path $ReleaseRoot "data\instance.json"
+    $instanceIdentityExists = Test-Path -LiteralPath $instanceIdentityPath -PathType Leaf
+    $scheduleScript = Join-Path $ReleaseRoot "scripts\backup-schedule.ps1"
+    if ($instanceIdentityExists -and (Test-Path -LiteralPath $scheduleScript -PathType Leaf)) {
+        try {
+            $scheduleResult = Invoke-NativeProcess $powerShellExe @(
+                "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scheduleScript,
+                "-Action", "Remove") $ReleaseRoot
+            if ($scheduleResult.ExitCode -ne 0) {
+                [void]$failures.Add("移除每日备份任务退出 $($scheduleResult.ExitCode)：$($scheduleResult.Output -join ' | ')")
+            }
+        } catch {
+            [void]$failures.Add("移除每日备份任务异常：$($_.Exception.Message)")
+        }
+    }
+    $stopScript = Join-Path $ReleaseRoot "scripts\stop.ps1"
+    if ($instanceIdentityExists -and (Test-Path -LiteralPath $stopScript -PathType Leaf)) {
+        try {
+            $stopResult = Invoke-NativeProcess $powerShellExe @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $stopScript) $ReleaseRoot
+            foreach ($line in $stopResult.Output) {
+                Write-Host $line
+            }
+            if ($stopResult.ExitCode -ne 0) {
+                [void]$failures.Add("stop.ps1 退出 $($stopResult.ExitCode)：$($stopResult.Output -join ' | ')")
+            }
+        } catch {
+            [void]$failures.Add("stop.ps1 异常：$($_.Exception.Message)")
         }
     }
     foreach ($recordPath in @(Get-ChildItem -LiteralPath (Join-Path $ReleaseRoot "pids") -Filter "*.json" -File -ErrorAction SilentlyContinue)) {
@@ -737,10 +926,19 @@ function Stop-ReleaseSafely {
                         [IO.Path]::GetFullPath([string]$record.executable_path),
                         [StringComparison]::OrdinalIgnoreCase)) "清理 PID 记录与实际可执行路径不一致。"
                 Assert-True (([string]$actual.CommandLine).Trim() -eq ([string]$record.command_line).Trim()) "清理 PID 记录与实际命令行不一致。"
-                Stop-Process -Id ([int]$record.pid) -Force -ErrorAction SilentlyContinue
+                Stop-Process -Id ([int]$record.pid) -Force -ErrorAction Stop
+                foreach ($attempt in 1..50) {
+                    if ($null -eq (Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$record.pid)" -ErrorAction SilentlyContinue)) {
+                        break
+                    }
+                    Start-Sleep -Milliseconds 200
+                }
+                if ($null -ne (Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$record.pid)" -ErrorAction SilentlyContinue)) {
+                    throw "进程在 10 秒有界等待后仍未退出：$($record.pid)"
+                }
             }
         } catch {
-            Write-Warning "清理 PID 记录失败：$($recordPath.FullName)：$($_.Exception.Message)"
+            [void]$failures.Add("清理 PID 记录失败：$($recordPath.FullName)：$($_.Exception.Message)")
         }
     }
     foreach ($port in @(55432, 8001, 8080)) {
@@ -753,10 +951,19 @@ function Stop-ReleaseSafely {
                     } else {
                         Assert-PathOwnedByReleaseOrAlias ([string]$actual.ExecutablePath) $ReleaseRoot $cleanupAlias "清理端口 $port 的进程"
                     }
-                    Stop-Process -Id ([int]$owner) -Force -ErrorAction SilentlyContinue
+                    Stop-Process -Id ([int]$owner) -Force -ErrorAction Stop
+                    foreach ($attempt in 1..50) {
+                        if ($null -eq (Get-CimInstance Win32_Process -Filter "ProcessId = $owner" -ErrorAction SilentlyContinue)) {
+                            break
+                        }
+                        Start-Sleep -Milliseconds 200
+                    }
+                    if ($null -ne (Get-CimInstance Win32_Process -Filter "ProcessId = $owner" -ErrorAction SilentlyContinue)) {
+                        throw "端口 $port 的发布进程在 10 秒有界等待后仍未退出：$owner"
+                    }
                 }
             } catch {
-                Write-Warning "清理端口 $port 的发布进程失败：$($_.Exception.Message)"
+                [void]$failures.Add("清理端口 $port 的发布进程失败：$($_.Exception.Message)")
             }
         }
     }
@@ -766,9 +973,26 @@ function Stop-ReleaseSafely {
             [IO.Directory]::Delete($cleanupAlias, $false)
             Assert-True (-not (Test-Path -LiteralPath $cleanupAlias)) "清理后受控 Junction 仍存在：$cleanupAlias"
         } catch {
-            Write-Warning "清理受控 Junction 失败：$($_.Exception.Message)"
+            [void]$failures.Add("清理受控 Junction 失败：$($_.Exception.Message)")
         }
     }
+    foreach ($port in @(55432, 8001, 8080)) {
+        foreach ($owner in @(Get-ListeningOwners $port)) {
+            try {
+                $actual = Get-CimInstance Win32_Process -Filter "ProcessId = $owner" -ErrorAction SilentlyContinue
+                if ($null -eq $actual) { continue }
+                if ($port -eq 8001) {
+                    Assert-PathUnderRoot ([string]$actual.ExecutablePath) $ReleaseRoot "复验端口 $port 的进程"
+                } else {
+                    Assert-PathOwnedByReleaseOrAlias ([string]$actual.ExecutablePath) $ReleaseRoot $cleanupAlias "复验端口 $port 的进程"
+                }
+                [void]$failures.Add("清理后端口 $port 仍由本发布进程 $owner 占用。")
+            } catch {
+                Write-Warning "清理后端口 $port 由非本发布进程占用，未执行越界停止：$($_.Exception.Message)"
+            }
+        }
+    }
+    return @($failures)
 }
 
 try {
@@ -785,6 +1009,11 @@ try {
 
     $runRoot = Join-Path $OutputRoot ((Get-Date -Format "yyyyMMdd-HHmmss") + "-" + [Guid]::NewGuid().ToString("N").Substring(0, 8))
     New-Item -ItemType Directory -Path $runRoot | Out-Null
+    $credentialRoot = Join-Path $runRoot ".credentials"
+    $externalBackupRoot = Join-Path $runRoot "external-backup"
+    if ($BusinessRelease) {
+        New-Item -ItemType Directory -Path $credentialRoot, $externalBackupRoot | Out-Null
+    }
     $e2eRoot = Join-Path $runRoot "tools\e2e"
     New-Item -ItemType Directory -Path $e2eRoot -Force | Out-Null
     Copy-Item -Path (Join-Path $repositoryRoot "tests\e2e\*.ts") -Destination $e2eRoot
@@ -806,13 +1035,16 @@ try {
     )
     $roundSummaries = @()
     $maintenanceSummaries = @()
+    $externalBackup = $null
+    $externalMetadata = $null
+    $crossInstanceSummary = $null
 
     for ($index = 0; $index -lt $destinations.Count; $index += 1) {
         $round = $index + 1
         Write-Host "开始第 $round 轮全新目录验收：$($destinations[$index])"
         $releaseRoot = Expand-FreshRelease $archive $destinations[$index]
         [void]$releaseRoots.Add($releaseRoot)
-        Assert-ReleaseManifest $releaseRoot $sourceCommit
+        Assert-ReleaseManifest $releaseRoot $sourceCommit $ReleaseVersion
 
         $restrictedPath = @(
             (Join-Path $releaseRoot "runtime\jre\bin"),
@@ -841,18 +1073,14 @@ try {
         Invoke-ReleaseScript $releaseRoot "preflight.ps1" | Out-Null
         Invoke-ReleaseScript $releaseRoot "start.ps1" | Out-Null
         Assert-HealthUp
+        Assert-GeneratedModelFiles $releaseRoot
         $instanceIdentity = Get-Content -LiteralPath (Join-Path $releaseRoot "data\instance.json") `
             -Raw -Encoding UTF8 | ConvertFrom-Json
         $backupTaskName = "AlertManagementSystem-Backup-" + [string]$instanceIdentity.instance_id
+        [void]$managedBackupTasks.Add($backupTaskName)
         Invoke-ReleaseScript $releaseRoot "backup-schedule.ps1" @(
             "-Action", "Configure", "-DailyAt", "23:59", "-RetentionCount", "2") | Out-Null
         Invoke-ReleaseScript $releaseRoot "backup-schedule.ps1" @("-Action", "Status") | Out-Null
-        $adminPasswordFile = Initialize-AdminCredential $releaseRoot
-        $processInventory = Assert-ProcessInventory $releaseRoot
-        $startedPids = @($processInventory.Pids)
-        $postgresAlias = [string]$processInventory.PostgresAlias
-
-        Invoke-ResetCheck $releaseRoot $adminPasswordFile
         $roundResultRoot = Join-Path $runRoot "round-$round-results"
         New-Item -ItemType Directory -Path $roundResultRoot | Out-Null
         $smokeDataset = Join-Path $releaseRoot "samples\smoke\synthetic_smoke_utf8.csv"
@@ -860,9 +1088,59 @@ try {
         Assert-True (Test-Path -LiteralPath $smokeDataset -PathType Leaf) "发布包缺少 300 行样例。"
         Assert-True (Test-Path -LiteralPath $demoDataset -PathType Leaf) "发布包缺少 20k 样例。"
 
+        if ($BusinessRelease) {
+            $adminPasswordFile = Join-Path $releaseRoot "data\secrets\bootstrap-admin-password.txt"
+            Assert-True (Test-Path -LiteralPath $adminPasswordFile -PathType Leaf) "缺少初始管理员密码文件。"
+            $bootstrapPassword = [IO.File]::ReadAllText($adminPasswordFile, [Text.Encoding]::UTF8).Trim()
+            Assert-True (-not [string]::IsNullOrWhiteSpace($bootstrapPassword)) "初始管理员密码为空。"
+            $observedSecrets.Add($bootstrapPassword)
+            $newPasswordFile = Join-Path $credentialRoot "round-$round-new-password.txt"
+            $newPassword = New-ReleasePasswordFile $newPasswordFile
+            $projectCode = "RELEASE-R$round-$($sourceCommit.Substring(0, 8).ToUpperInvariant())"
+            if ($round -eq 1) {
+                Invoke-E2e $e2eRoot $npm $releaseRoot "visual-inventory" $smokeDataset 300 `
+                    "test:visual-inventory" $roundResultRoot $newPasswordFile $projectCode
+            } else {
+                Invoke-E2e $e2eRoot $npm $releaseRoot "release-bootstrap" $smokeDataset 300 `
+                    "test:release-bootstrap" $roundResultRoot $newPasswordFile $projectCode
+            }
+            Set-AdminPasswordFile $adminPasswordFile $newPassword
+            Remove-Item -LiteralPath $newPasswordFile -Force
+        } else {
+            $adminPasswordFile = Initialize-AdminCredential $releaseRoot
+        }
+        $processInventory = Assert-ProcessInventory $releaseRoot
+        $startedPids = @($processInventory.Pids)
+        $postgresAlias = [string]$processInventory.PostgresAlias
+        if (-not [string]::IsNullOrWhiteSpace($postgresAlias)) {
+            [void]$managedPostgresAliases.Add([pscustomobject]@{
+                    Alias = $postgresAlias
+                    ReleaseRoot = $releaseRoot
+                })
+        }
+
+        Invoke-ResetCheck $releaseRoot $adminPasswordFile
+        if ($BusinessRelease -and $round -eq 2) {
+            $crossInstanceSummary = Invoke-CrossInstanceRestoreCheck $releaseRoot `
+                $externalBackup $externalMetadata $roundResultRoot
+        }
+
         Invoke-E2e $e2eRoot $npm $releaseRoot "smoke" $smokeDataset 300 "test:smoke" $roundResultRoot
         $backupCheck = Invoke-BackupCheck $releaseRoot $postgresAlias $roundResultRoot
         $backupPath = [string]$backupCheck.BackupPath
+        if ($BusinessRelease) {
+            Invoke-E2e $e2eRoot $npm $releaseRoot "release-backup" $smokeDataset 300 `
+                "test:release-backup-status" $roundResultRoot "" "" (1 + $round)
+            if ($round -eq 1) {
+                $externalBackup = Join-Path $externalBackupRoot ([IO.Path]::GetFileName($backupPath))
+                $externalMetadata = $externalBackup + ".meta.json"
+                Copy-Item -LiteralPath $backupPath -Destination $externalBackup
+                Copy-Item -LiteralPath ($backupPath + ".meta.json") -Destination $externalMetadata
+                Assert-True ((Get-FileHash -LiteralPath $externalBackup -Algorithm SHA256).Hash -eq
+                    (Get-FileHash -LiteralPath $backupPath -Algorithm SHA256).Hash) `
+                    "导出到发布目录外的备份哈希变化。"
+            }
+        }
         Invoke-ResetCheck $releaseRoot $adminPasswordFile
         Assert-True (Test-Path -LiteralPath $backupPath -PathType Leaf) "演示复位越界删除了备份。"
         Invoke-ReleaseScript $releaseRoot "restore-verify.ps1" @(
@@ -913,6 +1191,18 @@ try {
             "cleanup-instance.ps1 未清理当前实例维护锁文件。"
         Assert-True (Test-Path -LiteralPath $backupPath -PathType Leaf) `
             "cleanup-instance.ps1 默认不应删除备份。"
+        if ($BusinessRelease -and $round -eq 1) {
+            $firstDestination = [IO.Path]::GetFullPath($destinations[0]).TrimEnd('\')
+            $runPrefix = [IO.Path]::GetFullPath($runRoot).TrimEnd('\') + '\'
+            Assert-True ($firstDestination.StartsWith($runPrefix, [StringComparison]::OrdinalIgnoreCase)) `
+                "拒绝清理验收运行根以外的第一实例目录。"
+            Assert-True (Test-Path -LiteralPath $externalBackup -PathType Leaf) `
+                "清理第一实例前缺少外部备份。"
+            Remove-Item -LiteralPath $firstDestination -Recurse -Force
+            Assert-True (-not (Test-Path -LiteralPath $firstDestination)) "第一实例目录清理失败。"
+            Assert-True (Test-Path -LiteralPath $externalBackup -PathType Leaf) `
+                "清理第一实例越界删除了外部备份。"
+        }
         $roundSummaries += ,$roundSummary
         Write-Host "第 $round 轮验收通过。"
     }
@@ -920,21 +1210,82 @@ try {
     $firstSummary = $roundSummaries[0] | ConvertTo-Json -Depth 20 -Compress
     $secondSummary = $roundSummaries[1] | ConvertTo-Json -Depth 20 -Compress
     Assert-True ($firstSummary -eq $secondSummary) "两轮规范化业务摘要不一致。"
+    if ($BusinessRelease) {
+        Assert-True ($null -ne $crossInstanceSummary) "发布候选缺少跨实例恢复结果。"
+    }
+    $verificationIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $verificationPrincipal = New-Object Security.Principal.WindowsPrincipal($verificationIdentity)
     [ordered]@{
         source_commit = $sourceCommit
         archive = $archive
         archive_sha256 = $archiveHash
         completed_at = (Get-Date).ToUniversalTime().ToString("o")
+        windows_identity = $verificationIdentity.Name
+        windows_is_administrator = $verificationPrincipal.IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
         rounds = 2
+        business_release = [bool]$BusinessRelease
         normalized_summary = $roundSummaries[0]
         instance_maintenance = $maintenanceSummaries
+        cross_instance_restore = $crossInstanceSummary
     } | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath (Join-Path $runRoot "verification-summary.json") -Encoding UTF8
-    Write-Host "M6 Windows 原生发布双目录验收通过。"
+    if ($BusinessRelease) {
+        Write-Host "M14 Windows 原生发布业务终验预检查通过。"
+    } else {
+        Write-Host "M6 Windows 原生发布双目录验收通过。"
+    }
     Write-Host "NATIVE_VERIFICATION_ROOT=$runRoot"
+} catch {
+    $primaryFailure = $_
 } finally {
     $env:PATH = $originalPath
     $env:PATHEXT = $originalPathExt
     for ($index = $releaseRoots.Count - 1; $index -ge 0; $index -= 1) {
-        Stop-ReleaseSafely ([string]$releaseRoots[$index])
+        foreach ($failure in @(Stop-ReleaseSafely ([string]$releaseRoots[$index]))) {
+            [void]$cleanupFailures.Add([string]$failure)
+        }
     }
+    foreach ($managedAlias in @($managedPostgresAliases)) {
+        $aliasPath = [string]$managedAlias.Alias
+        $managedReleaseRoot = [string]$managedAlias.ReleaseRoot
+        if (-not (Test-Path -LiteralPath $aliasPath)) { continue }
+        try {
+            Assert-JunctionTargetsRelease $aliasPath $managedReleaseRoot
+            [IO.Directory]::Delete($aliasPath, $false)
+            Assert-True (-not (Test-Path -LiteralPath $aliasPath)) `
+                "兜底清理后受控 Junction 仍存在：$aliasPath"
+        } catch {
+            [void]$cleanupFailures.Add("兜底清理受控 Junction 失败：$aliasPath：$($_.Exception.Message)")
+        }
+    }
+    foreach ($taskName in @($managedBackupTasks | Select-Object -Unique)) {
+        try {
+            if ($null -ne (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) {
+                Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction Stop
+            }
+            if ($null -ne (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) {
+                throw "计划任务在清理后仍存在：$taskName"
+            }
+        } catch {
+            [void]$cleanupFailures.Add("清理精确计划任务失败：$taskName：$($_.Exception.Message)")
+        }
+    }
+    if ($null -ne $credentialRoot -and (Test-Path -LiteralPath $credentialRoot)) {
+        try {
+            Remove-Item -LiteralPath $credentialRoot -Recurse -Force -ErrorAction Stop
+        } catch {
+            [void]$cleanupFailures.Add("清理临时凭据目录失败：$($_.Exception.Message)")
+        }
+    }
+}
+if ($cleanupFailures.Count -gt 0) {
+    $cleanupMessage = "发布验收清理不完整：`n" + ($cleanupFailures -join "`n")
+    if ($null -ne $primaryFailure) {
+        Write-Error $cleanupMessage -ErrorAction Continue
+    } else {
+        throw $cleanupMessage
+    }
+}
+if ($null -ne $primaryFailure) {
+    throw $primaryFailure
 }

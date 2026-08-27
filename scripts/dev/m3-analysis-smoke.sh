@@ -2,10 +2,50 @@
 
 source "$(dirname "$0")/common.sh"
 
-"$REPOSITORY_ROOT/scripts/dev/start.sh"
+# M1/M2 共用的开发实例可能仍在占用固定端口；M3 必须先结束它，
+# 再切换到本轮专属容器、卷和密钥目录。
+"$REPOSITORY_ROOT/scripts/dev/stop.sh"
 
 M3_RUNTIME="$RUNTIME_DIR/m3"
 mkdir -p "$M3_RUNTIME"
+m3_run_id="${GITHUB_RUN_ID:-local}-$$"
+export APP_SECRETS_DIR="$M3_RUNTIME/secrets-$m3_run_id"
+DEV_SECRET_ROOT="$APP_SECRETS_DIR"
+DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE="$DEV_SECRET_ROOT/bootstrap-admin-password.txt"
+export POSTGRES_CONTAINER="alert-management-m3-postgres-$m3_run_id"
+export POSTGRES_VOLUME="alert_management_m3_pgdata_${m3_run_id//-/_}"
+export POSTGRES_RUNTIME_SCOPE="m3-$m3_run_id"
+
+cleanup_m3() {
+  "$REPOSITORY_ROOT/scripts/dev/stop.sh" >/dev/null 2>&1 || true
+  if docker_run container inspect "$POSTGRES_CONTAINER" >/dev/null 2>&1; then
+    container_scope=$(docker_run inspect --format \
+      '{{ index .Config.Labels "alert-management-runtime-scope" }}' "$POSTGRES_CONTAINER")
+    if [[ "$container_scope" == "$POSTGRES_RUNTIME_SCOPE" ]]; then
+      docker_run rm --force "$POSTGRES_CONTAINER" >/dev/null
+    else
+      echo "拒绝清理范围不匹配的 M3 容器：$POSTGRES_CONTAINER" >&2
+    fi
+  fi
+  if docker_run volume inspect "$POSTGRES_VOLUME" >/dev/null 2>&1; then
+    volume_scope=$(docker_run volume inspect --format \
+      '{{ index .Labels "alert-management-runtime-scope" }}' "$POSTGRES_VOLUME")
+    if [[ "$volume_scope" == "$POSTGRES_RUNTIME_SCOPE" ]]; then
+      docker_run volume rm "$POSTGRES_VOLUME" >/dev/null
+    else
+      echo "拒绝清理范围不匹配的 M3 数据卷：$POSTGRES_VOLUME" >&2
+    fi
+  fi
+}
+trap cleanup_m3 EXIT
+
+docker_run volume create \
+  --label alert-management-demo=m3 \
+  --label "alert-management-runtime-scope=$POSTGRES_RUNTIME_SCOPE" \
+  "$POSTGRES_VOLUME" >/dev/null
+
+"$REPOSITORY_ROOT/scripts/dev/start.sh"
+
 DEFAULT_PROJECT_ID="00000000-0000-0000-0000-000000000001"
 dev_admin_login "$M3_RUNTIME"
 
@@ -74,6 +114,10 @@ actual_records = [
 ]
 assert actual_records == expected["records"], (actual_records, expected["records"])
 assert all(item["evidence"] for item in actual["results"]), actual["results"]
+assert all(
+    any("SUPERVISED_CAUSE_V2" in evidence for evidence in item["evidence"])
+    for item in actual["results"]
+), "监督模型未参与全部记录的可解释分析"
 
 def instant(value):
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -197,6 +241,8 @@ assert_analysis_storage "$failed_run" 0 0
 (
   cd "$REPOSITORY_ROOT/src/algorithm"
   nohup env ALGORITHM_HOST=127.0.0.1 ALGORITHM_PORT=8001 \
+    ALGORITHM_MODEL_FILE="$DEV_SECRET_ROOT/algorithm-model.enc" \
+    ALGORITHM_MODEL_KEY_FILE="$DEV_SECRET_ROOT/algorithm-model-key.txt" \
     "$PYTHON_VENV/bin/python" -m algorithm_service \
     </dev/null >"$LOG_DIR/algorithm.log" 2>&1 &
   echo $! > "$PID_DIR/algorithm.pid"

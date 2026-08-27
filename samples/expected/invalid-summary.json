@@ -1,15 +1,60 @@
 {
   "schema_version": 1,
   "synthetic": true,
-  "generator_version": "2.0.0",
+  "generator_version": "3.0.0",
   "seed": 20260825,
   "valid_rows_definition": "通过文件级与逐行校验、可进入 READY 的数据行数；文件级阻断时为 0",
   "row_validation_skipped_on_file_error": true,
-  "total_data_rows": 42,
+  "total_data_rows": 43,
   "total_valid_rows": 0,
-  "total_file_errors": 1,
+  "total_file_errors": 4,
   "total_row_errors": 36,
   "files": {
+    "empty.csv": {
+      "data_rows": 0,
+      "total_rows": 0,
+      "valid_rows": 0,
+      "expected_error_code": "EMPTY_FILE",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "file_errors": [
+        {
+          "source_row": 1,
+          "field": "_file",
+          "code": "EMPTY_FILE"
+        }
+      ],
+      "row_errors": []
+    },
+    "unsupported_format.json": {
+      "data_rows": 0,
+      "total_rows": 0,
+      "valid_rows": 0,
+      "expected_error_code": "UNSUPPORTED_FORMAT",
+      "sha256": "729cd4435656683931ea719191f6786bbca51754bd7e573f413a655d71fdde49",
+      "file_errors": [
+        {
+          "source_row": 1,
+          "field": "_file",
+          "code": "UNSUPPORTED_FORMAT"
+        }
+      ],
+      "row_errors": []
+    },
+    "field_too_long.csv": {
+      "data_rows": 1,
+      "total_rows": 1,
+      "valid_rows": 0,
+      "expected_error_code": "IMPORT_CELL_LIMIT",
+      "sha256": "5d57f100456cf41d4e035c6845d2c066f5c135108d7065c5ceff84ddb08ad060",
+      "file_errors": [
+        {
+          "source_row": 2,
+          "field": "description",
+          "code": "IMPORT_CELL_LIMIT"
+        }
+      ],
+      "row_errors": []
+    },
     "missing_header.csv": {
       "data_rows": 6,
       "total_rows": 6,

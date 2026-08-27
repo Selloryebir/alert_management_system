@@ -23,6 +23,7 @@ from algorithm_service.models import (
     NoiseType,
     RecordResult,
 )
+from algorithm_service.supervised import configured_model, has_conservative_language
 
 
 RULE_VERSION = "hybrid-v2.0.0"
@@ -136,6 +137,18 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
 
     chain_evidence: dict[UUID, list[str]] = defaultdict(list)
     chains = _event_chains(request, chain_evidence)
+    model = configured_model()
+    supervised_decisions = (
+        dict(
+            zip(
+                (record.record_id for record in request.records),
+                model.decide_many(request.records),
+                strict=True,
+            )
+        )
+        if model is not None
+        else {}
+    )
     results: list[RecordResult] = []
     for record in _ordered(request.records):
         record_strengths = strengths[record.record_id]
@@ -157,6 +170,19 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
         evidence.extend(chain_evidence[record.record_id])
         cause, cause_evidence = _cause_category(record, request)
         evidence.append(cause_evidence)
+        if model is not None:
+            supervised = supervised_decisions[record.record_id]
+            if cause == "UNKNOWN" and supervised.accepted:
+                cause = supervised.category
+                evidence.append(supervised.evidence + "；专家模型弃权，由双分支一致结果补充。")
+            elif cause == "UNKNOWN":
+                evidence.append(supervised.evidence + "；专家模型与监督模型均保留 UNKNOWN。")
+            elif supervised.accepted and supervised.category == cause:
+                evidence.append(supervised.evidence + "；与专家建议一致，专家结果保持不变。")
+            elif supervised.accepted:
+                evidence.append(supervised.evidence + "；与专家建议冲突，专家结果保持不变。")
+            else:
+                evidence.append(supervised.evidence + "；监督分支弃权，专家结果保持不变。")
         results.append(
             RecordResult(
                 record_id=record.record_id,
@@ -233,9 +259,9 @@ def _mark_duplicates(
     strengths: dict[UUID, dict[NoiseType, float]],
     evidence: dict[UUID, dict[NoiseType, str]],
 ) -> None:
-    grouped: dict[
-        tuple[str, str, str | None, str, tuple[object, ...]], list[AlarmRecord]
-    ] = defaultdict(list)
+    grouped: dict[tuple[str, str, str | None, str, tuple[object, ...]], list[AlarmRecord]] = (
+        defaultdict(list)
+    )
     for record in request.records:
         grouped[(*_alarm_group(record), _core(record))].append(record)
 
@@ -247,15 +273,21 @@ def _mark_duplicates(
                 timestamp_groups.append([record])
             else:
                 timestamp_groups[-1].append(record)
-        for previous_group, current_group in zip(timestamp_groups, timestamp_groups[1:], strict=False):
+        for previous_group, current_group in zip(
+            timestamp_groups, timestamp_groups[1:], strict=False
+        ):
             delta = _seconds(previous_group[0].event_time, current_group[0].event_time)
             if delta > window:
                 continue
             strength = exp(-delta / window)
             for record in previous_group:
-                _set_duplicate(record, current_group[0], delta, window, strength, strengths, evidence)
+                _set_duplicate(
+                    record, current_group[0], delta, window, strength, strengths, evidence
+                )
             for record in current_group:
-                _set_duplicate(record, previous_group[-1], delta, window, strength, strengths, evidence)
+                _set_duplicate(
+                    record, previous_group[-1], delta, window, strength, strengths, evidence
+                )
 
 
 def _set_duplicate(
@@ -306,8 +338,7 @@ def _mark_chatter(
             )
 
         transformed = [
-            prefix_transitions[index] - minimum_ratio * index
-            for index in range(len(ordered))
+            prefix_transitions[index] - minimum_ratio * index for index in range(len(ordered))
         ]
         tree_size = 1
         while tree_size < len(transformed):
@@ -315,9 +346,7 @@ def _mark_chatter(
         minimum_tree = [float("inf")] * (tree_size * 2)
         minimum_tree[tree_size : tree_size + len(transformed)] = transformed
         for index in range(tree_size - 1, 0, -1):
-            minimum_tree[index] = min(
-                minimum_tree[index * 2], minimum_tree[index * 2 + 1]
-            )
+            minimum_tree[index] = min(minimum_tree[index * 2], minimum_tree[index * 2 + 1])
 
         def first_qualifying_start(
             node: int,
@@ -550,7 +579,9 @@ def _event_chains(
             for first, second in zip(episode, episode[1:], strict=False):
                 edge = first.tag, second.tag
                 actual_lag = _seconds(first.event_time, second.event_time)
-                can_extend = edge in valid_edges and actual_lag <= request.parameters.chain_window_seconds
+                can_extend = (
+                    edge in valid_edges and actual_lag <= request.parameters.chain_window_seconds
+                )
                 if can_extend and path:
                     can_extend = path[-1].record_id == first.record_id
                 if can_extend:
@@ -591,7 +622,8 @@ def _append_chain(
     member_ids = [member.record_id for member in members]
     chain_id = uuid5(
         NAMESPACE_URL,
-        f"{RULE_VERSION}:{ASSOCIATION_RULE}:" + ":".join(str(member_id) for member_id in member_ids),
+        f"{RULE_VERSION}:{ASSOCIATION_RULE}:"
+        + ":".join(str(member_id) for member_id in member_ids),
     )
     explanation = (
         f"{ASSOCIATION_RULE}；关系键为 {members[0].site}/{members[0].area}/"
@@ -632,12 +664,17 @@ def _term_present(term: str, text: str, english_tokens: set[str]) -> bool:
 
 
 def _cause_category(record: AlarmRecord, request: AnalysisRequest) -> tuple[CauseCategory, str]:
+    if has_conservative_language(record):
+        return (
+            "UNKNOWN",
+            "EXPERT_CAUSE_V2：文本明确表示未确认、排除故障或证据不足，"
+            "保守语义边界命中，保留 UNKNOWN。",
+        )
     text = f"{record.tag} {record.description}".lower()
     english_tokens = set(re.findall(r"[a-z0-9]+", text))
     feature_terms = sorted({term for weights in EXPERT_WEIGHTS.values() for term in weights})
     features = {
-        term: 1.0 if _term_present(term, text, english_tokens) else 0.0
-        for term in feature_terms
+        term: 1.0 if _term_present(term, text, english_tokens) else 0.0 for term in feature_terms
     }
     feature_norm = sqrt(sum(value * value for value in features.values()))
     maintenance_present = any(features[term] > 0 for term in MAINTENANCE_TERMS)

@@ -13,7 +13,6 @@ from urllib.parse import unquote, urlsplit
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_PATHS = (
-    "AGENTS.md",
     "README.md",
     "CONTRIBUTING.md",
     ".gitignore",
@@ -21,14 +20,18 @@ REQUIRED_PATHS = (
     ".editorconfig",
     ".github/workflows/repository-check.yml",
     "docs/README.md",
-    "docs/backgrounds",
-    "docs/sources",
     "docs/product",
     "docs/architecture",
     "docs/decisions",
     "docs/planning",
     "docs/verification",
     "docs/automation",
+    "docs/guides/business-user-manual.md",
+    "docs/guides/windows-deployment-operations.md",
+    "docs/deliverables",
+    "deliverables",
+    "tools/deliverables/build.py",
+    "tools/deliverables/manifest.json",
     "automation/README.md",
     "automation/workflow.json",
     "automation/state.json",
@@ -56,6 +59,10 @@ GENERATED_PARTS = {
     "venv",
 }
 NATIVE_RELEASE_TEMPLATE_PARTS = ("packaging", "native", "release")
+TRACKED_RELEASE_SOURCE_PREFIXES = {
+    ("scripts", "release"),
+    ("tests", "release"),
+}
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 MARKDOWN_FENCE = re.compile(r"^\s*(```|~~~)")
 
@@ -149,6 +156,8 @@ def validate_tracked_files(errors: list[str]) -> None:
         parts_to_check = relative_path.parts
         if parts_to_check[:3] == NATIVE_RELEASE_TEMPLATE_PARTS:
             parts_to_check = parts_to_check[3:]
+        elif parts_to_check[:2] in TRACKED_RELEASE_SOURCE_PREFIXES:
+            parts_to_check = parts_to_check[2:]
         if any(part in GENERATED_PARTS for part in parts_to_check):
             errors.append(f"已跟踪文件位于生成或依赖目录：{relative_path.as_posix()}")
 

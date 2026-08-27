@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "generator_version": "3.0.0",
+  "seed": 20260825,
+  "row_count": 144,
+  "scenario_counts": {
+    "ALARM_FLOOD": 12,
+    "DUPLICATE": 12,
+    "CHATTER": 12,
+    "SHORT_LIVED": 12,
+    "PERSISTENT": 12,
+    "EQUIPMENT_TRIP": 12,
+    "INSTRUMENT_DRIFT": 12,
+    "PROCESS_DISTURBANCE": 12,
+    "MAINTENANCE_TEST": 12,
+    "NORMAL": 12,
+    "FALSE_POSITIVE_BOUNDARY": 12,
+    "MIXED_PRIORITY_STATE": 12
+  },
+  "normalized_sha256": "4420c8f86f8231c9c9cdca6c9a3a9f6f46dd3af4491ded706a4d7ca90dca7e2e",
+  "runtime_fields_contain_scenario_names": false
+}

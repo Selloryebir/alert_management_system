@@ -67,6 +67,7 @@ try {
         $context.Java = "重新获取包含 jlink JRE 的完整发布 ZIP。"
         $context.BackendJar = "重新获取包含主程序 JAR 的完整发布 ZIP。"
         $context.Algorithm = "重新获取包含算法 onedir 的完整发布 ZIP。"
+        $context.ModelProvisioner = "重新获取包含模型准备程序的完整发布 ZIP。"
         (Get-PostgresExecutable $context "postgres") = "重新获取包含 PostgreSQL 运行时的完整发布 ZIP。"
         (Get-PostgresExecutable $context "initdb") = "重新获取包含 PostgreSQL 运行时的完整发布 ZIP。"
         (Get-PostgresExecutable $context "pg_ctl") = "重新获取包含 PostgreSQL 运行时的完整发布 ZIP。"
@@ -86,7 +87,7 @@ try {
     }
 
     foreach ($directory in @($context.Logs, $context.Pids, $context.Backups, $context.Secrets,
-            (Split-Path $context.PgData -Parent))) {
+            (Split-Path $context.PgData -Parent), (Split-Path $context.AlgorithmModel -Parent))) {
         $probe = Join-Path $directory (".write-test-" + [Guid]::NewGuid().ToString("N"))
         [IO.File]::WriteAllText($probe, "ok")
         Remove-Item -LiteralPath $probe -Force
@@ -117,10 +118,12 @@ try {
     }
 
     foreach ($relative in @("app/core-api.jar", "app/algorithm/algorithm-service.exe",
+            "app/model-provisioner/model-provisioner.exe",
             "runtime/jre/bin/java.exe", "runtime/postgresql/bin/postgres.exe")) {
         Assert-ManifestFileHash $context $manifest $relative
     }
     Assert-WindowsX64Pe $context.Algorithm
+    Assert-WindowsX64Pe $context.ModelProvisioner
     Assert-WindowsX64Pe $context.Java
     Assert-WindowsX64Pe (Get-PostgresExecutable $context "postgres")
 

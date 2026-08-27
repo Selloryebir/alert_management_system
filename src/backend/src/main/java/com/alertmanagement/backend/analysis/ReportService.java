@@ -201,8 +201,6 @@ class ReportService {
             return output.toByteArray();
         } catch (IOException exception) {
             throw new IllegalStateException("XLSX 报告生成失败", exception);
-        } finally {
-            workbook.dispose();
         }
     }
 

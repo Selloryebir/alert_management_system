@@ -8,8 +8,21 @@ type BrowserErrorFixtures = {
 export const test = base.extend<BrowserErrorFixtures>({
   browserErrors: [async ({ page }, use, testInfo) => {
     const browserErrors: string[] = [];
+    let anonymousIdentityProbeCount = 0;
+    const requiresUiLogin = testInfo.file.endsWith("release-business.spec.ts")
+      || testInfo.file.endsWith("visual-inventory.spec.ts");
     page.on("console", (message) => {
       if (message.type() === "error") {
+        const location = message.location();
+        const isExpectedAnonymousIdentityProbe = requiresUiLogin
+          && anonymousIdentityProbeCount === 0
+          && message.text() === "Failed to load resource: the server responded with a status of 401 ()"
+          && location.url !== ""
+          && new URL(location.url).pathname === "/api/v1/auth/me";
+        if (isExpectedAnonymousIdentityProbe) {
+          anonymousIdentityProbeCount += 1;
+          return;
+        }
         browserErrors.push(`console.error: ${message.text()}`);
       }
     });
@@ -18,7 +31,7 @@ export const test = base.extend<BrowserErrorFixtures>({
     });
 
     const passwordFile = process.env.E2E_ADMIN_PASSWORD_FILE;
-    if (passwordFile) {
+    if (passwordFile && !requiresUiLogin) {
       const username = process.env.E2E_ADMIN_USERNAME ?? "admin";
       const password = readFileSync(passwordFile, "utf8").trim();
       expect(password, "E2E 管理员密码文件不能为空").not.toBe("");
@@ -41,6 +54,10 @@ export const test = base.extend<BrowserErrorFixtures>({
         body: Buffer.from(`${JSON.stringify(browserErrors, null, 2)}\n`, "utf8"),
         contentType: "application/json",
       });
+    }
+    if (requiresUiLogin) {
+      expect(anonymousIdentityProbeCount,
+        "发布 UI 首次打开时必须且只能以一次 /api/v1/auth/me 401 判定未登录状态").toBe(1);
     }
     expect(browserErrors, "浏览器不得出现 console.error 或 pageerror").toEqual([]);
   }, { auto: true }],

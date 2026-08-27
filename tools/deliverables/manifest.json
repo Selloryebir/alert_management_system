@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "document_date": "2026-08-27",
+  "font": {
+    "path": "src/backend/src/main/resources/fonts/NotoSansSC-VF.ttf",
+    "sha256": "d68bafcb48a2707749396aa12bbbd833cb70401f3a9a689fd2902c7e0d295964",
+    "license_path": "src/backend/src/main/resources/fonts/OFL.txt",
+    "license_sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+  },
+  "documents": [
+    {
+      "source": "docs/guides/business-user-manual.md",
+      "output": "business-user-manual",
+      "title": "报警管理系统业务使用手册"
+    },
+    {
+      "source": "docs/guides/windows-deployment-operations.md",
+      "output": "windows-deployment-operations",
+      "title": "报警管理系统 Windows 部署与运维手册"
+    },
+    {
+      "source": "docs/deliverables/project-proposal.md",
+      "output": "project-proposal",
+      "title": "报警管理系统立项报告"
+    },
+    {
+      "source": "docs/deliverables/midterm-report.md",
+      "output": "midterm-report",
+      "title": "报警管理系统中期报告"
+    },
+    {
+      "source": "docs/deliverables/test-report.md",
+      "output": "test-report",
+      "title": "报警管理系统测试报告"
+    },
+    {
+      "source": "docs/deliverables/closure-report.md",
+      "output": "closure-report",
+      "title": "报警管理系统技术结项报告"
+    },
+    {
+      "source": "docs/deliverables/development-process.md",
+      "output": "development-process",
+      "title": "报警管理系统开发过程记录"
+    },
+    {
+      "source": "docs/deliverables/source-gap-analysis.md",
+      "output": "source-gap-analysis",
+      "title": "报警管理系统初期方案与正式实现差异说明"
+    },
+    {
+      "source": "docs/deliverables/model-technical-brochure.md",
+      "output": "model-technical-brochure",
+      "title": "报警管理系统组合模型技术手册"
+    },
+    {
+      "source": "docs/deliverables/patent-application-draft.md",
+      "output": "patent-application-draft",
+      "title": "报警管理系统发明专利申请主体草案"
+    }
+  ]
+}
