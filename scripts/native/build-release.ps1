@@ -398,6 +398,23 @@ try {
             (Join-Path $modelProvisionerSource "model-provisioner.exe") -PathType Leaf)) {
         throw "PyInstaller 未生成预期模型准备程序 EXE。"
     }
+    $modelProvisionerSmoke = Join-Path $stagingRoot "model-provisioner-smoke"
+    New-Item -ItemType Directory -Path $modelProvisionerSmoke | Out-Null
+    Invoke-Checked -FilePath (Join-Path $modelProvisionerSource "model-provisioner.exe") `
+        -Arguments @(
+            "--model-out", (Join-Path $modelProvisionerSmoke "algorithm-model.enc"),
+            "--key-out", (Join-Path $modelProvisionerSmoke "algorithm-model-key.txt"),
+            "--report-out", (Join-Path $modelProvisionerSmoke "algorithm-model-report.json")
+        ) -FailureMessage "监督模型准备程序运行冒烟失败"
+    foreach ($generatedName in @(
+            "algorithm-model.enc", "algorithm-model-key.txt", "algorithm-model-report.json")) {
+        $generatedPath = Join-Path $modelProvisionerSmoke $generatedName
+        if (-not (Test-Path -LiteralPath $generatedPath -PathType Leaf) -or
+                (Get-Item -LiteralPath $generatedPath).Length -le 0) {
+            throw "监督模型准备程序运行冒烟缺少输出：$generatedName"
+        }
+    }
+    Remove-Item -LiteralPath $modelProvisionerSmoke -Recurse -Force
     $modelProvisionerTarget = New-Item -ItemType Directory -Path `
         (Join-Path $releaseRoot "app\model-provisioner") -Force
     Copy-Item -Path (Join-Path $modelProvisionerSource "*") `

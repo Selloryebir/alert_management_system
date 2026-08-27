@@ -8,6 +8,11 @@ from PyInstaller.utils.hooks import collect_submodules
 repository_root = Path(SPECPATH).resolve().parents[1]
 algorithm_root = repository_root / "src" / "algorithm"
 training_root = repository_root / "tools" / "model-training"
+skops_protocol_modules = [
+    "skops.io.old._general_v0",
+    "skops.io.old._numpy_v0",
+    "skops.io.old._numpy_v1",
+]
 
 analysis = Analysis(
     [str(training_root / "train.py")],
@@ -19,7 +24,11 @@ analysis = Analysis(
             "model-data",
         )
     ],
-    hiddenimports=collect_submodules("sklearn") + collect_submodules("skops"),
+    hiddenimports=(
+        collect_submodules("sklearn")
+        + collect_submodules("skops")
+        + skops_protocol_modules
+    ),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
