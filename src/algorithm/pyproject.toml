@@ -17,12 +17,20 @@ dependencies = [
 test = [
     "httpx2==2.12.0",
     "pytest==9.1.1",
+    "ruff==0.16.4",
 ]
 
 [tool.pytest.ini_options]
 addopts = "-q --capture=sys"
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
 
 [tool.setuptools.packages.find]
 include = ["algorithm_service*"]

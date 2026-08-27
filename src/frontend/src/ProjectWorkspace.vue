@@ -274,7 +274,7 @@ onMounted(refreshProjects);
 </script>
 
 <template>
-  <section class="project-panel" aria-labelledby="project-title">
+  <section id="project-workspace" class="project-panel" aria-labelledby="project-title">
     <div class="panel-heading">
       <div><p class="eyebrow">业务项目</p><h2 id="project-title">选择当前工作项目</h2></div>
       <button v-if="systemAdmin" type="button" @click="showCreate = !showCreate">{{ showCreate ? "取消新建" : "新建项目" }}</button>

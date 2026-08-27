@@ -24,6 +24,7 @@ import {
   type NoiseType,
 } from "./business";
 import type { ImportBatch } from "./imports";
+import { dashboardCsvRows, donutSegments, encodeCsv, trendChartPoints } from "./dashboardPresentation";
 
 const props = defineProps<{
   currentBatch?: ImportBatch;
@@ -107,6 +108,10 @@ const actionableBatches = computed(() => {
   return [...byId.values()];
 });
 const businessWritable = computed(() => Boolean(props.canOperate && !props.readOnly));
+const trendPoints = computed(() => trendChartPoints(dashboard.value?.trend ?? []));
+const trendPolyline = computed(() => trendPoints.value.map((point) => `${point.x},${point.y}`).join(" "));
+const trendMaximum = computed(() => Math.max(...(dashboard.value?.trend ?? []).map((point) => point.count), 0));
+const noiseSegments = computed(() => donutSegments(dashboard.value?.noise_type_counts ?? {}));
 
 const lastPage = computed(() => {
   if (!alarmPage.value || alarmPage.value.total === 0) return 0;
@@ -333,16 +338,17 @@ async function changeDisposition(status: DispositionStatus) {
       assignee,
       note,
     );
-    selectedAlarm.value = await fetchAlarmDetail(
-      analysis.value.run_id,
-      selectedAlarm.value.record_id,
-    );
+    const recordId = selectedAlarm.value.record_id;
     dispositionNote.value = "";
     businessMessage.value = status === "IN_PROGRESS"
       ? "处置已保存，当前已进入处理中。"
       : `处置已保存，当前状态为“${zh(status)}”。`;
     const page = alarmPage.value?.page ?? 0;
-    alarmPage.value = await listAlarms(analysis.value.run_id, page, PAGE_SIZE, filters);
+    [selectedAlarm.value, dashboard.value, alarmPage.value] = await Promise.all([
+      fetchAlarmDetail(analysis.value.run_id, recordId),
+      fetchDashboard(analysis.value.run_id),
+      listAlarms(analysis.value.run_id, page, PAGE_SIZE, filters),
+    ]);
     emit("dispositionCompleted");
   } catch (error) {
     businessError.value = `处置更新失败：${error instanceof Error ? error.message : "未知错误"}。请核对当前状态后重试。`;
@@ -357,15 +363,13 @@ function printDashboard() {
 
 function exportDashboardData() {
   if (!dashboard.value) return;
-  const rows = [
-    ["统计维度", "分类", "数量"],
-    ...entries(dashboard.value.priority_counts).map(([label, count]) => ["优先级", priorityLabel(label), String(count)]),
-    ...entries(dashboard.value.area_counts).map(([label, count]) => ["区域排名", label, String(count)]),
-    ...entries(dashboard.value.unit_counts).map(([label, count]) => ["装置分布", label, String(count)]),
-    ...entries(dashboard.value.noise_type_counts).map(([label, count]) => ["报警类型", zh(label), String(count)]),
-    ...entries(dashboard.value.cause_category_counts).map(([label, count]) => ["原因建议", zh(label), String(count)]),
-  ];
-  const content = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\r\n");
+  const rows = dashboardCsvRows(dashboard.value, analysis.value?.summary?.event_chain_count ?? 0)
+    .map(([dimension, label, count]) => [
+      dimension,
+      dimension === "优先级" ? priorityLabel(label) : ["报警类型", "原因建议"].includes(dimension) ? zh(label) : label,
+      count,
+    ]);
+  const content = encodeCsv(rows);
   const blob = new Blob(["\ufeff", content], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -377,7 +381,7 @@ function exportDashboardData() {
 </script>
 
 <template>
-  <section class="business-panel" aria-labelledby="business-title">
+  <section id="business-workflow" class="business-panel" aria-labelledby="business-title">
     <div class="panel-heading">
       <div>
         <p class="eyebrow">分析与审核</p>
@@ -452,9 +456,9 @@ function exportDashboardData() {
 
         <div class="summary-cards">
           <article><span>报警总数</span><strong data-testid="dashboard-total">{{ dashboard.total }}</strong></article>
-          <article><span>待处理</span><strong>{{ dashboard.disposition_counts.OPEN ?? 0 }}</strong></article>
-          <article><span>处理中</span><strong>{{ dashboard.disposition_counts.IN_PROGRESS ?? 0 }}</strong></article>
-          <article><span>已关闭</span><strong>{{ dashboard.disposition_counts.CLOSED ?? 0 }}</strong></article>
+          <article><span>待处理</span><strong data-testid="dashboard-open">{{ dashboard.disposition_counts.OPEN ?? 0 }}</strong></article>
+          <article><span>处理中</span><strong data-testid="dashboard-in-progress">{{ dashboard.disposition_counts.IN_PROGRESS ?? 0 }}</strong></article>
+          <article><span>已关闭</span><strong data-testid="dashboard-closed">{{ dashboard.disposition_counts.CLOSED ?? 0 }}</strong></article>
           <article><span>关联事件链</span><strong data-testid="dashboard-chains">{{ analysis.summary?.event_chain_count ?? 0 }}</strong></article>
         </div>
 
@@ -468,12 +472,23 @@ function exportDashboardData() {
         </details>
 
         <div class="dashboard-grid">
-          <article class="metric-panel">
+          <article class="metric-panel trend-panel">
             <h4>小时趋势</h4>
-            <div v-if="dashboard.trend.length" class="metric-list">
-              <div v-for="point in dashboard.trend" :key="point.bucket" class="metric-row">
-                <span>{{ point.bucket }}</span><span class="bar-track"><i :style="{ width: barWidth(point.count) }" /></span><strong>{{ point.count }}</strong>
-              </div>
+            <div v-if="dashboard.trend.length">
+              <svg class="trend-chart" viewBox="0 0 600 220" role="img" aria-labelledby="trend-chart-title trend-chart-description">
+                <title id="trend-chart-title">每小时报警数量趋势</title>
+                <desc id="trend-chart-description">横轴按时间先后排列，纵轴从零到 {{ trendMaximum }} 条报警。</desc>
+                <line x1="32" y1="188" x2="568" y2="188" class="chart-axis" />
+                <line x1="32" y1="32" x2="32" y2="188" class="chart-axis" />
+                <text x="8" y="38" class="chart-label">{{ trendMaximum }}</text>
+                <text x="18" y="192" class="chart-label">0</text>
+                <polyline :points="trendPolyline" class="trend-line" />
+                <g v-for="point in trendPoints" :key="point.bucket">
+                  <circle :cx="point.x" :cy="point.y" r="4" class="trend-point"><title>{{ point.bucket }}：{{ point.count }} 条</title></circle>
+                </g>
+              </svg>
+              <p class="chart-range"><span>{{ dashboard.trend[0]?.bucket }}</span><span>时间</span><span>{{ dashboard.trend.at(-1)?.bucket }}</span></p>
+              <details class="chart-data"><summary>查看小时趋势数据表</summary><div class="table-wrap"><table><caption>每小时报警数量</caption><thead><tr><th scope="col">时间</th><th scope="col">报警数（条）</th></tr></thead><tbody><tr v-for="point in dashboard.trend" :key="point.bucket"><td>{{ point.bucket }}</td><td>{{ point.count }}</td></tr></tbody></table></div></details>
             </div>
             <p v-else class="empty-copy">暂无趋势数据。</p>
           </article>
@@ -494,6 +509,16 @@ function exportDashboardData() {
 
           <article class="metric-panel">
             <h4>报警类型占比</h4>
+            <div v-if="noiseSegments.length" class="donut-layout">
+              <svg class="donut-chart" viewBox="0 0 120 120" role="img" aria-labelledby="noise-chart-title noise-chart-description">
+                <title id="noise-chart-title">报警类型占比环形图</title>
+                <desc id="noise-chart-description">各报警类型占当前分析报警总数的比例，精确数量见图例。</desc>
+                <circle class="donut-background" cx="60" cy="60" r="44" pathLength="100" />
+                <circle v-for="segment in noiseSegments" :key="segment.label" class="donut-segment" cx="60" cy="60" r="44" pathLength="100" :stroke="segment.color" :stroke-dasharray="`${segment.percentage} ${100 - segment.percentage}`" :stroke-dashoffset="-segment.offset"><title>{{ zh(segment.label) }}：{{ segment.count }} 条，占 {{ segment.percentage.toFixed(1) }}%</title></circle>
+                <text x="60" y="57" text-anchor="middle" class="donut-total">{{ dashboard.total }}</text><text x="60" y="72" text-anchor="middle" class="donut-caption">总数</text>
+              </svg>
+              <ul class="donut-legend"><li v-for="segment in noiseSegments" :key="segment.label"><i :style="{ backgroundColor: segment.color }" /><span>{{ zh(segment.label) }}</span><strong>{{ segment.count }}（{{ segment.percentage.toFixed(1) }}%）</strong></li></ul>
+            </div>
             <div class="metric-list">
               <div
                 v-for="[label, count] in entries(dashboard.noise_type_counts)"
@@ -627,6 +652,6 @@ function exportDashboardData() {
       <p v-if="detailBusy" class="import-message" role="status">正在加载或更新报警详情…</p>
     </template>
 
-    <ReviewOperations v-if="!selectedAlarm || selectedAlarm.disposition.status !== 'OPEN'" :run-id="analysis?.status === 'COMPLETED' ? analysis.run_id : undefined" :project-id="projectId" :can-manage="canManage" :system-admin="systemAdmin" @report-downloaded="emit('reportDownloaded')" @demo-reset="handleDemoReset" />
+    <ReviewOperations :run-id="analysis?.status === 'COMPLETED' ? analysis.run_id : undefined" :project-id="projectId" :can-manage="canManage" :system-admin="systemAdmin" @report-downloaded="emit('reportDownloaded')" @demo-reset="handleDemoReset" />
   </section>
 </template>
