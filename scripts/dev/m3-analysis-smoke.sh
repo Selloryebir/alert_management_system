@@ -2,6 +2,10 @@
 
 source "$(dirname "$0")/common.sh"
 
+# M1/M2 共用的开发实例可能仍在占用固定端口；M3 必须先结束它，
+# 再切换到本轮专属容器、卷和密钥目录。
+"$REPOSITORY_ROOT/scripts/dev/stop.sh"
+
 M3_RUNTIME="$RUNTIME_DIR/m3"
 mkdir -p "$M3_RUNTIME"
 m3_run_id="${GITHUB_RUN_ID:-local}-$$"
