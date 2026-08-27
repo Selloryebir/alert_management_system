@@ -6,7 +6,9 @@ from base64 import b64decode
 from dataclasses import dataclass
 import os
 from pathlib import Path
+import re
 from typing import Any, Mapping
+import unicodedata
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -21,7 +23,7 @@ import skops.io as sio
 from algorithm_service.models import AlarmRecord, CauseCategory
 
 
-MODEL_VERSION = "cause-hybrid-svm-adaboost-v1"
+MODEL_VERSION = "cause-hybrid-svm-adaboost-v2"
 MODEL_FORMAT = "alert-management-skops-aesgcm-v1"
 MODEL_MAGIC = b"AMSM1"
 MODEL_AAD = MODEL_FORMAT.encode("ascii")
@@ -33,17 +35,13 @@ KNOWN_CAUSES = (
     "INSTRUMENT_ISSUE",
     "MAINTENANCE_TEST",
 )
-CONSERVATIVE_TERMS = (
-    "未发现故障",
-    "无明确原因",
-    "并非故障",
-    "排除故障",
-    "证据不足",
-    "原因不确定",
-    "uncertain",
-    "no fault found",
-    "not a fault",
-    "normal operation",
+CONSERVATIVE_PATTERNS = (
+    re.compile(r"无(?:明显)?(?:异常|故障)"),
+    re.compile(r"未(?:发现|见|检测到).{0,8}(?:异常|故障)"),
+    re.compile(r"(?:运行|状态|读数|参数|压力|温度|流量|液位)(?:均|已)?正常"),
+    re.compile(r"(?:并非|不是|非)(?:设备|仪表|工艺)?(?:异常|故障)"),
+    re.compile(r"(?:无明确原因|排除故障|证据不足|原因不确定)"),
+    re.compile(r"\b(?:uncertain|no\s+fault\s+found|not\s+a\s+fault|normal\s+operation)\b"),
 )
 MAINTENANCE_EVIDENCE_TERMS = (
     "维护",
@@ -122,6 +120,11 @@ def structural_features(record: AlarmRecord) -> np.ndarray:
     if record.return_time is not None:
         duration = max(0.0, (record.return_time - record.event_time).total_seconds())
     deviation = 0.0
+    acknowledgement_delay = 0.0
+    if record.ack_time is not None:
+        acknowledgement_delay = max(
+            0.0, (record.ack_time - record.event_time).total_seconds()
+        )
     has_deviation = record.value is not None and record.threshold not in (None, 0)
     if has_deviation:
         deviation = float((record.value - record.threshold) / abs(record.threshold))
@@ -135,6 +138,7 @@ def structural_features(record: AlarmRecord) -> np.ndarray:
             min(duration, 86_400.0) / 86_400.0,
             float(record.return_time is not None),
             float(record.ack_time is not None),
+            min(acknowledgement_delay, 86_400.0) / 86_400.0,
             deviation,
             float(has_deviation),
         ],
@@ -143,12 +147,12 @@ def structural_features(record: AlarmRecord) -> np.ndarray:
 
 
 def text_feature(record: AlarmRecord) -> str:
-    return record.description.strip().lower()
+    return unicodedata.normalize("NFKC", record.description).strip().casefold()
 
 
 def has_conservative_language(record: AlarmRecord) -> bool:
     text = text_feature(record)
-    return any(term in text for term in CONSERVATIVE_TERMS)
+    return any(pattern.search(text) for pattern in CONSERVATIVE_PATTERNS)
 
 
 def has_category_evidence(record: AlarmRecord, category: CauseCategory) -> bool:
@@ -299,7 +303,7 @@ class SupervisedModel:
         )
         category: CauseCategory = svm.category if accepted else "UNKNOWN"
         evidence = (
-            f"SUPERVISED_CAUSE_V1：model={MODEL_VERSION}；"
+            f"SUPERVISED_CAUSE_V2：model={MODEL_VERSION}；"
             f"SVM={svm.category},score={svm.score:.6f},margin={svm.margin:.6f}；"
             f"AdaBoost={ada.category},score={ada.score:.6f},margin={ada.margin:.6f}；"
             f"双分支{'同意并通过冻结阈值' if accepted else '未同时同意或未通过冻结阈值'}；"

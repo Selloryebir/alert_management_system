@@ -115,7 +115,7 @@ actual_records = [
 assert actual_records == expected["records"], (actual_records, expected["records"])
 assert all(item["evidence"] for item in actual["results"]), actual["results"]
 assert all(
-    any("SUPERVISED_CAUSE_V1" in evidence for evidence in item["evidence"])
+    any("SUPERVISED_CAUSE_V2" in evidence for evidence in item["evidence"])
     for item in actual["results"]
 ), "监督模型未参与全部记录的可解释分析"
 

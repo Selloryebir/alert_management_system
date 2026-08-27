@@ -11,7 +11,6 @@
 ## 目录职责
 
 - `docs/product/`：经筛选的产品事实、需求状态与数据契约。
-- `docs/planning/`：范围、阶段、任务和验收标准。
 - `docs/architecture/`：经确认的架构、接口和数据决策。
 - `docs/guides/`：实现业务组件后建立，用于安装、运行、演示和故障定位说明。
 - `src/`：前端、业务后端和算法实现，具体边界见 [`src/README.md`](src/README.md)。
@@ -22,7 +21,7 @@
 ## 工作流程
 
 1. 阅读本文件、文档总入口及当前任务涉及目录的说明。
-2. 自动化阶段任务还应读取 [`automation/README.md`](automation/README.md)及当前状态。
+2. 阅读当前里程碑、需求责任矩阵及相关验收说明。
 3. 检查工作区状态，保留他人的未提交修改。
 4. 明确本次改动能被哪项检查或演示流程验证。
 5. 实施最小完整改动并运行针对性检查。
@@ -33,7 +32,6 @@
 
 ```powershell
 wsl.exe python3 scripts/validate_repository.py
-wsl.exe python3 scripts/validate_automation.py
 git diff --check
 ```
 

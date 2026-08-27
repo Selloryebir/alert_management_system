@@ -67,9 +67,10 @@ services:
           exit 0
         fi
         if [ "$$existing" -ne 0 ]; then
-          echo "监督模型卷不完整，拒绝覆盖。" >&2
-          exit 1
+          echo "检测到上次中断留下的不完整监督模型，正在重建。" >&2
+          rm -f "$$model" "$$key" "$$report"
         fi
+        rm -f "$$model".tmp-* "$$key".tmp-* "$$report".tmp-*
         python /app/model-training/train.py \
           --data /app/model-training/data/engineering-scenarios.jsonl \
           --model-out "$$model" --key-out "$$key" --report-out "$$report"

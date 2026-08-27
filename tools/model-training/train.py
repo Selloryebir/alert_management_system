@@ -60,6 +60,15 @@ class TrainingDataError(ValueError):
     """训练数据或隔离契约无效。"""
 
 
+def configure_console_encoding() -> None:
+    """固定命令行输出为 UTF-8，避免英文 Windows 区域设置拒绝中文状态行。"""
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def load_rows(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     try:
@@ -130,6 +139,15 @@ def validate_group_isolation(rows: list[dict[str, Any]]) -> None:
             if similarity >= MAX_CROSS_SPLIT_TEXT_SIMILARITY:
                 raise TrainingDataError(f"跨 split 报警描述过度相似：{similarity:.3f}")
 
+    structures = [
+        (row["split"], tuple(structural_features(row["record"]).tolist()))
+        for row in rows
+    ]
+    for index, (first_split, first_structure) in enumerate(structures):
+        for second_split, second_structure in structures[index + 1 :]:
+            if first_split != second_split and first_structure == second_structure:
+                raise TrainingDataError("跨 split 结构特征完全重复")
+
 
 def _split(rows: list[dict[str, Any]], name: str) -> list[dict[str, Any]]:
     return [row for row in rows if row["split"] == name]
@@ -180,14 +198,28 @@ def evaluate(
     model = SupervisedModel(bundle)
     selected = _split(rows, split)
     expected = [row["label"] for row in selected]
+    texts = [text_feature(row["record"]) for row in selected]
+    structures = np.vstack([structural_features(row["record"]) for row in selected])
+    svm_predicted = [str(value) for value in bundle["text_pipeline"].predict(texts)]
+    ada_predicted = [str(value) for value in bundle["structure_model"].predict(structures)]
     predicted = [model.decide(row["record"]).category for row in selected]
     accepted = sum(value != "UNKNOWN" for value in predicted)
+    accepted_correct = sum(
+        actual == prediction
+        for actual, prediction in zip(expected, predicted, strict=True)
+        if prediction != "UNKNOWN"
+    )
     labels = [*KNOWN_CAUSES, "UNKNOWN"]
+    branch_labels = list(KNOWN_CAUSES)
     return {
         "count": len(selected),
         "group_count": len({row["group_id"] for row in selected}),
         "label_counts": dict(sorted(Counter(expected).items())),
         "coverage": accepted / len(selected),
+        "accepted_count": accepted,
+        "accepted_correct_count": accepted_correct,
+        "accepted_error_count": accepted - accepted_correct,
+        "accepted_accuracy": accepted_correct / accepted if accepted else None,
         "classification": classification_report(
             expected,
             predicted,
@@ -199,6 +231,26 @@ def evaluate(
         "confusion_matrix": confusion_matrix(
             expected, predicted, labels=labels
         ).tolist(),
+        "branches": {
+            "svm": classification_report(
+                expected,
+                svm_predicted,
+                labels=branch_labels,
+                output_dict=True,
+                zero_division=0,
+            ),
+            "adaboost": classification_report(
+                expected,
+                ada_predicted,
+                labels=branch_labels,
+                output_dict=True,
+                zero_division=0,
+            ),
+            "agreement_count": sum(
+                svm == ada
+                for svm, ada in zip(svm_predicted, ada_predicted, strict=True)
+            ),
+        },
     }
 
 
@@ -209,18 +261,15 @@ def write_artifacts(
     key_path: Path,
     report_path: Path,
 ) -> None:
-    existing = [path for path in (model_path, key_path, report_path) if path.exists()]
+    output_paths = (model_path, key_path, report_path)
+    existing = [path for path in output_paths if path.exists()]
     if existing:
         raise FileExistsError(f"拒绝覆盖已有输出：{existing[0]}")
-    key_path.parent.mkdir(parents=True, exist_ok=True)
-    model_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.parent.mkdir(parents=True, exist_ok=True)
+    for path in output_paths:
+        path.parent.mkdir(parents=True, exist_ok=True)
+
     key = os.urandom(32)
-    key_path.write_text(urlsafe_b64encode(key).decode("ascii"), encoding="ascii")
-    if os.name != "nt":
-        key_path.chmod(0o600)
     serialized = sio.dumps(bundle)
-    model_path.write_bytes(encrypt_model_bytes(serialized, key, os.urandom(12)))
     report = {
         "schema_version": 1,
         "model_version": MODEL_VERSION,
@@ -230,6 +279,7 @@ def write_artifacts(
         "seed": SEED,
         "thresholds": FROZEN_THRESHOLDS,
         "group_isolation": True,
+        "structure_signature_isolation": True,
         "text_isolation": {
             "exact_duplicate_rejected": True,
             "maximum_similarity_exclusive": MAX_CROSS_SPLIT_TEXT_SIMILARITY,
@@ -237,10 +287,30 @@ def write_artifacts(
         "validation": evaluate(bundle, rows, "validation"),
         "test": evaluate(bundle, rows, "test"),
     }
-    report_path.write_text(
-        json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-        encoding="utf-8",
+    suffix = f".tmp-{os.getpid()}-{os.urandom(6).hex()}"
+    temporary_paths = tuple(
+        path.with_name(f"{path.name}{suffix}") for path in output_paths
     )
+    model_temporary, key_temporary, report_temporary = temporary_paths
+    try:
+        key_temporary.write_text(
+            urlsafe_b64encode(key).decode("ascii"), encoding="ascii"
+        )
+        if os.name != "nt":
+            key_temporary.chmod(0o600)
+        model_temporary.write_bytes(
+            encrypt_model_bytes(serialized, key, os.urandom(12))
+        )
+        report_temporary.write_text(
+            json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        for temporary, output in zip(temporary_paths, output_paths, strict=True):
+            temporary.replace(output)
+    except BaseException:
+        for path in (*temporary_paths, *output_paths):
+            path.unlink(missing_ok=True)
+        raise
 
 
 def parse_args() -> argparse.Namespace:
@@ -253,6 +323,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    configure_console_encoding()
     args = parse_args()
     rows = load_rows(args.data)
     bundle = train_bundle(rows)

@@ -45,120 +45,120 @@
     },
     {
       "source": "docs/deliverables/project-proposal.md",
-      "source_sha256": "87516204d754c8fb4bcaa76566803771f34b6769f6c304009765d0eb2bdc1c87",
+      "source_sha256": "2ce39b3ea6f6d1364622015c4d0e8e9bfc2c2b81b590037475d91d051d2a13f3",
       "title": "报警管理系统立项报告",
       "outputs": {
         "docx": {
           "path": "deliverables/project-proposal.docx",
-          "sha256": "f6186f95a2ff18c8becdafeb1ce95332e4ba7cbfa19dec21558598f9e9553b6d",
-          "size": 865088
+          "sha256": "a8f04b47031efa946068be8a90b535153dc696e49240f381706a1731b3fa185f",
+          "size": 863882
         },
         "pdf": {
           "path": "deliverables/project-proposal.pdf",
-          "sha256": "389aca8322cb64fbf7420843a8e55bf5a729955786d0c44bc00ad8f3dd8a8106",
-          "size": 219456
+          "sha256": "4d53db6d03857792685e713e8fd8c2f28b3091d2a5cb939f4c1577ddf0c08c28",
+          "size": 218725
         }
       }
     },
     {
       "source": "docs/deliverables/midterm-report.md",
-      "source_sha256": "a95fc19ae65ee560cb1734c56ae6c72e1ad06f1fd1ca6e7209b47d4b6033bb46",
+      "source_sha256": "eee657e2a7bf932dff012664a437a934c2793b436fc01253f2666c8c5ffe13f0",
       "title": "报警管理系统中期报告",
       "outputs": {
         "docx": {
           "path": "deliverables/midterm-report.docx",
-          "sha256": "87ff7cc2302ba612f7d2f796e5cebe3d20ff808b0333bc7c046db80c1e3b15b3",
-          "size": 858866
+          "sha256": "d1591b6ddfd53c6b3610ba850dd6ae6ae8c6d38117226a006004bc745d5e4d58",
+          "size": 858479
         },
         "pdf": {
           "path": "deliverables/midterm-report.pdf",
-          "sha256": "b2fc43397f0aa2e738b8dd752d07d19bbe7fcd9a1a2839e4f40e26f13f46dc6c",
-          "size": 181066
+          "sha256": "db793376d665aca2571f258c97cb94436952747409484199e688d017c7e09deb",
+          "size": 178922
         }
       }
     },
     {
       "source": "docs/deliverables/test-report.md",
-      "source_sha256": "3d325f30445a698face83d9e52f6fea911d40621a757d65f22d84a2dd572f55f",
+      "source_sha256": "f7f5e09b373f5745812c35020e51223c288b932f041b4f8cf12ea071fa63082e",
       "title": "报警管理系统测试报告",
       "outputs": {
         "docx": {
           "path": "deliverables/test-report.docx",
-          "sha256": "3204daa162a8464802adfb453f36879731e5f464624e05863bae62a7de5fd94e",
-          "size": 876295
+          "sha256": "f924ece1cbc9fb388fd171eb26bd36bba4d7b9fb9e15334566d2268dbedf071d",
+          "size": 875669
         },
         "pdf": {
           "path": "deliverables/test-report.pdf",
-          "sha256": "6f18404d2996c08255435107285f693ccb8b14c64ae3c649e0843e99c866b023",
-          "size": 214463
+          "sha256": "434bf87e0fcf26821b57a70b5e230466b5e54af78bfb3de9674e3f7e0895a81d",
+          "size": 214446
         }
       }
     },
     {
       "source": "docs/deliverables/closure-report.md",
-      "source_sha256": "f174b3a6f9774c9a211e4d3898f7384e5cfbc1ac1d8a75c7248cd4efcdbae577",
+      "source_sha256": "25d3a7e5726e742895be8b18b08962e826986198f97e71d76f828ad5a23497f8",
       "title": "报警管理系统技术结项报告",
       "outputs": {
         "docx": {
           "path": "deliverables/closure-report.docx",
-          "sha256": "5f9103c25913587115c61634349f582babdf20001a52eca95ca482e950adf08e",
-          "size": 859269
+          "sha256": "f35d3e132dfd27a256e093b649c71d62dd357b591da02d86f1e6f63d714d3321",
+          "size": 858268
         },
         "pdf": {
           "path": "deliverables/closure-report.pdf",
-          "sha256": "be9d7b248a867de8a2e0a0ab6424adebdcfbcdac499fe2497be9d879ce1eefd4",
-          "size": 186278
+          "sha256": "42e93c14f64e651573f66c8f8b8626441005b5009f063d2acdff3726358ec410",
+          "size": 185798
         }
       }
     },
     {
       "source": "docs/deliverables/development-process.md",
-      "source_sha256": "acd1df9a9165c4563d57c7e6f5919f3719044c2f99cdea12301712bab9afa458",
+      "source_sha256": "5bb88e63d8bd6fa1eb23792e71eeff829d8fbff987b0db055f3b0778083f3a42",
       "title": "报警管理系统开发过程记录",
       "outputs": {
         "docx": {
           "path": "deliverables/development-process.docx",
-          "sha256": "787a4974b09d4e44cb635b29bb17083e7db3b432359b7ae2d0ea3d5413ed4ae7",
-          "size": 872798
+          "sha256": "26015d203ce18e6473c8061a653c244c2949b355e61ccbb9f56e718c82795963",
+          "size": 871482
         },
         "pdf": {
           "path": "deliverables/development-process.pdf",
-          "sha256": "3f8e7ce6c1833c984975402309151cfa5d3aa3f4d3cc61c5d692dc8b3c5d892f",
-          "size": 199119
+          "sha256": "ea86fc47f2d7f918284d430fdcdfd9572de71f5f38123a80f2efe2882c72b894",
+          "size": 197520
         }
       }
     },
     {
       "source": "docs/deliverables/source-gap-analysis.md",
-      "source_sha256": "6d08b09d996a4c52d5db98438698b42ab03fe9978598e668ac89e51274296b4f",
+      "source_sha256": "6936d8738f5c5446bf428b699051b3f974bfd7b591f90ad9e6e870bf97ae60d2",
       "title": "报警管理系统初期方案与正式实现差异说明",
       "outputs": {
         "docx": {
           "path": "deliverables/source-gap-analysis.docx",
-          "sha256": "7cee9b757fdedf01670366aa83ebbfda04f3e74036cf100035bd6c32aa28fc49",
-          "size": 913222
+          "sha256": "0b8cd9f685ab8d3dd54e1f923bb79fa166e9541a83f56d8e34f96edc70dadb5c",
+          "size": 913237
         },
         "pdf": {
           "path": "deliverables/source-gap-analysis.pdf",
-          "sha256": "c021a9277a37cbc03130e8edffc4c63a4df12864caf56f54ef0ccaa46d513d80",
-          "size": 314241
+          "sha256": "3836b4f43c27ce82ad33eefc2df2b83a706584bf39e5f9af6dae3c9e86af56f5",
+          "size": 313600
         }
       }
     },
     {
       "source": "docs/deliverables/model-technical-brochure.md",
-      "source_sha256": "51af44187c5939015779091b6d24cb9edb50913184f1112432cc1134a48a0d94",
+      "source_sha256": "62072e57c0f78a1c5faccc9dd2bd53cbcd8bfd74dbaa3dd0336381417d000829",
       "title": "报警管理系统组合模型技术手册",
       "outputs": {
         "docx": {
           "path": "deliverables/model-technical-brochure.docx",
-          "sha256": "9685ee72c0ffdda00bc1d98b490efcfa52e83504a037163a997883366e356665",
-          "size": 864024
+          "sha256": "0083f03528da4b7957b55d68186be4fbf2a206a91656875716c9a9803b7180b4",
+          "size": 865943
         },
         "pdf": {
           "path": "deliverables/model-technical-brochure.pdf",
-          "sha256": "50e2549b075b002b1975a17d057f6845f2f62e0a1841ee37635b199c925428a6",
-          "size": 200262
+          "sha256": "8a8b1dd591975210a2dba93052f808c3ba23074112a11b6e22bfeeec2896d1fc",
+          "size": 208099
         }
       }
     }

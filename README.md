@@ -1,6 +1,6 @@
 # 报警管理系统
 
-本仓库提供报警文件导入、规范化、可解释分析、统计看板、人工处置、审计、报告和备份恢复验证的一体化应用。`v0.8.0` 已通过 Windows 11 x64 自包含运行包、Docker Compose、身份权限、HTTPS 边界和有限可靠性验收；M13 正式说明书和项目过程文件已通过，当前 M14 正在固定 `1.0.0-rc.1` 业务发布候选，最终业务用户终验仍以 `automation/state.json` 为准。
+本仓库提供报警文件导入、规范化、可解释分析、统计看板、人工处置、审计、报告和备份恢复验证的一体化应用。`v0.8.0` 已通过 Windows 11 x64 自包含运行包、Docker Compose、身份权限、HTTPS 边界和有限可靠性验收；当前正在形成 `1.0.0-rc.1` 业务发布候选，最终发布仍须通过非技术业务用户终验和人工批准。
 
 产品北极星是让业务人员仅按中文说明即可部署并完成“导入校验 → 分析 → 查看 → 处置 → 报告 → 备份恢复”。实现与验收以稳定、可解释、可复现为优先，不把立项阶段未经验证的指标直接作为承诺。仓库内置数据均为合成示例数据。
 
@@ -42,7 +42,7 @@
 
 正式源码包由仓库维护流程从已验证的干净提交生成，包内 `SOURCE-MANIFEST.json` 记录源提交、精确文件、权限、大小和 SHA-256。源码包不包含 Git 元数据、本地运行数据、内部阶段控制、内部验收证据或项目档案。
 
-团队职责按交付物划分：前端、Java 后端和 Python 算法代码进入各自源码组件；测试组负责跨组件契约、集成、端到端与演示验收；工程组负责 `scripts/`、持续集成和原生/Docker 交付。实际任务出现时再建立对应目录，不用空目录或占位代码模拟进度。
+团队职责按交付物划分：前端、Java 后端和 Python 算法代码进入各自源码组件；测试组负责跨组件契约、集成、端到端与演示验收；工程组负责 `scripts/`、持续集成和原生/Docker 交付。实际任务出现时再建立对应目录，不用空目录或不完整实现模拟进度。
 
 ## 本地验证
 
@@ -50,23 +50,24 @@ Windows 11 x64 的当前 WSL2 开发环境（在仓库根目录的 PowerShell �
 
 ```powershell
 wsl.exe python3 scripts/validate_repository.py
-wsl.exe python3 scripts/validate_automation.py
+wsl.exe scripts/dev/quality.sh
+wsl.exe scripts/dev/test.sh
 ```
 
 Linux、WSL 或 macOS：
 
 ```bash
 python3 scripts/validate_repository.py
-python3 scripts/validate_automation.py
+scripts/dev/quality.sh
+scripts/dev/test.sh
 ```
 
-这些命令只验证仓库基础结构、文档链接和自动化状态定义；业务能力以对应阶段验收和证据为准。
+这些命令验证仓库结构、文档链接、静态质量和开发测试；完整业务能力还应按下文运行对应的真实环境验收。
 
 正式 DOCX/PDF 的生成环境、更新方法和只读一致性检查见 [`tools/deliverables/README.md`](tools/deliverables/README.md)。验收已提交交付物时执行：
 
 ```bash
 python3 tools/deliverables/build.py --check
-python3 scripts/validate_release_candidate.py
 ```
 
 ## 开发启动与阶段验证
@@ -151,4 +152,4 @@ python3 tests/smoke/run.py --target docker --fresh-volume
 
 ## 版本与当前状态
 
-`v0.8.0` 精确指向 `main` 的安全部署与可靠性发布提交，包含 M0–M12；M13 正式交付物已在 `dev` 检查点通过。M14 正在执行自动业务预检，之后必须由非技术业务人员对精确 ZIP/SHA-256 人工终验；通过前不会合入 `main` 或创建 `v1.0.0-rc.1`。版本标签和发布门槛见 [`docs/releases/versioning.md`](docs/releases/versioning.md)，实时状态以 `automation/state.json` 和提交绑定的验收证据为准。
+`v0.8.0` 精确指向 `main` 的安全部署与可靠性发布提交。当前 M14 负责固定业务发布候选；`v1.0.0-rc.1` 只能在候选源码、Windows ZIP、SHA-256、说明书和部署验收相互一致，并由非技术业务人员完成终验后创建；在此之前不得把候选描述为正式发布。版本标签和发布门槛见 [`docs/releases/versioning.md`](docs/releases/versioning.md)。

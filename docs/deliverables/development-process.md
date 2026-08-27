@@ -48,20 +48,20 @@
 
 | 阶段 | 主要活动 | 形成的检查点或证据 |
 |---|---|---|
-| M0 | 收敛需求与数据定义，登记能力清单，隔离占位代码 | 需求基线、能力清单和实现边界 |
-| M1 | 初始化 Java/Python/Vue/PostgreSQL，建立健康与最小全链 | [M1 证据](../verification/evidence/M1.md) |
-| M2 | 实现三格式导入、字段映射、校验、预览与原子落库 | [M2 证据](../verification/evidence/M2.md) |
-| M3 | 实现规则分析、原因建议、事件链和算法契约 | [M3 证据](../verification/evidence/M3.md) |
-| M4 | 实现中文浏览器流程和人工处置历史 | [M4 证据](../verification/evidence/M4.md) |
-| M5 | 实现 PDF/XLSX 报告、审计、演示复位 | [M5 证据](../verification/evidence/M5.md) |
-| M6 | 构建 Windows 自包含 ZIP，验证英文及中文空格目录 | [M6 证据](../verification/evidence/M6.md) |
-| M7 | 建立 Docker Compose 次级交付，空卷验证及精确清理 | [M7 证据](../verification/evidence/M7.md)，检查点 `a0526c0b` |
-| M8 | 冻结正式产品身份、来源责任、PRD、架构和后续门槛 | [M8 证据](../verification/evidence/M8.md) |
-| M9 | 升级 hybrid-v2，增加泛化、扰动、随机负控和大样本验证 | [M9 证据](../verification/evidence/M9.md)，检查点 `40680eeb` |
-| M10 | 建立项目作用域、纠错、人工数据、报告设置和全中文 UX | [M10 证据](../verification/evidence/M10.md)，检查点 `18dc6882` |
-| M11 | 建立身份会话、角色、CSRF、输入限制、HTTPS 和并发事务门闩 | [M11 证据](../verification/evidence/M11.md)，检查点 `5f3cce80` |
-| M12 | 建立备份隔离恢复、精确维护、资源观测、质量与依赖审计 | [M12 证据](../verification/evidence/M12.md)，检查点 `08a777b4` |
-| M13 | 形成说明书和正式项目过程文档 | [M13 证据](../verification/evidence/M13.md)，检查点 `4be7ea55` |
+| M0 | 收敛需求与数据定义，登记能力清单，隔离未经批准的实现描述 | 需求基线、能力清单和实现边界 |
+| M1 | 初始化 Java/Python/Vue/PostgreSQL，建立健康与最小全链 | 阶段验收通过 |
+| M2 | 实现三格式导入、字段映射、校验、预览与原子落库 | 阶段验收通过 |
+| M3 | 实现规则分析、原因建议、事件链和算法契约 | 阶段验收通过 |
+| M4 | 实现中文浏览器流程和人工处置历史 | 阶段验收通过 |
+| M5 | 实现 PDF/XLSX 报告、审计、演示复位 | 阶段验收通过 |
+| M6 | 构建 Windows 自包含 ZIP，验证英文及中文空格目录 | 阶段验收通过 |
+| M7 | 建立 Docker Compose 次级交付，空卷验证及精确清理 | 检查点 `a0526c0b` |
+| M8 | 冻结正式产品身份、需求责任、PRD、架构和后续门槛 | 阶段验收通过 |
+| M9 | 升级 hybrid-v2，增加泛化、扰动、随机负控和大样本验证 | 检查点 `40680eeb` |
+| M10 | 建立项目作用域、纠错、人工数据、报告设置和全中文 UX | 检查点 `18dc6882` |
+| M11 | 建立身份会话、角色、CSRF、输入限制、HTTPS 和并发事务门闩 | 检查点 `5f3cce80` |
+| M12 | 建立备份隔离恢复、精确维护、资源观测、质量与依赖审计 | 检查点 `08a777b4` |
+| M13 | 形成说明书和正式项目过程文档 | 检查点 `4be7ea55` |
 | M14 | Windows 11 非技术业务用户终验和最终候选冻结 | 当前阶段；自动预检通过后仍需人工终验 |
 
 ## 6. 关键架构裁决

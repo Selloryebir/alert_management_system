@@ -861,6 +861,7 @@ def run_clean_deployment(
     ca_certificate: Path | None = None,
     require_secure_cookie: bool = False,
     secret_values: list[str] | None = None,
+    inject_partial_model: bool = False,
 ) -> dict[str, Any]:
     primary_error: Exception | None = None
     diagnostic_error: Exception | None = None
@@ -870,6 +871,19 @@ def run_clean_deployment(
         compose.run("config", "--quiet", timeout=60)
         compose.run("down", "--volumes", "--remove-orphans", timeout=120)
         compose.assert_no_resources()
+        if inject_partial_model:
+            compose.run(
+                "run",
+                "--build",
+                "--no-deps",
+                "--rm",
+                "--entrypoint",
+                "/bin/sh",
+                "model-provisioner",
+                "-c",
+                "printf interrupted > /model/algorithm-model.enc",
+                timeout=1800,
+            )
         compose.run(
             "up", "--build", "--detach", "--wait", "--wait-timeout", "240", timeout=1800
         )
@@ -881,6 +895,8 @@ def run_clean_deployment(
             result["network_boundary"] = assert_network_boundaries(compose)
         if secret_values is not None:
             assert_secrets_not_exposed(compose, secret_values)
+        if inject_partial_model:
+            result["partial_model_recovery"] = "PASS"
     except Exception as exc:  # 保存原始失败后仍执行限定项目清理
         primary_error = exc
         try:
@@ -977,6 +993,7 @@ def verify_docker(fresh_volume: bool) -> dict[str, Any]:
             output / "local",
             base_url="http://127.0.0.1:8080",
             secret_values=local_secret_values,
+            inject_partial_model=True,
         )
         summary.update({key: value for key, value in local.items() if key != "cleanup"})
         summary["local_container"] = {

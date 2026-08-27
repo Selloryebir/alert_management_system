@@ -6,8 +6,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import posixpath
+import re
 import subprocess
 from pathlib import Path, PurePosixPath
+from urllib.parse import unquote
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,6 +36,16 @@ EXCLUDED_FILES = {
     "scripts/validate_formal_baseline.py",
     "scripts/validate_release_candidate.py",
 }
+PUBLIC_NARRATIVE_FORBIDDEN = (
+    "救急",
+    "源码遗失",
+    "智能体",
+    "Codex",
+    "研发事故",
+    "PDF 占位代码",
+    "提取清单",
+)
+MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 CACHE_PARTS = {
     ".gradle",
     ".mypy_cache",
@@ -116,6 +129,37 @@ def validate_selection(paths: list[str]) -> list[str]:
         if tracked:
             raise SystemExit(f"当前 Git 树仍跟踪禁止来源路径：{tracked[0]}")
     return selected
+
+
+def validate_public_documents(contents: dict[str, bytes]) -> None:
+    selected = set(contents)
+    for path, content in contents.items():
+        if not path.endswith(".md"):
+            continue
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise SystemExit(f"公开 Markdown 不是 UTF-8：{path}") from exc
+        for forbidden in PUBLIC_NARRATIVE_FORBIDDEN:
+            if forbidden.casefold() in text.casefold():
+                raise SystemExit(f"公开 Markdown 包含禁止叙事词：{path}：{forbidden}")
+        for raw_target in MARKDOWN_LINK.findall(text):
+            target = raw_target.strip().strip("<>").split("#", 1)[0].strip()
+            if not target or re.match(
+                r"^[a-z][a-z0-9+.-]*:", target, re.IGNORECASE
+            ):
+                continue
+            normalized = posixpath.normpath(
+                posixpath.join(posixpath.dirname(path), unquote(target))
+            )
+            if normalized.startswith("../") or normalized == "..":
+                raise SystemExit(f"公开 Markdown 链接越出源码根目录：{path} -> {raw_target}")
+            if normalized in selected:
+                continue
+            directory = normalized.rstrip("/") + "/"
+            if any(candidate.startswith(directory) for candidate in selected):
+                continue
+            raise SystemExit(f"公开 Markdown 存在断链：{path} -> {raw_target}")
 
 
 def clean_head() -> str:
@@ -204,6 +248,7 @@ def export(output: Path) -> None:
     if not output.parent.is_dir() or output.parent.is_symlink():
         raise SystemExit("输出父目录必须是已存在的普通目录。")
     contents = {path: blob(commit, path) for path in paths}
+    validate_public_documents(contents)
     tree_modes = commit_modes(commit)
     modes = {path: tree_modes[path] for path in paths}
     manifest_bytes = build_manifest(commit, contents, modes)
@@ -236,6 +281,9 @@ def main() -> int:
         if args.output is not None:
             raise SystemExit("--check 与 --output 不能同时使用。")
         selected = validate_selection(index_paths())
+        contents = {path: git("show", f":{path}", text=False) for path in selected}
+        assert all(isinstance(content, bytes) for content in contents.values())
+        validate_public_documents(contents)  # type: ignore[arg-type]
         print(f"正式源码导出边界检查通过：将包含 {len(selected)} 个跟踪文件。")
         return 0
     if args.output is None:

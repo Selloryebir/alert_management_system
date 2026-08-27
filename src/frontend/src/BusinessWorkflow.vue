@@ -49,6 +49,7 @@ const businessError = ref("");
 const businessMessage = ref("");
 const analysis = ref<AnalysisRun>();
 const dashboard = ref<Dashboard>();
+const dashboardUpdatedAt = ref("");
 const alarmPage = ref<AlarmPage>();
 const selectedAlarm = ref<AlarmDetail>();
 const dispositionAssignee = ref("");
@@ -179,9 +180,25 @@ async function openCompletedAnalysis(run: AnalysisRun) {
     listAlarms(run.run_id, 0, PAGE_SIZE, filters),
   ]);
   dashboard.value = loadedDashboard;
+  dashboardUpdatedAt.value = new Date().toLocaleString("zh-CN", { hour12: false });
   alarmPage.value = loadedAlarms;
   businessMessage.value = `分析运行 ${run.run_id} 已加载。`;
   emit("analysisCompleted");
+}
+
+async function refreshDashboard() {
+  if (!analysis.value) return;
+  analysisBusy.value = true;
+  clearBusinessState();
+  try {
+    dashboard.value = await fetchDashboard(analysis.value.run_id);
+    dashboardUpdatedAt.value = new Date().toLocaleString("zh-CN", { hour12: false });
+    businessMessage.value = "看板已按当前项目数据库事实刷新。";
+  } catch (error) {
+    businessError.value = `看板刷新失败：${error instanceof Error ? error.message : "未知错误"}。请检查主系统后重试。`;
+  } finally {
+    analysisBusy.value = false;
+  }
 }
 
 async function handleBatchAction(batch: ImportBatch) {
@@ -288,6 +305,7 @@ async function saveClassification() {
       fetchDashboard(analysis.value.run_id),
       listAlarms(analysis.value.run_id, page, PAGE_SIZE, filters),
     ]);
+    dashboardUpdatedAt.value = new Date().toLocaleString("zh-CN", { hour12: false });
     businessMessage.value = "人工分类修订已保存；算法原值保持不变。";
   } catch (error) {
     businessError.value = `分类修订失败：${error instanceof Error ? error.message : "未知错误"}。请核对当前有效值后重试。`;
@@ -299,6 +317,7 @@ async function saveClassification() {
 function handleDemoReset() {
   analysis.value = undefined;
   dashboard.value = undefined;
+  dashboardUpdatedAt.value = "";
   alarmPage.value = undefined;
   selectedAlarm.value = undefined;
   businessError.value = "";
@@ -349,6 +368,7 @@ async function changeDisposition(status: DispositionStatus) {
       fetchDashboard(analysis.value.run_id),
       listAlarms(analysis.value.run_id, page, PAGE_SIZE, filters),
     ]);
+    dashboardUpdatedAt.value = new Date().toLocaleString("zh-CN", { hour12: false });
     emit("dispositionCompleted");
   } catch (error) {
     businessError.value = `处置更新失败：${error instanceof Error ? error.message : "未知错误"}。请核对当前状态后重试。`;
@@ -451,8 +471,9 @@ function exportDashboardData() {
             <p class="eyebrow">固定事实源统计</p>
             <h3 id="dashboard-title">分析总览</h3>
           </div>
-          <div class="dashboard-actions"><button type="button" class="secondary-button" @click="printDashboard">打印或保存为 PDF</button><button type="button" class="secondary-button" @click="exportDashboardData">导出看板数据</button></div>
+          <div class="dashboard-actions"><button type="button" class="secondary-button" :disabled="analysisBusy" data-testid="refresh-dashboard" @click="refreshDashboard">刷新实时数据</button><button type="button" class="secondary-button" @click="printDashboard">打印或保存为 PDF</button><button type="button" class="secondary-button" @click="exportDashboardData">导出看板数据</button></div>
         </div>
+        <p class="dashboard-freshness" role="status">数据更新时间：{{ dashboardUpdatedAt }}；内容是当前项目数据库快照，业务操作完成后自动刷新。</p>
 
         <div class="summary-cards">
           <article><span>报警总数</span><strong data-testid="dashboard-total">{{ dashboard.total }}</strong></article>

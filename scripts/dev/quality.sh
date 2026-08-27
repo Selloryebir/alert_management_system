@@ -12,7 +12,8 @@ fi
 
 "$PYTHON_VENV/bin/python" -m ruff check \
   --config "$REPOSITORY_ROOT/src/algorithm/pyproject.toml" \
-  "$REPOSITORY_ROOT/src/algorithm" "$REPOSITORY_ROOT/tools/model-training"
+  "$REPOSITORY_ROOT/src/algorithm" "$REPOSITORY_ROOT/tools/model-training" \
+  "$REPOSITORY_ROOT/tests/smoke" "$REPOSITORY_ROOT/scripts/release/export_clean_source.py"
 npm --prefix "$REPOSITORY_ROOT/src/frontend" run lint
 
 echo "Java、Python 和前端质量检查通过。"

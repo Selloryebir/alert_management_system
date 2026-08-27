@@ -40,6 +40,7 @@ const fieldMapping = ref<Record<string, string>>({});
 const corrections = ref<ImportCorrections>({});
 const importBusy = ref(false);
 const importMessage = ref("");
+const importError = ref("");
 const currentBatch = ref<ImportBatch>();
 const recentBatches = ref<ImportBatch[]>([]);
 const fileInputKey = ref(0);
@@ -110,6 +111,7 @@ function resetProjectBusinessState() {
   currentBatch.value = undefined;
   recentBatches.value = [];
   importMessage.value = "";
+  importError.value = "";
   importBusy.value = false;
   analysisCompleted.value = false;
   dispositionCompleted.value = false;
@@ -133,6 +135,7 @@ function selectFile(event: Event) {
   fieldMapping.value = {};
   corrections.value = {};
   importMessage.value = "";
+  importError.value = "";
   showImportErrors.value = false;
 }
 
@@ -169,10 +172,11 @@ function handleImportDialogKeydown(event: KeyboardEvent) {
 }
 
 async function previewSelectedFile() {
-  if (!currentProject.value) { importMessage.value = "请先选择当前项目。"; return; }
-  if (!selectedFile.value) { importMessage.value = "请先选择 CSV、TXT 或 XLSX 文件。"; return; }
+  if (!currentProject.value) { importError.value = "请先选择当前项目。"; return; }
+  if (!selectedFile.value) { importError.value = "请先选择 CSV、TXT 或 XLSX 文件。"; return; }
   importBusy.value = true;
   importMessage.value = "";
+  importError.value = "";
   try {
     const mapping = Object.fromEntries(Object.entries(fieldMapping.value).filter(([, source]) => source));
     currentBatch.value = await previewImport(selectedFile.value, currentProject.value.project_id, mapping, corrections.value);
@@ -185,7 +189,7 @@ async function previewSelectedFile() {
       await openImportErrorDialog();
     }
   } catch (error) {
-    importMessage.value = error instanceof Error ? error.message : "预览失败";
+    importError.value = error instanceof Error ? error.message : "预览失败";
   } finally { importBusy.value = false; }
 }
 
@@ -208,29 +212,30 @@ async function confirmCurrentBatch() {
   if (!currentBatch.value) return;
   importBusy.value = true;
   importMessage.value = "";
+  importError.value = "";
   try {
     currentBatch.value = await confirmImport(currentBatch.value.batch_id);
     importMessage.value = `批次 ${currentBatch.value.batch_id} 已导入当前项目。`;
     await refreshBatches(false);
     await projectWorkspace.value?.refreshOverview();
   } catch (error) {
-    importMessage.value = error instanceof Error ? error.message : "确认导入失败";
+    importError.value = error instanceof Error ? error.message : "确认导入失败";
   } finally { importBusy.value = false; }
 }
 
 async function refreshBatches(showFeedback = true) {
   if (!currentProject.value) {
-    if (showFeedback) importMessage.value = "请先选择项目，再查看该项目批次。";
+    if (showFeedback) importError.value = "请先选择项目，再查看该项目批次。";
     return;
   }
   importBusy.value = true;
-  if (showFeedback) importMessage.value = "";
+  if (showFeedback) { importMessage.value = ""; importError.value = ""; }
   try {
     const batches = await listImports(currentProject.value.project_id);
     if (!Array.isArray(batches)) throw new Error("批次列表响应格式无效");
     recentBatches.value = batches;
   }
-  catch (error) { if (showFeedback) importMessage.value = error instanceof Error ? error.message : "批次列表加载失败"; }
+  catch (error) { if (showFeedback) importError.value = error instanceof Error ? error.message : "批次列表加载失败"; }
   finally { importBusy.value = false; }
 }
 
@@ -347,6 +352,7 @@ onBeforeUnmount(() => setUnauthorizedHandler(undefined));
       <section v-if="mappingHeaders.length" class="mapping-editor" data-testid="mapping-editor" aria-labelledby="mapping-title"><h3 id="mapping-title">字段映射</h3><p>左侧是系统目标字段，右侧选择文件中的源表头；可选字段允许留空。</p><div class="mapping-grid"><label v-for="[field, required] in TARGET_FIELDS" :key="field"><span>{{ fieldLabel(field) }}{{ required ? "（必填）" : "（可选）" }}</span><select v-model="fieldMapping[field]" :disabled="importBusy"><option value="">不映射</option><option v-for="header in mappingHeaders" :key="header" :value="header">{{ header }}</option></select></label></div></section>
 
       <p v-if="importMessage" class="import-message" role="status">{{ importMessage }}</p>
+      <p v-if="importError" class="request-error" role="alert">{{ importError }}</p>
       <article v-if="currentBatch" class="batch-detail" data-testid="preview-summary">
         <div class="status-line"><h3>{{ currentBatch.file_name }}</h3><span class="status-badge" :class="`batch-${currentBatch.status.toLowerCase()}`">{{ zh(currentBatch.status) }}</span></div><p>总行数 {{ currentBatch.total_rows }} · 有效 {{ currentBatch.valid_rows }} · 错误 {{ currentBatch.error_count }}</p>
         <button v-if="currentBatch.status === 'READY'" type="button" data-testid="confirm-import" :disabled="importBusy" @click="confirmCurrentBatch">确认导入</button>

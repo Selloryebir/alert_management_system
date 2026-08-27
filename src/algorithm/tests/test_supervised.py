@@ -101,6 +101,17 @@ def test_predefined_groups_are_disjoint_and_metrics_are_deterministic(
     assert not groups["train"] & groups["validation"]
     assert not groups["train"] & groups["test"]
     assert not groups["validation"] & groups["test"]
+    structures = {
+        split: {
+            tuple(supervised.structural_features(row["record"]).tolist())
+            for row in rows
+            if row["split"] == split
+        }
+        for split in training.SPLITS
+    }
+    assert not structures["train"] & structures["validation"]
+    assert not structures["train"] & structures["test"]
+    assert not structures["validation"] & structures["test"]
 
     first = training.train_bundle(rows)
     second = training.train_bundle(rows)
@@ -111,7 +122,12 @@ def test_predefined_groups_are_disjoint_and_metrics_are_deterministic(
     assert test_metrics["count"] == 12
     assert set(test_metrics["classification"]) >= {*supervised.KNOWN_CAUSES, "macro avg"}
     assert 0.0 <= test_metrics["coverage"] <= 1.0
+    assert test_metrics["accepted_count"] > 0
+    assert test_metrics["accepted_error_count"] == 0
+    assert test_metrics["accepted_accuracy"] == 1.0
     assert len(test_metrics["confusion_matrix"]) == 5
+    assert set(test_metrics["branches"]) == {"svm", "adaboost", "agreement_count"}
+    assert test_metrics["branches"]["agreement_count"] > 0
 
 
 def test_split_text_is_independent_and_metadata_never_enters_features(
@@ -165,6 +181,59 @@ def test_training_entry_rejects_cross_split_text_leakage(
     )
     with pytest.raises(training.TrainingDataError, match="跨 split 报警描述完全重复"):
         training.validate_group_isolation(leaked)
+
+
+def test_training_console_is_forced_to_utf8_on_english_windows(
+    training: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class SimulatedConsole:
+        encoding = "cp1252"
+        errors = "strict"
+
+        def reconfigure(self, *, encoding: str, errors: str) -> None:
+            self.encoding = encoding
+            self.errors = errors
+
+        def write(self, value: str) -> None:
+            value.encode(self.encoding, errors=self.errors)
+
+    stdout = SimulatedConsole()
+    stderr = SimulatedConsole()
+    monkeypatch.setattr(training.sys, "stdout", stdout)
+    monkeypatch.setattr(training.sys, "stderr", stderr)
+
+    training.configure_console_encoding()
+    stdout.write("已生成认证加密模型")
+    stderr.write("评估报告")
+
+    assert stdout.encoding == "utf-8"
+    assert stderr.encoding == "utf-8"
+
+
+def test_artifact_write_failure_leaves_no_partial_outputs(
+    training: Any,
+    rows: list[dict[str, Any]],
+    bundle: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_path = tmp_path / "model.enc"
+    key_path = tmp_path / "key.txt"
+    report_path = tmp_path / "report.json"
+    original_write_text = Path.write_text
+
+    def fail_report(path: Path, *args: Any, **kwargs: Any) -> int:
+        if path.name.startswith("report.json.tmp-"):
+            raise OSError("simulated report failure")
+        return original_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_report)
+    with pytest.raises(OSError, match="simulated report failure"):
+        training.write_artifacts(
+            bundle, rows, model_path, key_path, report_path
+        )
+
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_encrypted_model_loads_and_wrong_key_or_tampering_fails(
@@ -273,6 +342,47 @@ def test_unseen_scenarios_are_classified_or_conservatively_abstained(
     assert "类别证据门禁=未通过" in unsupported_decision.evidence
 
 
+def test_normal_and_abnormal_language_boundaries_use_full_phrases(
+    rows: list[dict[str, Any]], bundle: dict[str, Any]
+) -> None:
+    by_label = {row["label"]: row["record"] for row in rows if row["split"] == "test"}
+    model = SupervisedModel(bundle)
+    normal_cases = (
+        ("EQUIPMENT_FAULT", "循环泵设备运行正常，无异常"),
+        ("INSTRUMENT_ISSUE", "传感器仪表运行正常，无异常"),
+        ("PROCESS_DISTURBANCE", "反应器压力温度均正常"),
+    )
+    for label, description in normal_cases:
+        record = by_label[label].model_copy(
+            update={"tag": "STATUS-CHECK", "description": description}
+        )
+        assert supervised.has_conservative_language(record)
+        assert model.decide(record).category == "UNKNOWN"
+        result = analyze(analysis_request([record])).record_results[0]
+        assert result.cause_category == "UNKNOWN"
+
+    abnormal = by_label["EQUIPMENT_FAULT"].model_copy(
+        update={"tag": "PUMP-TRIP", "description": "abnormal operation caused pump trip"}
+    )
+    assert not supervised.has_conservative_language(abnormal)
+    assert (
+        analyze(analysis_request([abnormal])).record_results[0].cause_category
+        == "EQUIPMENT_FAULT"
+    )
+
+    recovered = by_label["EQUIPMENT_FAULT"].model_copy(
+        update={
+            "tag": "PUMP-TRIP",
+            "description": "equipment fault caused trip, then returned to normal",
+        }
+    )
+    assert not supervised.has_conservative_language(recovered)
+    assert (
+        analyze(analysis_request([recovered])).record_results[0].cause_category
+        == "EQUIPMENT_FAULT"
+    )
+
+
 def test_expert_result_is_not_overridden_and_unknown_can_only_use_agreement(
     rows: list[dict[str, Any]], bundle: dict[str, Any]
 ) -> None:
@@ -282,7 +392,7 @@ def test_expert_result_is_not_overridden_and_unknown_can_only_use_agreement(
     request = analysis_request([expert_known])
     result = analyze(request).record_results[0]
     assert result.cause_category == "PROCESS_DISTURBANCE"
-    assert any("SUPERVISED_CAUSE_V1" in item for item in result.evidence)
+    assert any("SUPERVISED_CAUSE_V2" in item for item in result.evidence)
     assert any("专家结果保持不变" in item for item in result.evidence)
 
     expert_unknown = source.model_copy(update={"description": "轴承卡涩导致转子停机"})
