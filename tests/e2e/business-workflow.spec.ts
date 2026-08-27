@@ -5,6 +5,7 @@ import { injectNextFetchFailure, test } from "./test-fixtures";
 const repositoryRoot = path.resolve(__dirname, "../..");
 const mode = process.env.E2E_MODE ?? "smoke";
 const expectedTotal = Number(process.env.E2E_EXPECTED_TOTAL ?? "300");
+const projectCode = process.env.E2E_PROJECT_CODE ?? "DEFAULT-DEMO";
 const dataset = path.resolve(
   repositoryRoot,
   process.env.E2E_DATASET ?? "samples/smoke/synthetic_smoke_utf8.csv",
@@ -25,7 +26,7 @@ async function responseJson<T>(response: APIResponse | Response): Promise<T> {
 }
 
 async function importAndAnalyze(page: Page): Promise<{ batchId: string; runId: string }> {
-  await page.getByTestId("select-project-DEFAULT-DEMO").click();
+  await page.getByTestId(`select-project-${projectCode}`).click();
   await expect(page.getByTestId("file-input")).toBeEnabled();
   await page.getByTestId("file-input").setInputFiles(dataset);
   const previewResponse = page.waitForResponse(
@@ -145,7 +146,7 @@ test("页面显示算法不可用的可重试提示", async ({ page }) => {
     message: "算法服务不可用，可重试",
   });
 
-  await page.getByTestId("select-project-DEFAULT-DEMO").click();
+  await page.getByTestId(`select-project-${projectCode}`).click();
   await expect(page.getByTestId("file-input")).toBeEnabled();
   await page.getByTestId("file-input").setInputFiles(dataset);
   await page.getByTestId("preview-button").click();

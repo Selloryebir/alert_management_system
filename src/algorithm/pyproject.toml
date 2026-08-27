@@ -9,7 +9,10 @@ description = "报警管理系统纯计算算法服务"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "cryptography==50.0.1",
     "fastapi==0.141.1",
+    "scikit-learn==1.9.0",
+    "skops==0.14.0",
     "uvicorn==0.52.4",
 ]
 
@@ -17,12 +20,20 @@ dependencies = [
 test = [
     "httpx2==2.12.0",
     "pytest==9.1.1",
+    "ruff==0.16.4",
 ]
 
 [tool.pytest.ini_options]
 addopts = "-q --capture=sys"
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
 
 [tool.setuptools.packages.find]
 include = ["algorithm_service*"]

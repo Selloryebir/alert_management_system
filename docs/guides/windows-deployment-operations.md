@@ -142,6 +142,15 @@ data\secrets\bootstrap-admin-password.txt
 
 系统没有邮件找回、短信找回、默认后门或通用密码重置命令。普通账号忘记密码由系统管理员在网页“账号与项目权限”中重置；唯一管理员失去全部可用凭据时，不得直接修改数据库，应按组织的数据恢复和授权流程处置。
 
+首次启动会在当前实例生成加密监督模型与独立密钥：
+
+```text
+data\model\algorithm-model.enc
+data\secrets\algorithm-model-key.txt
+```
+
+模型使用 AES-256-GCM 认证加密。发布 ZIP 不包含模型或密钥；`preflight.ps1` 会核验包内模型准备程序，`start.ps1` 在空实例中生成上述两项文件并立即限制密钥 ACL。后续启动只把其精确路径传给算法进程；部分文件存在、密钥错误或密文被修改时启动失败，不会降级为明文模型。不要打开、移动、复制到日志或提交模型密钥，也不要用其他实例的同名文件替换。实例清理和备份按各自脚本的明确范围执行，业务数据库备份不等同于模型密钥托管。
+
 ## 7. 日常停止和重新启动
 
 ### 7.1 停止并保留数据
@@ -276,7 +285,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\reset-demo.ps1
 
 脚本会要求输入精确确认文本和管理员凭据，只调用受保护的演示复位 API。它不会删除数据库目录、备份或样例。
 
-自动化参数 `-Force` 和 `-PasswordFile` 只供受控验收使用，不作为日常人工操作说明。
+受控验收参数 `-Force` 和 `-PasswordFile` 只供发布检查使用，不作为日常人工操作说明。
 
 ## 11. 数据、日志和实例目录
 
@@ -353,7 +362,7 @@ logs\backend-*.err.log
 
 ## 14. Docker Compose 本机模式管理员附录
 
-Docker 是次级交付方式，不属于 Windows 自包含原生包。以下命令要求在仓库源码根目录的 Bash 环境运行，并已安装 Docker Desktop 或 Docker Engine、Docker Compose、Bash 和 OpenSSL。
+Docker 是次级交付方式，不属于 Windows 自包含原生包。以下命令要求在仓库源码根目录的 Bash 环境运行，并已安装 Docker Desktop 或 Docker Engine、Docker Compose 2.24.4 或更高版本、Bash 和 OpenSSL；该 Compose 最低版本用于支持 HTTPS 覆盖文件中的 `!override` 合并语义。
 
 ### 14.1 准备本机秘密并启动
 

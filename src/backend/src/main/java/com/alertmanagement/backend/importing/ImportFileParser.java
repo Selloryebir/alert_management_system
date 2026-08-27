@@ -45,7 +45,6 @@ class ImportFileParser {
     static {
         ZipSecureFile.setMinInflateRatio(0.01);
         ZipSecureFile.setMaxEntrySize(64L * 1024 * 1024);
-        ZipSecureFile.setMaxTextSize(64L * 1024 * 1024);
     }
 
     SourceTable parse(MultipartFile file) {

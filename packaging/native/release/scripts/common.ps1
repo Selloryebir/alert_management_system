@@ -1,4 +1,6 @@
 ﻿Set-StrictMode -Version 2.0
+[Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)
+$OutputEncoding = [Console]::OutputEncoding
 $ErrorActionPreference = "Stop"
 
 function Get-ReleaseRoot {
@@ -44,6 +46,10 @@ function Get-RuntimeContext {
         Java = Join-ReleasePath $root "runtime/jre/bin/java.exe"
         BackendJar = Join-ReleasePath $root "app/core-api.jar"
         Algorithm = Join-ReleasePath $root "app/algorithm/algorithm-service.exe"
+        ModelProvisioner = Join-ReleasePath $root "app/model-provisioner/model-provisioner.exe"
+        AlgorithmModel = Resolve-ReleaseChildPath $root ([string]$config.algorithm_model.file)
+        AlgorithmModelKeyFile = Resolve-ReleaseChildPath $root ([string]$config.algorithm_model.key_file)
+        AlgorithmModelReport = Resolve-ReleaseChildPath $root ([string]$config.algorithm_model.report_file)
         PgBin = Join-ReleasePath $root "runtime/postgresql/bin"
         PgData = Join-ReleasePath $root "data/postgresql"
         PgDataArgument = "data\postgresql"
@@ -61,7 +67,7 @@ function Get-RuntimeContext {
 function Initialize-ReleaseDirectories {
     param([Parameter(Mandatory = $true)]$Context)
     foreach ($path in @($Context.Logs, $Context.Pids, $Context.Backups, $Context.Secrets,
-            (Split-Path $Context.PgData -Parent))) {
+            (Split-Path $Context.PgData -Parent), (Split-Path $Context.AlgorithmModel -Parent))) {
         if (-not (Test-Path -LiteralPath $path)) {
             New-Item -ItemType Directory -Path $path | Out-Null
         }
@@ -89,6 +95,9 @@ function Assert-FixedRuntimeConfig {
     }
     if ([string]$config.database.password_file -ne "data/secrets/database-password.txt" -or
             [string]$config.bootstrap_admin.password_file -ne "data/secrets/bootstrap-admin-password.txt" -or
+            [string]$config.algorithm_model.file -ne "data/model/algorithm-model.enc" -or
+            [string]$config.algorithm_model.key_file -ne "data/secrets/algorithm-model-key.txt" -or
+            [string]$config.algorithm_model.report_file -ne "data/model/algorithm-model-report.json" -or
             [string]$config.bootstrap_admin.username -notmatch '^[a-z0-9._-]{3,50}$') {
         throw "密钥文件或初始管理员配置与发布契约不一致。"
     }
@@ -404,6 +413,39 @@ function Initialize-InstanceSecrets {
     Initialize-SecretFile $Context.BootstrapAdminPasswordFile
 }
 
+function Initialize-AlgorithmModel {
+    param([Parameter(Mandatory = $true)]$Context)
+    $paths = @($Context.AlgorithmModel, $Context.AlgorithmModelKeyFile, $Context.AlgorithmModelReport)
+    $existing = @($paths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+    if ($existing.Count -eq 3) {
+        Protect-SecretFile $Context.AlgorithmModelKeyFile
+        return
+    }
+    if ($existing.Count -ne 0) {
+        throw "监督模型运行文件不完整，拒绝覆盖；请执行受控实例清理后重新部署。"
+    }
+    try {
+        Invoke-BundledCommand $Context.ModelProvisioner @(
+            "--model-out", $Context.AlgorithmModel,
+            "--key-out", $Context.AlgorithmModelKeyFile,
+            "--report-out", $Context.AlgorithmModelReport) $Context.Root | Out-Null
+        foreach ($path in $paths) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
+                    (Get-Item -LiteralPath $path).Length -le 0) {
+                throw "监督模型准备程序未生成完整输出：$path"
+            }
+        }
+        Protect-SecretFile $Context.AlgorithmModelKeyFile
+    } catch {
+        foreach ($path in $paths) {
+            if (Test-Path -LiteralPath $path -PathType Leaf) {
+                Remove-Item -LiteralPath $path -Force
+            }
+        }
+        throw
+    }
+}
+
 function Get-SecretValue {
     param([Parameter(Mandatory = $true)][string]$Path)
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
@@ -449,7 +491,11 @@ function Invoke-BundledCommandResult {
     )
     $stdout = [IO.Path]::GetTempFileName()
     $stderr = [IO.Path]::GetTempFileName()
+    $oldLanguage = [Environment]::GetEnvironmentVariable("LANG", "Process")
+    $oldMessageLanguage = [Environment]::GetEnvironmentVariable("LC_MESSAGES", "Process")
     try {
+        [Environment]::SetEnvironmentVariable("LANG", "C", "Process")
+        [Environment]::SetEnvironmentVariable("LC_MESSAGES", "C", "Process")
         $parameters = @{
             FilePath = $FilePath
             Wait = $true
@@ -475,6 +521,8 @@ function Invoke-BundledCommandResult {
             Output = ($standardOutput + $standardError).Trim()
         }
     } finally {
+        [Environment]::SetEnvironmentVariable("LANG", $oldLanguage, "Process")
+        [Environment]::SetEnvironmentVariable("LC_MESSAGES", $oldMessageLanguage, "Process")
         Remove-Item -LiteralPath $stdout, $stderr -Force -ErrorAction SilentlyContinue
     }
 }

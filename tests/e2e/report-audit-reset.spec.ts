@@ -9,6 +9,7 @@ const repositoryRoot = path.resolve(__dirname, "../..");
 const mode = process.env.E2E_MODE ?? "smoke";
 const expectedTotal = Number(process.env.E2E_EXPECTED_TOTAL ?? "300");
 const cycles = Number(process.env.E2E_CYCLES ?? "2");
+const projectCode = process.env.E2E_PROJECT_CODE ?? "DEFAULT-DEMO";
 const dataset = path.resolve(
   repositoryRoot,
   process.env.E2E_DATASET ?? "samples/smoke/synthetic_smoke_utf8.csv",
@@ -64,8 +65,26 @@ async function assertSuccessfulWithoutBody(
   throw new Error(`${label}失败：HTTP ${response.status()}；${details}`);
 }
 
+async function ensureProject(page: Page): Promise<void> {
+  if (projectCode === "DEFAULT-DEMO") return;
+  await expect(page.getByRole("heading", { name: "选择当前工作项目" })).toBeVisible();
+  await expect(page.getByTestId("project-select")).toBeVisible();
+  if (await page.getByTestId(`select-project-${projectCode}`).count() > 0) return;
+
+  await page.getByRole("button", { name: "新建项目" }).click();
+  const form = page.getByTestId("project-entry");
+  await form.getByLabel("项目编号（必填）").fill(projectCode);
+  await form.getByLabel("项目名称（必填）").fill("浏览器报告验收项目");
+  await form.getByLabel("客户名称（必填）").fill("合成示例客户");
+  await form.getByLabel("厂区（必填）").fill("合成示例厂区");
+  await form.getByLabel("装置（必填）").fill("合成示例装置");
+  await form.getByRole("button", { name: "创建并选中" }).click();
+  await expect(page.getByTestId(`select-project-${projectCode}`)).toHaveText("当前项目");
+}
+
 async function importAndAnalyze(page: Page): Promise<string> {
-  await page.getByTestId("select-project-DEFAULT-DEMO").click();
+  await ensureProject(page);
+  await page.getByTestId(`select-project-${projectCode}`).click();
   await expect(page.getByTestId("file-input")).toBeEnabled();
   await page.getByTestId("file-input").setInputFiles(dataset);
   const previewPromise = page.waitForResponse(
@@ -171,7 +190,11 @@ async function downloadReport(
     ? "application/pdf"
     : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   expect(response.headers()["content-type"]).toContain(expectedType);
-  expect(download.suggestedFilename()).toMatch(new RegExp(`^DEFAULT-DEMO-alert-report-${runId}\\.${format}$`));
+  const safeProjectCode = projectCode.replace(/[^A-Za-z0-9._-]/g, "_");
+  const escapedProjectCode = safeProjectCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  expect(download.suggestedFilename()).toMatch(
+    new RegExp(`^${escapedProjectCode}-alert-report-${runId}\\.${format}$`),
+  );
   expect(await download.failure()).toBeNull();
 
   const reportPath = path.join(outputDirectory, `report.${format}`);

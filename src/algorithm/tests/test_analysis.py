@@ -257,15 +257,11 @@ def test_chatter_finds_an_interior_qualifying_window_with_a_quiet_tail() -> None
     indexed = by_id(analyze(records, run="interior-chatter"))
 
     assert indexed[identity("interior-0")]["noise_type"] == "NORMAL"
-    assert {
-        indexed[identity(f"interior-{index}")]["noise_type"]
-        for index in range(1, 7)
-    } == {"CHATTER"}
+    assert {indexed[identity(f"interior-{index}")]["noise_type"] for index in range(1, 7)} == {
+        "CHATTER"
+    }
     assert indexed[identity("interior-6")]["score"] == 0.8
-    assert any(
-        "A=T/(N-1)=0.800000" in line
-        for line in indexed[identity("interior-6")]["evidence"]
-    )
+    assert any("A=T/(N-1)=0.800000" in line for line in indexed[identity("interior-6")]["evidence"])
 
 
 def test_chatter_evidence_size_is_linear_for_a_large_same_time_group() -> None:
@@ -394,7 +390,10 @@ def test_markov_rejects_insufficient_support_random_order_and_cross_scope() -> N
         ("C", "A", "D", "B", "E"),
     )
     random_order = sum(
-        (sequence_records(index, index * 120, tags=tags) for index, tags in enumerate(permutations)),
+        (
+            sequence_records(index, index * 120, tags=tags)
+            for index, tags in enumerate(permutations)
+        ),
         [],
     )
     assert analyze(random_order, run="random-negative")["event_chains"] == []
@@ -530,8 +529,16 @@ def test_duplicate_ids_and_cross_batch_input_are_rejected() -> None:
 
 def test_runtime_has_no_demo_or_expected_result_dependency() -> None:
     package = Path(__file__).resolve().parents[1] / "algorithm_service"
-    runtime_text = "\n".join(path.read_text("utf-8") for path in sorted(package.glob("*.py"))).lower()
+    runtime_text = "\n".join(
+        path.read_text("utf-8") for path in sorted(package.glob("*.py"))
+    ).lower()
 
-    for forbidden in ("synthetic", "samples/expected", "步骤 1..5", "equipment_trip", "process_cascade"):
+    for forbidden in (
+        "synthetic",
+        "samples/expected",
+        "步骤 1..5",
+        "equipment_trip",
+        "process_cascade",
+    ):
         assert forbidden not in runtime_text
     assert "postgresql" not in runtime_text

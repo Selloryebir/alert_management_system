@@ -259,8 +259,13 @@ describe("M2 导入向导", () => {
       },
     );
     await fireEvent.click(screen.getByRole("button", { name: "读取表头并预览" }));
-    expect(await screen.findByText("选项值无效")).toBeInTheDocument();
-    expect(screen.getByText("优先级")).toBeInTheDocument();
+    const errorDialog = await screen.findByTestId("import-error-dialog");
+    expect(errorDialog).toHaveFocus();
+    expect(within(errorDialog).getByText(/优先级必须为/)).toBeInTheDocument();
+    await fireEvent.keyDown(errorDialog, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("import-error-dialog")).not.toBeInTheDocument());
+    expect(screen.getByTestId("preview-button")).toHaveFocus();
+    expect(screen.getByText("选项值无效")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "确认导入" })).not.toBeInTheDocument();
 
     await fireEvent.click(screen.getByRole("button", { name: "刷新批次" }));
@@ -380,7 +385,11 @@ describe("M4 浏览器业务闭环", () => {
             run_id: runId,
             batch_id: batchId,
             total: 300,
-            disposition_counts: { OPEN: 300, IN_PROGRESS: 0, CLOSED: 0 },
+            disposition_counts: {
+              OPEN: disposition === "OPEN" ? 300 : 299,
+              IN_PROGRESS: disposition === "IN_PROGRESS" ? 1 : 0,
+              CLOSED: disposition === "CLOSED" ? 1 : 0,
+            },
             trend: [{ bucket: "2026-01-15T09:00:00+08:00", count: 80 }],
             priority_counts: { P1: 75, P2: 75, P3: 75, P4: 75 },
             area_counts: { SYNTHETIC_AREA_02: 80 },
@@ -489,6 +498,8 @@ describe("M4 浏览器业务闭环", () => {
     await waitFor(() => {
       expect(screen.getByTestId("disposition-close")).toBeEnabled();
     });
+    expect(screen.getByTestId("dashboard-open")).toHaveTextContent("299");
+    expect(screen.getByTestId("dashboard-in-progress")).toHaveTextContent("1");
     expect(screen.getByTestId("disposition-reopen")).toBeEnabled();
 
     await fireEvent.update(screen.getByTestId("disposition-note"), "已完成合成报警处置");
@@ -496,6 +507,7 @@ describe("M4 浏览器业务闭环", () => {
     await waitFor(() => {
       expect(screen.getByTestId("alarm-detail")).toHaveTextContent("已关闭");
     });
+    expect(screen.getByTestId("dashboard-closed")).toHaveTextContent("1");
     expect(screen.getByTestId("disposition-history")).toHaveTextContent("待处理 → 处理中");
     expect(screen.getByTestId("disposition-history")).toHaveTextContent("处理中 → 已关闭");
 

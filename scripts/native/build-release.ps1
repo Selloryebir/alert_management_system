@@ -2,7 +2,7 @@
 param(
     [string]$OutputRoot = "",
     [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$')]
-    [string]$ReleaseVersion = "0.8.0+m13",
+    [string]$ReleaseVersion = "1.0.0-rc.1",
     [switch]$AllowDirty
 )
 
@@ -22,12 +22,15 @@ $releaseRoot = Join-Path $stagingRoot "alert-management-system-windows-x64"
 $lockPath = Join-Path $repositoryRoot "packaging\native\runtime-lock.json"
 $templateRoot = Join-Path $repositoryRoot "packaging\native\release"
 $algorithmSpec = Join-Path $repositoryRoot "packaging\native\algorithm-service.spec"
+$modelProvisionerSpec = Join-Path $repositoryRoot "packaging\native\model-provisioner.spec"
 $pyinstallerLock = Join-Path $repositoryRoot "packaging\native\pyinstaller.lock"
 $manualSources = @(
     "business-user-manual.docx",
     "business-user-manual.pdf",
     "windows-deployment-operations.docx",
-    "windows-deployment-operations.pdf"
+    "windows-deployment-operations.pdf",
+    "model-technical-brochure.docx",
+    "model-technical-brochure.pdf"
 )
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
@@ -237,7 +240,7 @@ function Get-BuildTool {
 if ($env:OS -ne "Windows_NT" -or -not [Environment]::Is64BitOperatingSystem) {
     throw "原生发布构建只支持 Windows x64。"
 }
-foreach ($required in @($lockPath, $algorithmSpec, $pyinstallerLock)) {
+foreach ($required in @($lockPath, $algorithmSpec, $modelProvisionerSpec, $pyinstallerLock)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
         throw "缺少构建输入：$required"
     }
@@ -358,6 +361,13 @@ try {
         "-m", "PyInstaller", "--noconfirm", "--clean",
         "--distpath", $algorithmDist, "--workpath", $algorithmWork, $algorithmSpec
     ) -FailureMessage "算法 Windows 可执行文件构建失败"
+    $modelProvisionerDist = Join-Path $stagingRoot "model-provisioner-dist"
+    $modelProvisionerWork = Join-Path $stagingRoot "model-provisioner-work"
+    Invoke-Checked -FilePath $buildPython -Arguments @(
+        "-m", "PyInstaller", "--noconfirm", "--clean",
+        "--distpath", $modelProvisionerDist, "--workpath", $modelProvisionerWork,
+        $modelProvisionerSpec
+    ) -FailureMessage "监督模型准备程序构建失败"
 
     Copy-Item -LiteralPath (Join-Path $templateRoot "README.txt") -Destination $releaseRoot
     Copy-Item -LiteralPath (Join-Path $templateRoot "THIRD-PARTY-NOTICES.txt") -Destination $releaseRoot
@@ -383,6 +393,32 @@ try {
         throw "PyInstaller 未生成预期算法 EXE。"
     }
     Copy-Item -Path (Join-Path $algorithmSource "*") -Destination $appDirectory.FullName -Recurse
+    $modelProvisionerSource = Join-Path $modelProvisionerDist "model-provisioner"
+    if (-not (Test-Path -LiteralPath `
+            (Join-Path $modelProvisionerSource "model-provisioner.exe") -PathType Leaf)) {
+        throw "PyInstaller 未生成预期模型准备程序 EXE。"
+    }
+    $modelProvisionerSmoke = Join-Path $stagingRoot "model-provisioner-smoke"
+    New-Item -ItemType Directory -Path $modelProvisionerSmoke | Out-Null
+    Invoke-Checked -FilePath (Join-Path $modelProvisionerSource "model-provisioner.exe") `
+        -Arguments @(
+            "--model-out", (Join-Path $modelProvisionerSmoke "algorithm-model.enc"),
+            "--key-out", (Join-Path $modelProvisionerSmoke "algorithm-model-key.txt"),
+            "--report-out", (Join-Path $modelProvisionerSmoke "algorithm-model-report.json")
+        ) -FailureMessage "监督模型准备程序运行冒烟失败"
+    foreach ($generatedName in @(
+            "algorithm-model.enc", "algorithm-model-key.txt", "algorithm-model-report.json")) {
+        $generatedPath = Join-Path $modelProvisionerSmoke $generatedName
+        if (-not (Test-Path -LiteralPath $generatedPath -PathType Leaf) -or
+                (Get-Item -LiteralPath $generatedPath).Length -le 0) {
+            throw "监督模型准备程序运行冒烟缺少输出：$generatedName"
+        }
+    }
+    Remove-Item -LiteralPath $modelProvisionerSmoke -Recurse -Force
+    $modelProvisionerTarget = New-Item -ItemType Directory -Path `
+        (Join-Path $releaseRoot "app\model-provisioner") -Force
+    Copy-Item -Path (Join-Path $modelProvisionerSource "*") `
+        -Destination $modelProvisionerTarget.FullName -Recurse
 
     $jreDirectory = Join-Path $releaseRoot "runtime\jre"
     New-Item -ItemType Directory -Path (Split-Path -Parent $jreDirectory) -Force | Out-Null
@@ -427,6 +463,9 @@ try {
     }
     $demoTarget = Join-Path $sampleTarget "demo"
     New-Item -ItemType Directory -Path $demoTarget -Force | Out-Null
+    Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "samples\demo") -File | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $demoTarget
+    }
     Invoke-Checked -FilePath $buildPython -Arguments @(
         (Join-Path $repositoryRoot "samples\generate_samples.py"),
         "--dataset", "demo", "--output", (Join-Path $demoTarget "synthetic_demo_20000.csv")
@@ -494,7 +533,25 @@ try {
     )
 
     $zipTemporary = Join-Path $stagingRoot $zipName
-    Compress-Archive -LiteralPath $releaseRoot -DestinationPath $zipTemporary -CompressionLevel Optimal
+    $compressionFailure = $null
+    foreach ($attempt in 1..3) {
+        try {
+            Remove-Item -LiteralPath $zipTemporary -Force -ErrorAction SilentlyContinue
+            Compress-Archive -LiteralPath $releaseRoot -DestinationPath $zipTemporary `
+                -CompressionLevel Optimal -ErrorAction Stop
+            $compressionFailure = $null
+            break
+        } catch {
+            $compressionFailure = $_
+            if ($attempt -lt 3) {
+                Write-Warning "发布文件被短暂占用，1 秒后重试压缩（$attempt/3）。"
+                Start-Sleep -Seconds 1
+            }
+        }
+    }
+    if ($null -ne $compressionFailure) {
+        throw $compressionFailure
+    }
     New-Item -ItemType Directory -Path $artifactDirectory | Out-Null
     Move-Item -LiteralPath $zipTemporary -Destination $zipPath
     $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()

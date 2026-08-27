@@ -1,8 +1,8 @@
 # 报警管理系统
 
-本仓库提供报警文件导入、规范化、可解释分析、统计看板、人工处置、审计、报告和备份恢复验证的一体化应用。`v0.8.0` 已通过 Windows 11 x64 自包含运行包、Docker Compose、身份权限、HTTPS 边界和有限可靠性验收；当前 `dev` 在编制正式说明书和项目过程文件，最终业务用户终验仍以 `automation/state.json` 为准。
+本仓库提供报警文件导入、规范化、可解释分析、统计看板、人工处置、审计、报告和备份恢复验证的一体化应用。`v0.8.0` 已通过 Windows 11 x64 自包含运行包、Docker Compose、身份权限、HTTPS 边界和有限可靠性验收；当前正在形成 `1.0.0-rc.1` 业务发布候选，最终发布仍须通过非技术业务用户终验和人工批准。
 
-产品北极星是让业务人员仅按中文说明即可部署并完成“导入校验 → 分析 → 查看 → 处置 → 报告 → 备份恢复”。实现与验收以稳定、可解释、可复现为优先，不把历史材料中未经验证的指标直接作为承诺。仓库内置数据均为合成示例数据。
+产品北极星是让业务人员仅按中文说明即可部署并完成“导入校验 → 分析 → 查看 → 处置 → 报告 → 备份恢复”。实现与验收以稳定、可解释、可复现为优先，不把立项阶段未经验证的指标直接作为承诺。仓库内置数据均为合成示例数据。
 
 ## Windows 11 快速开始
 
@@ -28,24 +28,21 @@
 ## 仓库入口
 
 - [`docs/`](docs/)：文档总入口及推荐阅读顺序。
-- `docs/backgrounds/`：只读原始 PDF、DOCX 资料及来源索引。
-- [`docs/sources/`](docs/sources/)：从原始资料生成的可追溯 Markdown、图片和提取清单。
 - [`docs/product/`](docs/product/)：经筛选的产品事实、范围和数据契约。
 - [`docs/architecture/`](docs/architecture/)：系统边界与已接受的技术决策。
-- [`docs/planning/`](docs/planning/)：阶段规划、范围和验收入口。
 - [`docs/guides/`](docs/guides/)：正式业务使用和 Windows 部署运维说明。
 - [`docs/deliverables/`](docs/deliverables/)：正式项目过程文档的 Markdown 单一事实源。
 - [`deliverables/`](deliverables/)：由 Markdown 确定生成的正式 DOCX/PDF 说明书与项目过程文件。
 - [`tools/deliverables/`](tools/deliverables/)：正式交付物生成和一致性验证工具。
-- [`automation/`](automation/)：可恢复的阶段状态、机器可读工作流和 Codex 提示链。
 - [`src/`](src/)：Java 后端、Python 算法服务和 Vue 前端源码。
-- [`tools/document-extraction/`](tools/document-extraction/)：可重复的历史材料提取工具。
 - [`scripts/validate_repository.py`](scripts/validate_repository.py)：无第三方依赖的仓库结构与文档链接检查。
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)：开发、验证和提交约定。
 
-后续文档应把原始事实、筛选后的产品要求、架构决策和验收记录分开保存。原始材料存在冲突时，以已落盘的产品决策和可执行验收标准为准。
+产品要求、架构决策和验收记录分区保存；冲突以已批准的需求基线、产品决策和可执行验收标准为准。
 
-团队职责按交付物划分：前端、Java 后端和 Python 算法代码进入各自源码组件；测试组负责跨组件契约、集成、端到端与演示验收；工程组负责 `scripts/`、持续集成和原生/Docker 交付。实际任务出现时再建立对应目录，不用空目录或占位代码模拟进度。
+正式源码包由仓库维护流程从已验证的干净提交生成，包内 `SOURCE-MANIFEST.json` 记录源提交、精确文件、权限、大小和 SHA-256。源码包不包含 Git 元数据、本地运行数据、内部阶段控制、内部验收证据或项目档案。
+
+团队职责按交付物划分：前端、Java 后端和 Python 算法代码进入各自源码组件；测试组负责跨组件契约、集成、端到端与演示验收；工程组负责 `scripts/`、持续集成和原生/Docker 交付。实际任务出现时再建立对应目录，不用空目录或不完整实现模拟进度。
 
 ## 本地验证
 
@@ -53,17 +50,19 @@ Windows 11 x64 的当前 WSL2 开发环境（在仓库根目录的 PowerShell �
 
 ```powershell
 wsl.exe python3 scripts/validate_repository.py
-wsl.exe python3 scripts/validate_automation.py
+wsl.exe scripts/dev/quality.sh
+wsl.exe scripts/dev/test.sh
 ```
 
 Linux、WSL 或 macOS：
 
 ```bash
 python3 scripts/validate_repository.py
-python3 scripts/validate_automation.py
+scripts/dev/quality.sh
+scripts/dev/test.sh
 ```
 
-这些命令只验证仓库基础结构、文档链接和自动化状态定义；业务能力以对应阶段验收和证据为准。
+这些命令验证仓库结构、文档链接、静态质量和开发测试；完整业务能力还应按下文运行对应的真实环境验收。
 
 正式 DOCX/PDF 的生成环境、更新方法和只读一致性检查见 [`tools/deliverables/README.md`](tools/deliverables/README.md)。验收已提交交付物时执行：
 
@@ -121,7 +120,7 @@ scripts/dev/m5-report-audit-reset-smoke.sh
 
 ## Docker Compose 次级交付
 
-Docker Desktop 或 Docker Engine 可用时，从仓库根目录启动同一套 Java、Python 和 PostgreSQL 17 实现：
+Docker Desktop 或 Docker Engine 可用且 Docker Compose 版本不低于 2.24.4 时，从仓库根目录启动同一套 Java、Python 和 PostgreSQL 17 实现；该最低版本用于支持网络覆盖文件中的 `!override` 合并语义：
 
 ```bash
 scripts/security/prepare-local-secrets.sh
@@ -143,14 +142,14 @@ docker compose -p alert-management-m7 up --build --detach --wait
 
 网络部署必须另行提供受信的 PKCS#12 证书及密码文件，并叠加 `compose.network.yaml`；该模式只发布 HTTPS 8443，不发布明文 8080、PostgreSQL 或算法端口。缺少 TLS 或实例密钥时会拒绝启动，不能把本机模式端口直接暴露到局域网。
 
-正式 G7 验收会使用隔离的临时 project，从空卷完成健康、CSV/TXT/XLSX 导入、固定分析、处置审计和清理闭环：
+正式容器验收会使用隔离的临时 project，先从空卷完成本机业务闭环，再用全新卷、临时自签证书和显式测试信任完成 HTTPS 网络业务闭环：
 
 ```bash
 python3 tests/smoke/run.py --target docker --fresh-volume
 ```
 
-Compose 只向本机发布 Java 的 8080 端口；PostgreSQL 与算法服务仅在项目网络内可达。不要使用全局容器或卷清理命令。
+本机阶段只向回环发布 Java 的 8080 端口；网络阶段只发布 HTTPS 8443，明文 8080、PostgreSQL 与算法服务均不对宿主开放。不要使用全局容器或卷清理命令。
 
 ## 版本与当前状态
 
-`v0.8.0` 精确指向 `main` 的安全部署与可靠性发布提交，包含 M0–M12。M13 正在生成正式说明书和过程文件；M14 将按最终说明在 Windows 11 上执行业务用户终验。版本标签和发布门槛见 [`docs/releases/versioning.md`](docs/releases/versioning.md)，实时状态以 `automation/state.json` 和提交绑定的验收证据为准。
+`v0.8.0` 精确指向 `main` 的安全部署与可靠性发布提交。当前 M14 负责固定业务发布候选；`v1.0.0-rc.1` 只能在候选源码、Windows ZIP、SHA-256、说明书和部署验收相互一致，并由非技术业务人员完成终验后创建；在此之前不得把候选描述为正式发布。版本标签和发布门槛见 [`docs/releases/versioning.md`](docs/releases/versioning.md)。

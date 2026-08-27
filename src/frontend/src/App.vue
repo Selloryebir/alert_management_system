@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 
 import AccessManagement from "./AccessManagement.vue";
 import AccountPanel from "./AccountPanel.vue";
@@ -40,6 +40,7 @@ const fieldMapping = ref<Record<string, string>>({});
 const corrections = ref<ImportCorrections>({});
 const importBusy = ref(false);
 const importMessage = ref("");
+const importError = ref("");
 const currentBatch = ref<ImportBatch>();
 const recentBatches = ref<ImportBatch[]>([]);
 const fileInputKey = ref(0);
@@ -47,6 +48,10 @@ const analysisCompleted = ref(false);
 const dispositionCompleted = ref(false);
 const reportDownloaded = ref(false);
 const demoResetMessage = ref("");
+const importErrorDialog = ref<HTMLDialogElement>();
+const previewButton = ref<HTMLButtonElement>();
+const correctionTitle = ref<HTMLElement>();
+const showImportErrors = ref(false);
 
 const healthSummary = computed(() => {
   const statuses = Object.values(health.value).map((item) => item.status);
@@ -106,6 +111,7 @@ function resetProjectBusinessState() {
   currentBatch.value = undefined;
   recentBatches.value = [];
   importMessage.value = "";
+  importError.value = "";
   importBusy.value = false;
   analysisCompleted.value = false;
   dispositionCompleted.value = false;
@@ -129,13 +135,48 @@ function selectFile(event: Event) {
   fieldMapping.value = {};
   corrections.value = {};
   importMessage.value = "";
+  importError.value = "";
+  showImportErrors.value = false;
+}
+
+async function openImportErrorDialog() {
+  showImportErrors.value = true;
+  await nextTick();
+  if (importErrorDialog.value && !importErrorDialog.value.open) {
+    if (typeof importErrorDialog.value.showModal === "function") importErrorDialog.value.showModal();
+    else importErrorDialog.value.setAttribute("open", "");
+  }
+  importErrorDialog.value?.focus();
+}
+
+async function closeImportErrorDialog(returnFocus = true) {
+  if (importErrorDialog.value?.open && typeof importErrorDialog.value.close === "function") {
+    importErrorDialog.value.close();
+  }
+  showImportErrors.value = false;
+  await nextTick();
+  if (returnFocus) previewButton.value?.focus();
+}
+
+async function jumpToCorrections() {
+  await closeImportErrorDialog(false);
+  correctionTitle.value?.focus();
+  correctionTitle.value?.scrollIntoView({ block: "center" });
+}
+
+function handleImportDialogKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    void closeImportErrorDialog();
+  }
 }
 
 async function previewSelectedFile() {
-  if (!currentProject.value) { importMessage.value = "请先选择当前项目。"; return; }
-  if (!selectedFile.value) { importMessage.value = "请先选择 CSV、TXT 或 XLSX 文件。"; return; }
+  if (!currentProject.value) { importError.value = "请先选择当前项目。"; return; }
+  if (!selectedFile.value) { importError.value = "请先选择 CSV、TXT 或 XLSX 文件。"; return; }
   importBusy.value = true;
   importMessage.value = "";
+  importError.value = "";
   try {
     const mapping = Object.fromEntries(Object.entries(fieldMapping.value).filter(([, source]) => source));
     currentBatch.value = await previewImport(selectedFile.value, currentProject.value.project_id, mapping, corrections.value);
@@ -144,8 +185,11 @@ async function previewSelectedFile() {
     importMessage.value = currentBatch.value.status === "READY"
       ? "全文件校验通过，请核对预览后确认导入。"
       : "预览已完成，请根据中文错误和源表头调整映射后重新校验。";
+    if (currentBatch.value.status === "REJECTED" && currentBatch.value.errors.length > 0) {
+      await openImportErrorDialog();
+    }
   } catch (error) {
-    importMessage.value = error instanceof Error ? error.message : "预览失败";
+    importError.value = error instanceof Error ? error.message : "预览失败";
   } finally { importBusy.value = false; }
 }
 
@@ -168,29 +212,30 @@ async function confirmCurrentBatch() {
   if (!currentBatch.value) return;
   importBusy.value = true;
   importMessage.value = "";
+  importError.value = "";
   try {
     currentBatch.value = await confirmImport(currentBatch.value.batch_id);
     importMessage.value = `批次 ${currentBatch.value.batch_id} 已导入当前项目。`;
     await refreshBatches(false);
     await projectWorkspace.value?.refreshOverview();
   } catch (error) {
-    importMessage.value = error instanceof Error ? error.message : "确认导入失败";
+    importError.value = error instanceof Error ? error.message : "确认导入失败";
   } finally { importBusy.value = false; }
 }
 
 async function refreshBatches(showFeedback = true) {
   if (!currentProject.value) {
-    if (showFeedback) importMessage.value = "请先选择项目，再查看该项目批次。";
+    if (showFeedback) importError.value = "请先选择项目，再查看该项目批次。";
     return;
   }
   importBusy.value = true;
-  if (showFeedback) importMessage.value = "";
+  if (showFeedback) { importMessage.value = ""; importError.value = ""; }
   try {
     const batches = await listImports(currentProject.value.project_id);
     if (!Array.isArray(batches)) throw new Error("批次列表响应格式无效");
     recentBatches.value = batches;
   }
-  catch (error) { if (showFeedback) importMessage.value = error instanceof Error ? error.message : "批次列表加载失败"; }
+  catch (error) { if (showFeedback) importError.value = error instanceof Error ? error.message : "批次列表加载失败"; }
   finally { importBusy.value = false; }
 }
 
@@ -274,6 +319,7 @@ onBeforeUnmount(() => setUnauthorizedHandler(undefined));
     <template v-else>
     <AccountPanel :user="authenticatedUser" @changed="handleAuthenticated" @logged-out="handleLoggedOut" />
     <template v-if="!authenticatedUser.must_change_password">
+    <nav class="workspace-nav" aria-label="业务区快捷导航"><a href="#project-workspace">项目</a><a href="#import-workspace">导入</a><a href="#business-workflow">分析与处置</a></nav>
     <ProjectWorkspace ref="projectWorkspace" :system-admin="systemAdmin" @selected="handleProjectSelected" />
     <AccessManagement :user="authenticatedUser" :project="currentProject" />
     <DataBackupPanel v-if="systemAdmin" :user="authenticatedUser" />
@@ -297,21 +343,22 @@ onBeforeUnmount(() => setUnauthorizedHandler(undefined));
       </div>
     </details>
 
-    <section class="import-panel" aria-labelledby="import-title">
+    <section id="import-workspace" class="import-panel" aria-labelledby="import-title">
       <div class="panel-heading"><div><p class="eyebrow">当前项目数据</p><h2 id="import-title">文件导入与字段映射</h2></div><button type="button" class="secondary-button" :disabled="importBusy || !currentProject" @click="refreshBatches()">刷新批次</button></div>
       <p v-if="!currentProject" class="empty-copy">请先在上方创建或选择项目。</p>
       <p v-else-if="!projectWritable" class="archive-notice">“{{ currentProject.name }}”处于归档状态，当前仅可查看历史批次。</p>
-      <div class="import-form"><label><span>报警文件</span><input :key="fileInputKey" data-testid="file-input" type="file" accept=".csv,.txt,.xlsx" :disabled="importBusy || !projectWritable" @change="selectFile" /></label><button data-testid="preview-button" type="button" :disabled="importBusy || !selectedFile || !projectWritable" @click="previewSelectedFile">{{ importBusy ? "处理中…" : mappingHeaders.length ? "按当前映射重新校验" : "读取表头并预览" }}</button></div>
+      <div class="import-form"><label><span>报警文件</span><input :key="fileInputKey" data-testid="file-input" type="file" accept=".csv,.txt,.xlsx" :disabled="importBusy || !projectWritable" @change="selectFile" /></label><button ref="previewButton" data-testid="preview-button" type="button" :disabled="importBusy || !selectedFile || !projectWritable" @click="previewSelectedFile">{{ importBusy ? "处理中…" : mappingHeaders.length ? "按当前映射重新校验" : "读取表头并预览" }}</button></div>
 
       <section v-if="mappingHeaders.length" class="mapping-editor" data-testid="mapping-editor" aria-labelledby="mapping-title"><h3 id="mapping-title">字段映射</h3><p>左侧是系统目标字段，右侧选择文件中的源表头；可选字段允许留空。</p><div class="mapping-grid"><label v-for="[field, required] in TARGET_FIELDS" :key="field"><span>{{ fieldLabel(field) }}{{ required ? "（必填）" : "（可选）" }}</span><select v-model="fieldMapping[field]" :disabled="importBusy"><option value="">不映射</option><option v-for="header in mappingHeaders" :key="header" :value="header">{{ header }}</option></select></label></div></section>
 
       <p v-if="importMessage" class="import-message" role="status">{{ importMessage }}</p>
+      <p v-if="importError" class="request-error" role="alert">{{ importError }}</p>
       <article v-if="currentBatch" class="batch-detail" data-testid="preview-summary">
         <div class="status-line"><h3>{{ currentBatch.file_name }}</h3><span class="status-badge" :class="`batch-${currentBatch.status.toLowerCase()}`">{{ zh(currentBatch.status) }}</span></div><p>总行数 {{ currentBatch.total_rows }} · 有效 {{ currentBatch.valid_rows }} · 错误 {{ currentBatch.error_count }}</p>
         <button v-if="currentBatch.status === 'READY'" type="button" data-testid="confirm-import" :disabled="importBusy" @click="confirmCurrentBatch">确认导入</button>
-        <div v-if="currentBatch.errors.length" class="table-wrap"><table><caption>校验错误</caption><thead><tr><th>源行</th><th>字段</th><th>错误类型</th><th>说明</th></tr></thead><tbody><tr v-for="error in currentBatch.errors" :key="`${error.source_row}-${error.field}-${error.code}`"><td>{{ error.source_row }}</td><td>{{ fieldLabel(error.field) }}</td><td>{{ zh(error.code) }}</td><td>{{ error.message }}</td></tr></tbody></table></div>
+        <div v-if="currentBatch.errors.length" class="table-wrap"><table><caption>校验错误</caption><thead><tr><th scope="col">源行</th><th scope="col">字段</th><th scope="col">错误类型</th><th scope="col">说明</th></tr></thead><tbody><tr v-for="error in currentBatch.errors" :key="`${error.source_row}-${error.field}-${error.code}`"><td>{{ error.source_row }}</td><td>{{ fieldLabel(error.field) }}</td><td>{{ zh(error.code) }}</td><td>{{ error.message }}</td></tr></tbody></table></div>
         <section v-if="correctableErrors.length" class="correction-editor" aria-labelledby="correction-title">
-          <h4 id="correction-title">异常行修正</h4>
+          <h4 id="correction-title" ref="correctionTitle" tabindex="-1">异常行修正</h4>
           <p>只修正本次校验指出的目标字段；系统会连同原文件重新解析并全量校验，不会跳过其他行。</p>
           <div class="correction-grid">
             <label v-for="error in correctableErrors" :key="`${error.source_row}-${error.field}`" :data-testid="`correction-row-${error.source_row}-${error.field}`">
@@ -323,6 +370,14 @@ onBeforeUnmount(() => setUnauthorizedHandler(undefined));
         </section>
         <div v-if="currentBatch.preview_rows.length" class="table-wrap"><table><caption>规范化预览（最多 20 行）</caption><thead><tr><th>源行</th><th>时间</th><th>位号</th><th>描述</th><th>优先级</th><th>状态</th></tr></thead><tbody><tr v-for="row in currentBatch.preview_rows" :key="row.source_row"><td>{{ row.source_row }}</td><td>{{ row.event_time }}</td><td>{{ row.tag }}</td><td>{{ row.description }}</td><td>{{ priorityLabel(row.priority ?? '') }}</td><td>{{ zh(row.state) }}</td></tr></tbody></table></div>
       </article>
+
+      <dialog v-if="showImportErrors && currentBatch" ref="importErrorDialog" class="import-error-dialog" aria-labelledby="import-error-title" aria-describedby="import-error-summary" data-testid="import-error-dialog" tabindex="-1" @keydown="handleImportDialogKeydown">
+        <div class="dialog-heading"><h3 id="import-error-title">文件校验未通过</h3><button type="button" class="secondary-button" aria-label="关闭校验结果" @click="closeImportErrorDialog()">关闭</button></div>
+        <p id="import-error-summary">{{ currentBatch.file_name }} 共 {{ currentBatch.total_rows }} 行，发现 {{ currentBatch.error_count }} 项错误。原文件尚未导入。</p>
+        <ul class="dialog-error-list"><li v-for="error in currentBatch.errors.slice(0, 8)" :key="`${error.source_row}-${error.field}-${error.code}`">第 {{ error.source_row }} 行 · {{ fieldLabel(error.field) }}：{{ error.message }}</li></ul>
+        <p v-if="currentBatch.errors.length > 8">其余错误请在页面内完整校验错误表查看。</p>
+        <div class="dialog-actions"><button v-if="correctableErrors.length" type="button" @click="jumpToCorrections">前往修正</button><button type="button" class="secondary-button" @click="closeImportErrorDialog()">返回导入</button></div>
+      </dialog>
 
       <div v-if="recentBatches.length" class="table-wrap recent-batches"><table><caption>当前项目最近导入批次</caption><thead><tr><th>文件</th><th>格式</th><th>状态</th><th>总行数</th><th>创建时间</th></tr></thead><tbody><tr v-for="batch in recentBatches" :key="batch.batch_id"><td>{{ batch.file_name }}</td><td>{{ zh(batch.format) }}</td><td>{{ zh(batch.status) }}</td><td>{{ batch.total_rows }}</td><td>{{ batch.created_at }}</td></tr></tbody></table></div>
     </section>

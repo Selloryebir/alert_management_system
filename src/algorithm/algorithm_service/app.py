@@ -8,6 +8,10 @@ from pydantic import BaseModel
 from algorithm_service import CONTRACT_VERSION, SERVICE_NAME, SERVICE_VERSION
 from algorithm_service.models import AnalysisRequest, AnalysisResponse
 from algorithm_service.rules import analyze
+from algorithm_service.supervised import configure_model
+
+
+configure_model()
 
 
 class HealthResponse(BaseModel):

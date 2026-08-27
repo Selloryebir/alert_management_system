@@ -46,23 +46,23 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: 检出完整历史
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: 准备 Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
       - name: 准备 Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: src/algorithm/requirements.lock
       - name: 准备 Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -71,7 +71,7 @@ jobs:
         run: python3 tests/reliability/run.py
       - name: 保存可靠性证据
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: m12-reliability-evidence
           path: .runtime/reliability/results/**

@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test": "playwright test",
+    "test": "playwright test business-workflow.spec.ts report-audit-reset.spec.ts",
     "test:smoke": "playwright test business-workflow.spec.ts",
     "test:m5": "playwright test report-audit-reset.spec.ts",
+    "test:release-bootstrap": "playwright test release-business.spec.ts --grep 首次登录",
+    "test:release-backup-status": "playwright test release-business.spec.ts --grep 备份生成后",
+    "test:visual-inventory": "playwright test visual-inventory.spec.ts",
     "install:chromium": "playwright install chromium"
   },
   "devDependencies": {

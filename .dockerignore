@@ -20,6 +20,12 @@ src/*
 !src/algorithm/requirements.lock
 !src/algorithm/algorithm_service/
 !src/algorithm/algorithm_service/**
+!tools/
+tools/*
+!tools/model-training/
+!tools/model-training/train.py
+!tools/model-training/data/
+!tools/model-training/data/**
 !packaging/
 packaging/*
 !packaging/docker/
