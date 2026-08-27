@@ -2,7 +2,8 @@ FROM python:3.12.14-slim-bookworm@sha256:0f5b26b9518d002b6173fd61daad821fa340635
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONHASHSEED=0
+    PYTHONHASHSEED=0 \
+    PYTHONPATH=/app
 RUN groupadd --system --gid 10001 alertdemo \
     && useradd --system --uid 10001 --gid alertdemo --home-dir /app alertdemo
 WORKDIR /app
