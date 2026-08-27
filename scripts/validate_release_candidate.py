@@ -376,6 +376,10 @@ def validate_release_contract() -> None:
     workflow = json.loads((ROOT / "automation/workflow.json").read_text(encoding="utf-8"))
     commands = next(stage for stage in workflow["stages"] if stage["id"] == "M14")["acceptance"]["commands"]
     required = {
+        "scripts/dev/quality.sh",
+        "scripts/dev/test.sh",
+        ".runtime/deliverables-venv/bin/python tools/deliverables/build.py --check",
+        "python3 scripts/release/export_clean_source.py --check",
         "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release/verify-business-release.ps1",
         "python3 tests/smoke/run.py --target docker --fresh-volume",
         "python3 scripts/validate_release_candidate.py",

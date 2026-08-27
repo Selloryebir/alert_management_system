@@ -45,6 +45,19 @@ CONSERVATIVE_TERMS = (
     "not a fault",
     "normal operation",
 )
+MAINTENANCE_EVIDENCE_TERMS = (
+    "维护",
+    "检修",
+    "试验",
+    "测试",
+    "标定",
+    "校验",
+    "maintenance",
+    "overhaul",
+    "calibration",
+    "proof test",
+    "verification",
+)
 
 
 class ModelConfigurationError(ValueError):
@@ -136,6 +149,15 @@ def text_feature(record: AlarmRecord) -> str:
 def has_conservative_language(record: AlarmRecord) -> bool:
     text = text_feature(record)
     return any(term in text for term in CONSERVATIVE_TERMS)
+
+
+def has_category_evidence(record: AlarmRecord, category: CauseCategory) -> bool:
+    """对高误判成本类别要求可直接复核的文本证据。"""
+
+    if category != "MAINTENANCE_TEST":
+        return True
+    text = text_feature(record)
+    return any(term in text for term in MAINTENANCE_EVIDENCE_TERMS)
 
 
 def _branch_decisions(estimator: Any, features: Any) -> list[BranchDecision]:
@@ -265,8 +287,10 @@ class SupervisedModel:
         self, record: AlarmRecord, svm: BranchDecision, ada: BranchDecision
     ) -> SupervisedDecision:
         conservative = has_conservative_language(record)
+        category_evidence = has_category_evidence(record, svm.category)
         accepted = (
             not conservative
+            and category_evidence
             and svm.category == ada.category
             and svm.score >= self.thresholds["svm_score"]
             and svm.margin >= self.thresholds["svm_margin"]
@@ -280,6 +304,7 @@ class SupervisedModel:
             f"AdaBoost={ada.category},score={ada.score:.6f},margin={ada.margin:.6f}；"
             f"双分支{'同意并通过冻结阈值' if accepted else '未同时同意或未通过冻结阈值'}；"
             f"保守语义边界={'命中' if conservative else '未命中'}；"
+            f"类别证据门禁={'通过' if category_evidence else '未通过'}；"
             "score/margin 为判别量，不是概率，结果保留人工复核。"
         )
         return SupervisedDecision(category=category, accepted=accepted, evidence=evidence)

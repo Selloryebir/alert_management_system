@@ -260,6 +260,18 @@ def test_unseen_scenarios_are_classified_or_conservatively_abstained(
     assert not negated_decision.accepted
     assert "保守语义边界=命中" in negated_decision.evidence
 
+    maintenance = next(row["record"] for row in test_rows if row["label"] == "MAINTENANCE_TEST")
+    unsupported_maintenance = maintenance.model_copy(
+        update={
+            "description": "短时恢复报警，原因尚不明确",
+            "return_time": maintenance.event_time,
+        }
+    )
+    unsupported_decision = model.decide(unsupported_maintenance)
+    assert unsupported_decision.category == "UNKNOWN"
+    assert not unsupported_decision.accepted
+    assert "类别证据门禁=未通过" in unsupported_decision.evidence
+
 
 def test_expert_result_is_not_overridden_and_unknown_can_only_use_agreement(
     rows: list[dict[str, Any]], bundle: dict[str, Any]

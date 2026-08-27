@@ -1082,8 +1082,17 @@ dd {
 }
 
 .detail-columns li {
+  min-width: 0;
   margin-bottom: 0.55rem;
+  overflow-wrap: anywhere;
   line-height: 1.5;
+}
+
+.alarm-detail,
+.detail-columns > *,
+.chain-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .chain-section,

@@ -147,18 +147,18 @@
     },
     {
       "source": "docs/deliverables/model-technical-brochure.md",
-      "source_sha256": "89965e8543705817840416251641c70945216a6a34e630b02c257b994881fd87",
+      "source_sha256": "51af44187c5939015779091b6d24cb9edb50913184f1112432cc1134a48a0d94",
       "title": "报警管理系统组合模型技术手册",
       "outputs": {
         "docx": {
           "path": "deliverables/model-technical-brochure.docx",
-          "sha256": "f46b85a09007adcb70b8a010b3b1c6a4158aa1e5a87c5d5468a7822e84eb6baf",
-          "size": 863167
+          "sha256": "9685ee72c0ffdda00bc1d98b490efcfa52e83504a037163a997883366e356665",
+          "size": 864024
         },
         "pdf": {
           "path": "deliverables/model-technical-brochure.pdf",
-          "sha256": "a1a065adef6ef8d1fa950d78a8b14db9e3fb67c7269faa71acf9c6b12bb28a20",
-          "size": 195411
+          "sha256": "50e2549b075b002b1975a17d057f6845f2f62e0a1841ee37635b199c925428a6",
+          "size": 200262
         }
       }
     }

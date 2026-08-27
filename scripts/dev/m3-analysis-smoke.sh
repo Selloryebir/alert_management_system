@@ -2,10 +2,14 @@
 
 source "$(dirname "$0")/common.sh"
 
-"$REPOSITORY_ROOT/scripts/dev/start.sh"
-
 M3_RUNTIME="$RUNTIME_DIR/m3"
 mkdir -p "$M3_RUNTIME"
+export APP_SECRETS_DIR="$M3_RUNTIME/secrets-${GITHUB_RUN_ID:-local}-$$"
+DEV_SECRET_ROOT="$APP_SECRETS_DIR"
+DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE="$DEV_SECRET_ROOT/bootstrap-admin-password.txt"
+
+"$REPOSITORY_ROOT/scripts/dev/start.sh"
+
 DEFAULT_PROJECT_ID="00000000-0000-0000-0000-000000000001"
 dev_admin_login "$M3_RUNTIME"
 
@@ -74,6 +78,10 @@ actual_records = [
 ]
 assert actual_records == expected["records"], (actual_records, expected["records"])
 assert all(item["evidence"] for item in actual["results"]), actual["results"]
+assert all(
+    any("SUPERVISED_CAUSE_V1" in evidence for evidence in item["evidence"])
+    for item in actual["results"]
+), "监督模型未参与全部记录的可解释分析"
 
 def instant(value):
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -197,6 +205,8 @@ assert_analysis_storage "$failed_run" 0 0
 (
   cd "$REPOSITORY_ROOT/src/algorithm"
   nohup env ALGORITHM_HOST=127.0.0.1 ALGORITHM_PORT=8001 \
+    ALGORITHM_MODEL_FILE="$DEV_SECRET_ROOT/algorithm-model.enc" \
+    ALGORITHM_MODEL_KEY_FILE="$DEV_SECRET_ROOT/algorithm-model-key.txt" \
     "$PYTHON_VENV/bin/python" -m algorithm_service \
     </dev/null >"$LOG_DIR/algorithm.log" 2>&1 &
   echo $! > "$PID_DIR/algorithm.pid"
