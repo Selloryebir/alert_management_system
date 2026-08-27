@@ -8,7 +8,7 @@
 - PostgreSQL：PostgreSQL License。
 - Python：Python Software Foundation License。
 - PyInstaller：GPL-2.0 with exception，用于生成算法服务发布目录。
-- FastAPI、Uvicorn 及其运行依赖：分别依其随包元数据所列许可证。
+- FastAPI、Uvicorn、scikit-learn、skops、cryptography 及其运行依赖：分别依其随包元数据所列许可证。
 - Spring Boot 及 Java 依赖：分别依其构建依赖元数据所列许可证。
 - Vue 及前端依赖：分别依其构建依赖元数据所列许可证。
 - Apache PDFBox、Apache POI：Apache License 2.0。

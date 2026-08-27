@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "dataset": "engineering-scenarios.jsonl",
+  "scope": "报警原因分类的项目自建工程场景，包含中英文描述、状态、优先级和可选数值",
+  "claim_boundary": "当前评估适用于文件中声明的工程场景分布；进入具体现场前需使用授权标注数据重新校准阈值并执行独立验证",
+  "record_count": 48,
+  "boundary_dataset": "boundary-scenarios.jsonl",
+  "boundary_record_count": 8,
+  "label_taxonomy": [
+    "PROCESS_DISTURBANCE",
+    "EQUIPMENT_FAULT",
+    "INSTRUMENT_ISSUE",
+    "MAINTENANCE_TEST"
+  ],
+  "split_policy": "group_id 在 train、validation、test 之间严格不重叠",
+  "seed": 20260827
+}

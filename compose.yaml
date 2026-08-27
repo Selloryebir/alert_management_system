@@ -23,6 +23,14 @@ services:
     environment:
       ALGORITHM_HOST: 0.0.0.0
       ALGORITHM_PORT: "8001"
+      ALGORITHM_MODEL_FILE: /model/algorithm-model.enc
+      ALGORITHM_MODEL_KEY_FILE: /model-key/algorithm-model-key.txt
+    volumes:
+      - algorithm_model:/model:ro
+      - algorithm_model_key:/model-key:ro
+    depends_on:
+      model-provisioner:
+        condition: service_completed_successfully
     expose:
       - "8001"
     healthcheck:
@@ -34,6 +42,41 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    restart: "no"
+
+  model-provisioner:
+    build:
+      context: .
+      dockerfile: packaging/docker/algorithm.Dockerfile
+    entrypoint:
+      - /bin/sh
+      - -ec
+    user: "0:0"
+    command:
+      - |
+        model=/model/algorithm-model.enc
+        key=/model-key/algorithm-model-key.txt
+        report=/model/algorithm-model-report.json
+        existing=0
+        for item in "$$model" "$$key" "$$report"; do
+          if [ -s "$$item" ]; then existing=$$((existing + 1)); fi
+        done
+        if [ "$$existing" -eq 3 ]; then
+          ALGORITHM_MODEL_FILE="$$model" ALGORITHM_MODEL_KEY_FILE="$$key" \
+            python -c 'from algorithm_service.supervised import load_model_from_environment; assert load_model_from_environment() is not None'
+          exit 0
+        fi
+        if [ "$$existing" -ne 0 ]; then
+          echo "监督模型卷不完整，拒绝覆盖。" >&2
+          exit 1
+        fi
+        python /app/model-training/train.py \
+          --data /app/model-training/data/engineering-scenarios.jsonl \
+          --model-out "$$model" --key-out "$$key" --report-out "$$report"
+        chmod 0644 "$$model" "$$key" "$$report"
+    volumes:
+      - algorithm_model:/model
+      - algorithm_model_key:/model-key
     restart: "no"
 
   backend:
@@ -73,6 +116,8 @@ services:
 
 volumes:
   pgdata:
+  algorithm_model:
+  algorithm_model_key:
 
 secrets:
   database_password:

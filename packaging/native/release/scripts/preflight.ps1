@@ -117,6 +117,8 @@ try {
     }
 
     foreach ($relative in @("app/core-api.jar", "app/algorithm/algorithm-service.exe",
+            "app/model/algorithm-model.enc", "app/model/algorithm-model-report.json",
+            "data/secrets/algorithm-model-key.txt",
             "runtime/jre/bin/java.exe", "runtime/postgresql/bin/postgres.exe")) {
         Assert-ManifestFileHash $context $manifest $relative
     }

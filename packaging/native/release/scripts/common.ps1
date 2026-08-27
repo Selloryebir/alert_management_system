@@ -46,6 +46,9 @@ function Get-RuntimeContext {
         Java = Join-ReleasePath $root "runtime/jre/bin/java.exe"
         BackendJar = Join-ReleasePath $root "app/core-api.jar"
         Algorithm = Join-ReleasePath $root "app/algorithm/algorithm-service.exe"
+        AlgorithmModel = Resolve-ReleaseChildPath $root ([string]$config.algorithm_model.file)
+        AlgorithmModelKeyFile = Resolve-ReleaseChildPath $root ([string]$config.algorithm_model.key_file)
+        AlgorithmModelReport = Resolve-ReleaseChildPath $root ([string]$config.algorithm_model.report_file)
         PgBin = Join-ReleasePath $root "runtime/postgresql/bin"
         PgData = Join-ReleasePath $root "data/postgresql"
         PgDataArgument = "data\postgresql"
@@ -91,6 +94,9 @@ function Assert-FixedRuntimeConfig {
     }
     if ([string]$config.database.password_file -ne "data/secrets/database-password.txt" -or
             [string]$config.bootstrap_admin.password_file -ne "data/secrets/bootstrap-admin-password.txt" -or
+            [string]$config.algorithm_model.file -ne "app/model/algorithm-model.enc" -or
+            [string]$config.algorithm_model.key_file -ne "data/secrets/algorithm-model-key.txt" -or
+            [string]$config.algorithm_model.report_file -ne "app/model/algorithm-model-report.json" -or
             [string]$config.bootstrap_admin.username -notmatch '^[a-z0-9._-]{3,50}$') {
         throw "密钥文件或初始管理员配置与发布契约不一致。"
     }
@@ -404,6 +410,12 @@ function Initialize-InstanceSecrets {
     param([Parameter(Mandatory = $true)]$Context)
     Initialize-SecretFile $Context.DatabasePasswordFile
     Initialize-SecretFile $Context.BootstrapAdminPasswordFile
+    if (-not (Test-Path -LiteralPath $Context.AlgorithmModelKeyFile -PathType Leaf) -or
+            [string]::IsNullOrWhiteSpace([IO.File]::ReadAllText(
+                $Context.AlgorithmModelKeyFile, [Text.Encoding]::UTF8))) {
+        throw "监督模型运行密钥缺失或为空：$($Context.AlgorithmModelKeyFile)"
+    }
+    Protect-SecretFile $Context.AlgorithmModelKeyFile
 }
 
 function Get-SecretValue {

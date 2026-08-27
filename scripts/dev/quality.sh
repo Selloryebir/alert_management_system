@@ -10,7 +10,9 @@ else
   cmd.exe /d /c "set DEBUG=false&& mvnw.cmd -f src\\backend\\pom.xml test" </dev/null
 fi
 
-"$PYTHON_VENV/bin/python" -m ruff check "$REPOSITORY_ROOT/src/algorithm"
+"$PYTHON_VENV/bin/python" -m ruff check \
+  --config "$REPOSITORY_ROOT/src/algorithm/pyproject.toml" \
+  "$REPOSITORY_ROOT/src/algorithm" "$REPOSITORY_ROOT/tools/model-training"
 npm --prefix "$REPOSITORY_ROOT/src/frontend" run lint
 
 echo "Java、Python 和前端质量检查通过。"

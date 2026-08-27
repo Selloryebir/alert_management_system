@@ -352,6 +352,19 @@ try {
     Invoke-Checked -FilePath $buildPython -Arguments @("-m", "pip", "check") `
         -FailureMessage "Python 构建依赖不完整"
 
+    $modelDirectory = Join-Path $stagingRoot "model"
+    New-Item -ItemType Directory -Path $modelDirectory | Out-Null
+    $modelFile = Join-Path $modelDirectory "algorithm-model.enc"
+    $modelKeyFile = Join-Path $modelDirectory "algorithm-model-key.txt"
+    $modelReportFile = Join-Path $modelDirectory "algorithm-model-report.json"
+    Invoke-Checked -FilePath $buildPython -Arguments @(
+        (Join-Path $repositoryRoot "tools\model-training\train.py"),
+        "--data", (Join-Path $repositoryRoot "tools\model-training\data\engineering-scenarios.jsonl"),
+        "--model-out", $modelFile,
+        "--key-out", $modelKeyFile,
+        "--report-out", $modelReportFile
+    ) -FailureMessage "监督模型训练、评估或认证加密失败"
+
     $algorithmDist = Join-Path $stagingRoot "algorithm-dist"
     $algorithmWork = Join-Path $stagingRoot "algorithm-work"
     Invoke-Checked -FilePath $buildPython -Arguments @(
@@ -383,6 +396,13 @@ try {
         throw "PyInstaller 未生成预期算法 EXE。"
     }
     Copy-Item -Path (Join-Path $algorithmSource "*") -Destination $appDirectory.FullName -Recurse
+    $releaseModelDirectory = New-Item -ItemType Directory -Path `
+        (Join-Path $releaseRoot "app\model") -Force
+    Copy-Item -LiteralPath $modelFile -Destination $releaseModelDirectory.FullName
+    Copy-Item -LiteralPath $modelReportFile -Destination $releaseModelDirectory.FullName
+    $releaseSecretDirectory = New-Item -ItemType Directory -Path `
+        (Join-Path $releaseRoot "data\secrets") -Force
+    Copy-Item -LiteralPath $modelKeyFile -Destination $releaseSecretDirectory.FullName
 
     $jreDirectory = Join-Path $releaseRoot "runtime\jre"
     New-Item -ItemType Directory -Path (Split-Path -Parent $jreDirectory) -Force | Out-Null

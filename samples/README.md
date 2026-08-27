@@ -1,21 +1,45 @@
 # 合成报警样例
 
-本目录全部内容均为 **SYNTHETIC 合成数据**，不包含真实厂名、人名、生产位号或生产数据。生成器版本为 `2.0.0`，默认固定种子为 `20260825`，仅使用 Python 标准库。v2 数据保持既有随机数流，只修正时间和关系字段，使重复、抖动及跨 episode 关联场景符合 hybrid-v2 数学定义。
+本目录全部内容均为 **SYNTHETIC 合成数据**，不包含真实厂名、人名、生产位号或生产数据。生成器版本为 `3.0.0`，默认固定种子为 `20260825`，仅使用 Python 标准库。
 
-## 已提交数据
+## 正式演示短集
 
-- `smoke/synthetic_smoke_utf8.csv`：UTF-8 BOM，300 条。
-- `smoke/synthetic_smoke_utf8.txt`：UTF-8、制表符分隔，与 CSV 同逻辑。
-- `smoke/synthetic_smoke.xlsx`：与 CSV 同逻辑；首个工作表是隐藏合成元数据，首个可见工作表是 300 条报警。
-- `smoke/synthetic_smoke_gb18030.csv`：GB18030 编码的 12 条中文导入小样例。
-- `invalid/*.csv`：六类可达输入错误，共 42 条数据行；除缺表头为文件级失败外，其余每行恰有一个明确错误。
-- `expected/*.json`：格式、场景计数和确定性摘要；无效集清单精确列出文件级错误及每行的 `source_row`、字段和错误码，不代表真实工业准确率。
+业务展示优先使用以下三个文件。它们包含相同的 144 条报警，只是文件格式不同；导入后行数、字段和规范化摘要必须一致。
 
-无效集清单中的 `valid_rows` 表示通过文件级与逐行校验、可进入 `READY` 的数据行数。`missing_header.csv` 在文件级即阻断，因此不继续制造逐行派生错误，`valid_rows` 为 0。
+| 文件 | 用途 | 预期 |
+| --- | --- | --- |
+| `demo/alarm_demo_utf8.csv` | 常用 CSV 导入 | 可导入 |
+| `demo/alarm_demo_utf8.txt` | 制表符 TXT 导入 | 可导入 |
+| `demo/alarm_demo.xlsx` | 办公人员常用表格导入 | 可导入 |
 
-场景覆盖报警洪泛、重复、抖动、短时恢复、长期未恢复、仪表漂移、设备跳停序列、工艺扰动级联和维护测试。位号、地点、操作员和描述均带有 `SYNTHETIC` 标识。
+短集覆盖报警密集上送、重复记录、信号抖动、短时恢复、持续未恢复、设备故障序列、仪表漂移、工艺扰动、维护测试、正常恢复、包含否定表达的假阳性边界，以及优先级和状态混合。描述同时覆盖中文、英文、短文本和较长文本。场景分类只用于生成和测试，不写入运行时字段，算法不得按文件名、行号、场景名或固定结果表查找答案。
 
-## 固定重建
+## 兼容与回归样例
+
+| 文件 | 用途 | 预期 |
+| --- | --- | --- |
+| `smoke/synthetic_smoke_utf8.csv` | 既有 300 行回归基线 | 可导入 |
+| `smoke/synthetic_smoke_utf8.txt` | 与回归 CSV 同义的制表符文件 | 可导入 |
+| `smoke/synthetic_smoke.xlsx` | 与回归 CSV 同义的 XLSX 文件 | 可导入 |
+| `smoke/synthetic_smoke_gb18030.csv` | 12 行 GB18030 中文编码检查 | 可导入 |
+
+## 必须拒绝的非法样例
+
+| 文件 | 错误内容 | 预期 |
+| --- | --- | --- |
+| `invalid/empty.csv` | 空文件 | 必须拒绝 |
+| `invalid/unsupported_format.json` | 不支持的 JSON 文件 | 必须拒绝 |
+| `invalid/field_too_long.csv` | 单元格超过 4,096 字符 | 必须拒绝 |
+| `invalid/missing_header.csv` | 缺少必填表头 | 必须拒绝 |
+| `invalid/required_value_missing.csv` | 必填值为空 | 必须拒绝 |
+| `invalid/invalid_enum.csv` | 优先级或状态枚举错误 | 必须拒绝 |
+| `invalid/invalid_number.csv` | 数值格式错误 | 必须拒绝 |
+| `invalid/invalid_time.csv` | 时间格式或时区错误 | 必须拒绝 |
+| `invalid/time_order_invalid.csv` | 确认或恢复时间早于发生时间 | 必须拒绝 |
+
+`expected/*.json` 保存格式、场景计数、固定摘要和非法集清单。清单说明样例应触发的输入边界，不代替后端原子导入集成测试，也不代表真实工业准确率。
+
+## 固定重建与长集
 
 从仓库根目录运行：
 
@@ -24,7 +48,7 @@ python3 samples/generate_samples.py --dataset committed
 python3 samples/generate_samples.py --dataset demo --output /path/to/synthetic_demo_20000.csv
 ```
 
-第二条命令固定生成 20,000 行 Demo CSV；大文件不提交。容量观察数据可显式指定行数：
+第二条命令固定生成 20,000 行长集；大文件不提交。容量观察数据可显式指定行数：
 
 ```bash
 python3 samples/generate_samples.py \

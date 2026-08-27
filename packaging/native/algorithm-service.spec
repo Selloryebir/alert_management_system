@@ -13,7 +13,11 @@ analysis = Analysis(
     pathex=[str(algorithm_root)],
     binaries=[],
     datas=[],
-    hiddenimports=collect_submodules("uvicorn"),
+    hiddenimports=(
+        collect_submodules("uvicorn")
+        + collect_submodules("sklearn")
+        + collect_submodules("skops")
+    ),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

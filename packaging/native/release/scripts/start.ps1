@@ -174,6 +174,8 @@ try {
     $algorithmProcess = Start-BundledProcess $context.Algorithm "" $context.Root $algorithmOut $algorithmError @{
         ALGORITHM_HOST = "127.0.0.1"
         ALGORITHM_PORT = [string]$context.Config.ports.algorithm
+        ALGORITHM_MODEL_FILE = $context.AlgorithmModel
+        ALGORITHM_MODEL_KEY_FILE = $context.AlgorithmModelKeyFile
     }
     $algorithmStarted = $true
     Save-RunningProcess "algorithm" $algorithmProcess.Id $context.Algorithm $context.Root @(

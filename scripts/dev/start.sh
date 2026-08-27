@@ -100,6 +100,8 @@ fi
 (
   cd "$REPOSITORY_ROOT/src/algorithm"
   nohup env ALGORITHM_HOST=127.0.0.1 ALGORITHM_PORT=8001 \
+    ALGORITHM_MODEL_FILE="$DEV_SECRET_ROOT/algorithm-model.enc" \
+    ALGORITHM_MODEL_KEY_FILE="$DEV_SECRET_ROOT/algorithm-model-key.txt" \
     "$PYTHON_VENV/bin/python" -m algorithm_service \
     </dev/null >"$LOG_DIR/algorithm.log" 2>"$LOG_DIR/algorithm-error.log" &
   echo $! > "$PID_DIR/algorithm.pid"

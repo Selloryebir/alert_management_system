@@ -23,6 +23,7 @@ from algorithm_service.models import (
     NoiseType,
     RecordResult,
 )
+from algorithm_service.supervised import configured_model, has_conservative_language
 
 
 RULE_VERSION = "hybrid-v2.0.0"
@@ -136,6 +137,18 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
 
     chain_evidence: dict[UUID, list[str]] = defaultdict(list)
     chains = _event_chains(request, chain_evidence)
+    model = configured_model()
+    supervised_decisions = (
+        dict(
+            zip(
+                (record.record_id for record in request.records),
+                model.decide_many(request.records),
+                strict=True,
+            )
+        )
+        if model is not None
+        else {}
+    )
     results: list[RecordResult] = []
     for record in _ordered(request.records):
         record_strengths = strengths[record.record_id]
@@ -157,6 +170,19 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
         evidence.extend(chain_evidence[record.record_id])
         cause, cause_evidence = _cause_category(record, request)
         evidence.append(cause_evidence)
+        if model is not None:
+            supervised = supervised_decisions[record.record_id]
+            if cause == "UNKNOWN" and supervised.accepted:
+                cause = supervised.category
+                evidence.append(supervised.evidence + "；专家模型弃权，由双分支一致结果补充。")
+            elif cause == "UNKNOWN":
+                evidence.append(supervised.evidence + "；专家模型与监督模型均保留 UNKNOWN。")
+            elif supervised.accepted and supervised.category == cause:
+                evidence.append(supervised.evidence + "；与专家建议一致，专家结果保持不变。")
+            elif supervised.accepted:
+                evidence.append(supervised.evidence + "；与专家建议冲突，专家结果保持不变。")
+            else:
+                evidence.append(supervised.evidence + "；监督分支弃权，专家结果保持不变。")
         results.append(
             RecordResult(
                 record_id=record.record_id,
@@ -632,6 +658,12 @@ def _term_present(term: str, text: str, english_tokens: set[str]) -> bool:
 
 
 def _cause_category(record: AlarmRecord, request: AnalysisRequest) -> tuple[CauseCategory, str]:
+    if has_conservative_language(record):
+        return (
+            "UNKNOWN",
+            "EXPERT_CAUSE_V2：文本明确表示未确认、排除故障或证据不足，"
+            "保守语义边界命中，保留 UNKNOWN。",
+        )
     text = f"{record.tag} {record.description}".lower()
     english_tokens = set(re.findall(r"[a-z0-9]+", text))
     feature_terms = sorted({term for weights in EXPERT_WEIGHTS.values() for term in weights})

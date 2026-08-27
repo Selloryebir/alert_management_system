@@ -15,5 +15,10 @@
   "bootstrap_admin": {
     "username": "admin",
     "password_file": "data/secrets/bootstrap-admin-password.txt"
+  },
+  "algorithm_model": {
+    "file": "app/model/algorithm-model.enc",
+    "key_file": "data/secrets/algorithm-model-key.txt",
+    "report_file": "app/model/algorithm-model-report.json"
   }
 }

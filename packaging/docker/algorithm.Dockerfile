@@ -9,6 +9,7 @@ WORKDIR /app
 COPY src/algorithm/requirements.lock ./requirements.lock
 RUN python -m pip install --no-cache-dir --no-deps --requirement requirements.lock
 COPY src/algorithm/algorithm_service ./algorithm_service
+COPY tools/model-training ./model-training
 USER 10001:10001
 EXPOSE 8001
 ENTRYPOINT ["python", "-m", "algorithm_service"]

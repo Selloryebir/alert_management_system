@@ -34,6 +34,31 @@ generate_secret() {
 generate_secret "$secret_root/database-password.txt"
 generate_secret "$secret_root/bootstrap-admin-password.txt"
 
+model_file="$secret_root/algorithm-model.enc"
+model_key_file="$secret_root/algorithm-model-key.txt"
+model_report_file="$secret_root/algorithm-model-report.json"
+model_count=0
+for model_path in "$model_file" "$model_key_file" "$model_report_file"; do
+  [[ -f "$model_path" && -s "$model_path" ]] && model_count=$((model_count + 1))
+done
+if [[ $model_count -ne 0 && $model_count -ne 3 ]]; then
+  echo "监督模型文件不完整，拒绝覆盖；请核对：$secret_root" >&2
+  exit 1
+fi
+if [[ $model_count -eq 0 ]]; then
+  model_python="$repository_root/.runtime/venv/bin/python"
+  if [[ ! -x "$model_python" ]]; then
+    echo "生成监督模型前请先运行 scripts/dev/bootstrap.sh。" >&2
+    exit 1
+  fi
+  "$model_python" "$repository_root/tools/model-training/train.py" \
+    --data "$repository_root/tools/model-training/data/engineering-scenarios.jsonl" \
+    --model-out "$model_file" \
+    --key-out "$model_key_file" \
+    --report-out "$model_report_file" >/dev/null
+fi
+chmod 644 "$model_file" "$model_key_file" "$model_report_file"
+
 if [[ "$secret_root" == /mnt/?/* ]] \
     && command -v powershell.exe >/dev/null 2>&1 \
     && command -v wslpath >/dev/null 2>&1; then
@@ -45,3 +70,4 @@ fi
 echo "本机 Compose 密钥已就绪：$secret_root"
 echo "初始管理员：admin"
 echo "首次登录密码文件：$secret_root/bootstrap-admin-password.txt"
+echo "监督模型已认证加密并与运行密钥分文件保存。"
