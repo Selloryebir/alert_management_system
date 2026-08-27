@@ -29,6 +29,7 @@ EXPECTED_SOURCES = (
     "docs/deliverables/development-process.md",
     "docs/deliverables/source-gap-analysis.md",
     "docs/deliverables/model-technical-brochure.md",
+    "docs/deliverables/patent-application-draft.md",
 )
 EXPECTED_FONT = "src/backend/src/main/resources/fonts/NotoSansSC-VF.ttf"
 EXPECTED_LICENSE = "src/backend/src/main/resources/fonts/OFL.txt"
@@ -80,7 +81,7 @@ def _load_config() -> Config:
     except (KeyError, TypeError, ValueError) as error:
         raise BuildError("tools/deliverables/manifest.json 字段无效") from error
     if tuple(item.source for item in documents) != EXPECTED_SOURCES:
-        raise BuildError("构建清单必须按冻结顺序登记九份正式 Markdown")
+        raise BuildError("构建清单必须按冻结顺序登记十份正式 Markdown")
     if len({item.output for item in documents}) != len(documents):
         raise BuildError("构建清单的输出名称重复")
     for item in documents:
@@ -266,10 +267,10 @@ def main() -> int:
         _check_fact_file(config.license_path, config.license_sha256, "字体许可证")
         if args.check:
             _check_mode(config)
-            print("PASS: 九份 Markdown 与 DOCX/PDF 交付物一致、结构安全且生成确定")
+            print("PASS: 十份 Markdown 与 DOCX/PDF 交付物一致、结构安全且生成确定")
         else:
             _build_mode(config)
-            print("PASS: 已从九份 Markdown 生成 18 个 DOCX/PDF 交付物")
+            print("PASS: 已从十份 Markdown 生成 20 个 DOCX/PDF 交付物")
         return 0
     except (BuildError, OSError) as error:
         print(f"ERROR: {error}", file=sys.stderr)

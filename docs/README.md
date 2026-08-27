@@ -9,7 +9,7 @@
 3. [数据契约 v1](product/data-contract.md)：统一导入字段、状态、Java—Python 接口和合成数据。
 4. [系统架构基线](architecture/README.md)与[决策记录](decisions/README.md)：确认组件职责和禁止的架构漂移。
 5. `guides/`：面向业务人员和部署管理员的正式操作说明。
-6. `deliverables/`：立项、中期、测试、结项、过程与方案差距的 Markdown 单一事实源。
+6. `deliverables/`：立项、中期、测试、结项、过程、方案差距、模型技术和专利申请主体草案的 Markdown 单一事实源。
 7. 仓库根目录 [`../deliverables/`](../deliverables/)：从上述事实源确定生成的 DOCX/PDF 正式交付文件。
 
 ## 责任分层

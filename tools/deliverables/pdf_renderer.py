@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# ReportLab reads invariant during submodule import; configure it before those imports.
+# ruff: noqa: E402
+
 import html
 import io
 from pathlib import Path

@@ -2,7 +2,7 @@
 param(
     [string]$OutputRoot = "",
     [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$')]
-    [string]$ReleaseVersion = "1.0.0-rc.1"
+    [string]$ReleaseVersion = "1.0.0"
 )
 
 Set-StrictMode -Version Latest

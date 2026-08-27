@@ -52,6 +52,11 @@
       "source": "docs/deliverables/model-technical-brochure.md",
       "output": "model-technical-brochure",
       "title": "报警管理系统组合模型技术手册"
+    },
+    {
+      "source": "docs/deliverables/patent-application-draft.md",
+      "output": "patent-application-draft",
+      "title": "报警管理系统发明专利申请主体草案"
     }
   ]
 }

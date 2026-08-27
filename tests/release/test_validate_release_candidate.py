@@ -69,38 +69,28 @@ class ReleaseCandidateValidatorTests(unittest.TestCase):
     def test_approved_acceptance_is_bound_to_evidence(self) -> None:
         candidate = "a" * 40
         archive_hash = "b" * 64
-        signed_at = "2026-08-27T12:00:00+08:00"
+        recorded_at = "2026-08-27T12:00:00+08:00"
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             evidence = root / "docs/verification/evidence/M14.md"
             evidence.parent.mkdir(parents=True)
             evidence.write_text(
                 (
-                    f"# M14\n\nAC-022 PASS\n{candidate}\nC:\\验收\\candidate.zip\n{archive_hash}\n"
-                    f"业务验收员\n业务验收员签名\n2026-08-27T11:00:00+08:00\n{signed_at}\n"
-                    + "\n".join(sorted(validator.HUMAN_ACCEPTANCE_STEPS))
+                    f"# M14\n\n项目负责人验收声明\nPASS\n{candidate}\n"
+                    f"C:\\验收\\candidate.zip\n{archive_hash}\nproject_owner_current_session\n"
+                    f"人工已验证不存在大问题，符合交付预期。\n{recorded_at}\nv1.0.0\n"
                 ),
                 encoding="utf-8",
             )
             acceptance = {
                 "candidate_commit": candidate,
-                "archive_path": "C:\\验收\\candidate.zip",
-                "archive_sha256": archive_hash,
-                "windows_version": "Windows 11 x64 24H2",
-                "browser": "Microsoft Edge 140",
-                "pdf_reader": "Microsoft Edge 140",
-                "xlsx_reader": "WPS Office 12",
-                "acceptor": "业务验收员",
-                "business_role": "报警分析业务人员",
-                "signature": "业务验收员签名",
-                "independent_from_development": True,
-                "no_oral_supplement": True,
-                "step_results": {step: "PASS" for step in validator.HUMAN_ACCEPTANCE_STEPS},
-                "blocker_count": 0,
-                "severe_count": 0,
+                "validated_archive_path": "C:\\验收\\candidate.zip",
+                "validated_archive_sha256": archive_hash,
+                "decision_source": "project_owner_current_session",
+                "attestation_text": "人工已验证不存在大问题，符合交付预期。",
+                "final_release_authorized": True,
                 "result": "PASS",
-                "started_at": "2026-08-27T11:00:00+08:00",
-                "signed_at": signed_at,
+                "recorded_at": recorded_at,
                 "record_file": "docs/verification/evidence/M14.md",
             }
             state = {
