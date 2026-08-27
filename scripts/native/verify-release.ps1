@@ -539,6 +539,10 @@ function Invoke-E2e {
         $env:E2E_BASE_URL = "http://127.0.0.1:8080"
         $env:E2E_MODE = $Mode
         $env:E2E_DATASET = $Dataset
+        $invalidDataset = Join-Path $ReleaseRoot "samples\invalid\invalid_enum.csv"
+        Assert-True (Test-Path -LiteralPath $invalidDataset -PathType Leaf) `
+            "发布包缺少枚举错误样例：$invalidDataset"
+        $env:E2E_INVALID_DATASET = $invalidDataset
         $env:E2E_EXPECTED_TOTAL = [string]$ExpectedTotal
         $env:E2E_CYCLES = "1"
         $env:M5_OUTPUT_DIR = $ResultRoot
@@ -560,7 +564,7 @@ function Invoke-E2e {
         Remove-Item Env:E2E_ADMIN_USERNAME, Env:E2E_ADMIN_PASSWORD_FILE, `
             Env:E2E_ADMIN_NEW_PASSWORD_FILE, Env:E2E_PROJECT_CODE, `
             Env:E2E_EXPECTED_RECOVERY_POINTS, Env:E2E_SOURCE_COMMIT, `
-            Env:E2E_VISUAL_OUTPUT_DIR -ErrorAction SilentlyContinue
+            Env:E2E_VISUAL_OUTPUT_DIR, Env:E2E_INVALID_DATASET -ErrorAction SilentlyContinue
     }
 }
 
