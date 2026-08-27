@@ -9,7 +9,8 @@ export const test = base.extend<BrowserErrorFixtures>({
   browserErrors: [async ({ page }, use, testInfo) => {
     const browserErrors: string[] = [];
     let anonymousIdentityProbeCount = 0;
-    const requiresUiLogin = testInfo.file.endsWith("release-business.spec.ts");
+    const requiresUiLogin = testInfo.file.endsWith("release-business.spec.ts")
+      || testInfo.file.endsWith("visual-inventory.spec.ts");
     page.on("console", (message) => {
       if (message.type() === "error") {
         const location = message.location();
