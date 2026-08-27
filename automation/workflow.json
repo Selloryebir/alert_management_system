@@ -339,11 +339,16 @@
       "depends_on": ["M13"],
       "references": [
         "README.md",
+        "docs/planning/M14-release-hardening.md",
         "docs/verification/README.md",
         "docs/verification/automation-audit.md"
       ],
       "acceptance": {
         "criteria": [
+          "Java、Python、TypeScript/Vue 固定 lint 与构建入口通过，POM 模型和编译无未处置告警",
+          "多场景样例、非法输入原子拒绝和可复现监督模型通过测试，模型参数认证加密且密钥分离",
+          "Dashboard 的统计、时序、占比和表格均由当前项目数据库事实生成，主要页面通过桌面和窄屏浏览器验收",
+          "背景原件及提取链不再由 Git 跟踪，正式 README、项目过程文档、部署运维手册和技术材料与实现及实测一致",
           "不了解代码的业务用户可仅按说明完成预检、安装、启动、登录、样例闭环、备份恢复和停止",
           "Windows 原生包与 HTTPS 容器部署均从干净状态通过正式验收且失败不会假成功",
           "最终差距矩阵无悬空项，阻断和严重缺陷为零，发布候选标签绑定已验证提交"
