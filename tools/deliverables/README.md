@@ -1,6 +1,6 @@
 # 正式交付物生成器
 
-本工具以登记的九份 Markdown 为唯一正文事实源，直接生成 DOCX 和 PDF；不调用 Microsoft Office、WPS、LibreOffice、浏览器、Pandoc 或 LaTeX。
+本工具以登记的十份 Markdown 为唯一正文事实源，直接生成 DOCX 和 PDF；不调用 Microsoft Office、WPS、LibreOffice、浏览器、Pandoc 或 LaTeX。十份文档覆盖操作、部署、立项、中期、测试、结项、过程、方案差距、模型技术和专利申请主体草案。
 
 ## 准备环境
 

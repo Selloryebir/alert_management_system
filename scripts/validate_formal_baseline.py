@@ -26,6 +26,7 @@ FORMAL_FILES = (
     "docs/deliverables/development-process.md",
     "docs/deliverables/source-gap-analysis.md",
     "docs/deliverables/model-technical-brochure.md",
+    "docs/deliverables/patent-application-draft.md",
     "docs/releases/versioning.md",
     "packaging/native/release/THIRD-PARTY-NOTICES.txt",
     "packaging/native/release/README.txt",

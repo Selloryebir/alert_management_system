@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import zipfile
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Iterable
 
 from docx import Document

@@ -75,7 +75,8 @@
       "固定候选 aefe9bd 的仓库、M1、M12、Windows 原生和 Docker 五条远端流水线最终均 SUCCESS；Windows run 33048599592 第一次外部限流失败后仅采用第二次完整成功结果",
       "固定候选 53b8ff3e0d6768543bd7a3c8cc0295f5dc3e7b98 在开发关停时序修正后重新通过质量、完整测试、九份交付物确定性、320 文件净化源码、正式基线、候选校验、Windows 标准用户双目录和 Docker 双空卷固定命令；Windows ZIP SHA-256 为 ea09168a5ea318dd0680c58ec5867ed8b7693f2fcb884a87b445b71a259fc9c0，净化源码双次 SHA-256 为 b54a82d9405e56fb2dcf834e558d24d4577b124190fa7f558d7d4987dc1aa2d7",
       "固定候选 53b8ff3 的仓库 run 33055817337/33055955761、M1 run 33055817214/33055955844、M12 run 33055817229/33055955802 均 SUCCESS；Windows 原生与 Docker 由本机正式命令在该精确提交完整复验",
-      "最终 Windows 视觉清单为 28 张忽略文件，桌面和窄屏各覆盖 14 个主要页面或状态；Dashboard、错误弹窗、证据链和中文显示已人工复核"
+      "最终 Windows 视觉清单为 28 张忽略文件，桌面和窄屏各覆盖 14 个主要页面或状态；Dashboard、错误弹窗、证据链和中文显示已人工复核",
+      "2026-08-27 项目负责人声明‘人工已验证不存在大问题，符合交付预期。’，并明确要求完成文档后执行 v1.0.0 正式发布；未补造姓名、设备版本、逐项结果或签名"
     ],
     "failures": [
       "首次 M14 Docker 实跑在 Maven Central 下载 byte-buddy-1.17.8.jar 时发生外部网络截断；退出 1，隔离资源和临时秘密清理 PASS，使用缓存重试后连续两次完整 PASS",
@@ -103,9 +104,9 @@
       "aefe9bd 合并到 dev 后，M1 run 33051569380 首次在 M4 完成后的 Java 进程关停等待耗尽，旧 PID 文件阻断 M5；同一提交复跑虽 SUCCESS，仍作为可达时序缺陷修正。53b8ff3 增加僵尸识别和仅限项目命令行匹配 PID 的有限强制关停，两次远端 M1 均完整通过",
       "证据治理提交 a3f8f18 的 M1 run 33057041764 在 M3 隔离运行时重新供应阶段、前端和 Java 构建开始前退出，未输出产品异常栈，停止与资源清理 SUCCESS；同一 headSha 的 run 33056935011 完整 SUCCESS。失败不作为候选成功证据，最终 PR 头仍要求重新通过完整 M1"
     ],
-    "decision": "Windows 11 原生自包含包是首要业务终验路径，HTTPS Docker Compose 是次级部署路径；自动化验证失败必须阻断，最终真实业务人员终验和 main 正式发布保留人工门禁；发布标签只绑定已验证的 main 提交。",
-    "next_action": "由未参与候选开发的业务人员使用固定 Windows ZIP、SHA-256 和包内手册执行 AC-022；人工记录完成前不合并 dev 到 main、不创建 RC 或正式标签。",
-    "resume_status": "review"
+    "decision": "Windows 11 原生自包含包是首要业务验收路径，HTTPS Docker Compose 是次级部署路径；项目负责人已给出结果性 PASS 并授权 v1.0.0，正式标签只绑定发布 PR 与远端 CI 成功的 main 提交。",
+    "next_action": "完成允许路径静态检查和正式文档生成，合入 dev 后通过发布 PR 合入 main；远端 CI 成功并同步 dev 后创建 annotated v1.0.0。",
+    "resume_status": null
   },
   "stages": {
     "M0": {
@@ -263,16 +264,26 @@
       "note": "第三固定候选经独立复审和 PR #13 合入 dev；合并树与受审分支一致，dev 检查点的仓库、应用、可靠性、Windows 原生和 Docker 五条远端流水线全部成功。"
     },
     "M14": {
-      "status": "awaiting_human",
+      "status": "review",
       "attempt": 2,
       "evidence_files": [
         "docs/verification/evidence/M14.md"
       ],
       "checkpoint_commit": null,
       "remote_verified": false,
-      "human_acceptance": null,
-      "next_action": "等待独立业务人员按固定 ZIP 和 SHA-256 完成 AC-022 的 13 项真实终验并签署原始记录。",
-      "note": "最终强化候选 53b8ff3 已通过本机全部自动门槛及适用远端检查，当前仅等待人工可理解性与独立操作终验；不得提前创建 v1.0.0-rc.1 或 v1.0.0 标签。"
+      "human_acceptance": {
+        "candidate_commit": "53b8ff3e0d6768543bd7a3c8cc0295f5dc3e7b98",
+        "validated_archive_path": "E:\\code\\alert_management_system\\.runtime\\release\\artifacts\\53b8ff3e0d6768543bd7a3c8cc0295f5dc3e7b98\\alert-management-system-windows-x64-53b8ff3e0d67.zip",
+        "validated_archive_sha256": "ea09168a5ea318dd0680c58ec5867ed8b7693f2fcb884a87b445b71a259fc9c0",
+        "decision_source": "project_owner_current_session",
+        "attestation_text": "人工已验证不存在大问题，符合交付预期。",
+        "final_release_authorized": true,
+        "result": "PASS",
+        "recorded_at": "2026-08-27T18:01:06+08:00",
+        "record_file": "docs/verification/evidence/M14.md"
+      },
+      "next_action": "完成正式文档、静态检查和发布 PR；远端 CI 成功后创建 annotated v1.0.0，并同步最终 M14 发布证据。",
+      "note": "固定候选 53b8ff3 已通过自动验收；项目负责人已确认符合交付预期并授权 v1.0.0 正式发布。本轮仅允许文档、发布治理和版本元数据变化，业务源码变化仍会使验收失效。"
     }
   }
 }
