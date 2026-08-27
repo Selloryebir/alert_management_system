@@ -358,7 +358,13 @@ def validate_deliverables() -> None:
         path = safe_repository_file(font.get(path_key, ""))
         if sha256(path) != font.get(hash_key):
             raise ValueError(f"正式交付字体依赖哈希不匹配：{font.get(path_key)}")
-    check = run(sys.executable, "tools/deliverables/build.py", "--check", check=False)
+    deliverables_python = ROOT / ".runtime/deliverables-venv/bin/python"
+    check = run(
+        str(deliverables_python) if deliverables_python.is_file() else sys.executable,
+        "tools/deliverables/build.py",
+        "--check",
+        check=False,
+    )
     if check.returncode:
         raise ValueError(f"正式 DOCX/PDF 生成物存在漂移：\n{check.stdout}{check.stderr}")
 
