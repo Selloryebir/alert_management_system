@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { test } from "./test-fixtures";
-import { captureVisualState, prepareVisualPage } from "./visual-audit";
+import { captureVisualState } from "./visual-audit";
 
 const repositoryRoot = path.resolve(__dirname, "../..");
 const validDataset = path.resolve(repositoryRoot, process.env.E2E_DATASET ?? "samples/smoke/synthetic_smoke_utf8.csv");
@@ -44,7 +44,6 @@ test("真实业务闭环生成桌面与窄屏视觉清单", async ({ page }) => 
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
-  await prepareVisualPage(page);
   await expect(page.getByRole("heading", { name: "登录报警管理系统" })).toBeVisible();
   await captureVisualState(page, "00-login");
 

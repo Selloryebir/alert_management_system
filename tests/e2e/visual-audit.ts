@@ -21,17 +21,6 @@ const viewports = [
   { directory: "mobile-390x844", width: 390, height: 844 },
 ] as const;
 
-export async function prepareVisualPage(page: Page): Promise<void> {
-  await page.addStyleTag({ content: `
-    *, *::before, *::after {
-      animation-duration: 0s !important;
-      animation-delay: 0s !important;
-      transition-duration: 0s !important;
-      caret-color: transparent !important;
-    }
-  ` });
-}
-
 export async function assertNoDocumentOverflow(page: Page): Promise<void> {
   const overflow = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,
