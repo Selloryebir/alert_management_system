@@ -17,6 +17,14 @@ trap cleanup_on_error EXIT
 
 "$REPOSITORY_ROOT/scripts/dev/bootstrap.sh"
 APP_SECRETS_DIR="$DEV_SECRET_ROOT" "$REPOSITORY_ROOT/scripts/security/prepare-local-secrets.sh" >/dev/null
+dev_model_file="$DEV_SECRET_ROOT/algorithm-model.enc"
+dev_model_key_file="$DEV_SECRET_ROOT/algorithm-model-key.txt"
+dev_model_report_file="$DEV_SECRET_ROOT/algorithm-model-report.json"
+rm -f "$dev_model_file" "$dev_model_key_file" "$dev_model_report_file"
+"$PYTHON_VENV/bin/python" "$REPOSITORY_ROOT/tools/model-training/train.py" \
+  --model-out "$dev_model_file" \
+  --key-out "$dev_model_key_file" \
+  --report-out "$dev_model_report_file" >/dev/null
 
 if docker_run container inspect "$POSTGRES_CONTAINER" >/dev/null 2>&1; then
   if [[ $(docker_run inspect --format '{{.State.Running}}' "$POSTGRES_CONTAINER") != "true" ]]; then
@@ -100,8 +108,8 @@ fi
 (
   cd "$REPOSITORY_ROOT/src/algorithm"
   nohup env ALGORITHM_HOST=127.0.0.1 ALGORITHM_PORT=8001 \
-    ALGORITHM_MODEL_FILE="$DEV_SECRET_ROOT/algorithm-model.enc" \
-    ALGORITHM_MODEL_KEY_FILE="$DEV_SECRET_ROOT/algorithm-model-key.txt" \
+    ALGORITHM_MODEL_FILE="$dev_model_file" \
+    ALGORITHM_MODEL_KEY_FILE="$dev_model_key_file" \
     "$PYTHON_VENV/bin/python" -m algorithm_service \
     </dev/null >"$LOG_DIR/algorithm.log" 2>"$LOG_DIR/algorithm-error.log" &
   echo $! > "$PID_DIR/algorithm.pid"
