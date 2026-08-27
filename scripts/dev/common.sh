@@ -162,6 +162,7 @@ pid_running_for_project() {
   local pid=$1
   local expected_marker=$2
   [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null \
+    && [[ $(awk '$1 == "State:" {print $2}' "/proc/$pid/status" 2>/dev/null) != "Z" ]] \
     && tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq "$expected_marker"
 }
 
@@ -180,11 +181,19 @@ stop_pid_file() {
     fi
     kill "$pid"
     for _ in $(seq 1 10); do
-      kill -0 "$pid" 2>/dev/null || break
+      pid_running_for_project "$pid" "$expected_marker" || break
       sleep 1
     done
-    if kill -0 "$pid" 2>/dev/null; then
-      echo "$label 未能正常停止，PID=$pid" >&2
+    if pid_running_for_project "$pid" "$expected_marker"; then
+      echo "$label 未在 10 秒内正常停止，执行项目进程强制关停：PID=$pid" >&2
+      kill -KILL "$pid"
+      for _ in $(seq 1 5); do
+        pid_running_for_project "$pid" "$expected_marker" || break
+        sleep 1
+      done
+    fi
+    if pid_running_for_project "$pid" "$expected_marker"; then
+      echo "$label 强制关停失败，PID=$pid" >&2
       return 1
     fi
   fi
