@@ -4,9 +4,41 @@ source "$(dirname "$0")/common.sh"
 
 M3_RUNTIME="$RUNTIME_DIR/m3"
 mkdir -p "$M3_RUNTIME"
-export APP_SECRETS_DIR="$M3_RUNTIME/secrets-${GITHUB_RUN_ID:-local}-$$"
+m3_run_id="${GITHUB_RUN_ID:-local}-$$"
+export APP_SECRETS_DIR="$M3_RUNTIME/secrets-$m3_run_id"
 DEV_SECRET_ROOT="$APP_SECRETS_DIR"
 DEV_BOOTSTRAP_ADMIN_PASSWORD_FILE="$DEV_SECRET_ROOT/bootstrap-admin-password.txt"
+export POSTGRES_CONTAINER="alert-management-m3-postgres-$m3_run_id"
+export POSTGRES_VOLUME="alert_management_m3_pgdata_${m3_run_id//-/_}"
+export POSTGRES_RUNTIME_SCOPE="m3-$m3_run_id"
+
+cleanup_m3() {
+  "$REPOSITORY_ROOT/scripts/dev/stop.sh" >/dev/null 2>&1 || true
+  if docker_run container inspect "$POSTGRES_CONTAINER" >/dev/null 2>&1; then
+    container_scope=$(docker_run inspect --format \
+      '{{ index .Config.Labels "alert-management-runtime-scope" }}' "$POSTGRES_CONTAINER")
+    if [[ "$container_scope" == "$POSTGRES_RUNTIME_SCOPE" ]]; then
+      docker_run rm --force "$POSTGRES_CONTAINER" >/dev/null
+    else
+      echo "拒绝清理范围不匹配的 M3 容器：$POSTGRES_CONTAINER" >&2
+    fi
+  fi
+  if docker_run volume inspect "$POSTGRES_VOLUME" >/dev/null 2>&1; then
+    volume_scope=$(docker_run volume inspect --format \
+      '{{ index .Labels "alert-management-runtime-scope" }}' "$POSTGRES_VOLUME")
+    if [[ "$volume_scope" == "$POSTGRES_RUNTIME_SCOPE" ]]; then
+      docker_run volume rm "$POSTGRES_VOLUME" >/dev/null
+    else
+      echo "拒绝清理范围不匹配的 M3 数据卷：$POSTGRES_VOLUME" >&2
+    fi
+  fi
+}
+trap cleanup_m3 EXIT
+
+docker_run volume create \
+  --label alert-management-demo=m3 \
+  --label "alert-management-runtime-scope=$POSTGRES_RUNTIME_SCOPE" \
+  "$POSTGRES_VOLUME" >/dev/null
 
 "$REPOSITORY_ROOT/scripts/dev/start.sh"
 
