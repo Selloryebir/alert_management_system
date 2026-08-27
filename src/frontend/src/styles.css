@@ -1163,6 +1163,7 @@ dd {
 
 .operation-card,
 .danger-zone {
+  min-width: 0;
   border: 1px solid #d8e0e7;
   border-radius: 0.75rem;
   padding: 1rem;
