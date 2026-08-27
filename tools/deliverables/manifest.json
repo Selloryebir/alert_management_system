@@ -46,7 +46,12 @@
     {
       "source": "docs/deliverables/source-gap-analysis.md",
       "output": "source-gap-analysis",
-      "title": "报警管理系统原始方案差距说明"
+      "title": "报警管理系统初期方案与正式实现差异说明"
+    },
+    {
+      "source": "docs/deliverables/model-technical-brochure.md",
+      "output": "model-technical-brochure",
+      "title": "报警管理系统组合模型技术手册"
     }
   ]
 }

@@ -154,6 +154,19 @@ def test_group_leakage_is_rejected(training: Any, rows: list[dict[str, Any]]) ->
         training.validate_group_isolation(leaked)
 
 
+def test_training_entry_rejects_cross_split_text_leakage(
+    training: Any, rows: list[dict[str, Any]]
+) -> None:
+    leaked = deepcopy(rows)
+    train_row = next(row for row in leaked if row["split"] == "train")
+    validation_row = next(row for row in leaked if row["split"] == "validation")
+    validation_row["record"] = validation_row["record"].model_copy(
+        update={"description": train_row["record"].description}
+    )
+    with pytest.raises(training.TrainingDataError, match="跨 split 报警描述完全重复"):
+        training.validate_group_isolation(leaked)
+
+
 def test_encrypted_model_loads_and_wrong_key_or_tampering_fails(
     tmp_path: Path, bundle: dict[str, Any]
 ) -> None:

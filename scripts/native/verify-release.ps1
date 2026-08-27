@@ -305,6 +305,15 @@ function Assert-ReleaseManifest {
             (Get-FileHash -LiteralPath $repositoryManual -Algorithm SHA256).Hash) `
             "发布包手册与当前已提交正式交付物不一致：$requiredManual"
     }
+    Assert-True ($seen.ContainsKey("app/model-provisioner/model-provisioner.exe")) `
+        "发布包缺少独立模型准备程序。"
+    foreach ($generatedModelPath in @(
+            "data/model/algorithm-model.enc",
+            "data/model/algorithm-model-report.json",
+            "data/secrets/algorithm-model-key.txt")) {
+        Assert-True (-not $seen.ContainsKey($generatedModelPath)) `
+            "发布包不得预置模型运行文件或密钥：$generatedModelPath"
+    }
     $actualFiles = @(
         Get-ChildItem -LiteralPath $ReleaseRoot -File -Recurse |
             Where-Object { $_.FullName -ne $manifestPath }
@@ -533,6 +542,8 @@ function Invoke-E2e {
         $env:E2E_EXPECTED_TOTAL = [string]$ExpectedTotal
         $env:E2E_CYCLES = "1"
         $env:M5_OUTPUT_DIR = $ResultRoot
+        $env:E2E_SOURCE_COMMIT = $sourceCommit
+        $env:E2E_VISUAL_OUTPUT_DIR = Join-Path $ResultRoot "visual-inventory"
         $env:PLAYWRIGHT_BROWSERS_PATH = $playwrightBrowsers
         if (-not [string]::IsNullOrWhiteSpace($NewPasswordFile)) {
             $env:E2E_ADMIN_NEW_PASSWORD_FILE = $NewPasswordFile
@@ -548,8 +559,33 @@ function Invoke-E2e {
         $env:PATH = $savedPath
         Remove-Item Env:E2E_ADMIN_USERNAME, Env:E2E_ADMIN_PASSWORD_FILE, `
             Env:E2E_ADMIN_NEW_PASSWORD_FILE, Env:E2E_PROJECT_CODE, `
-            Env:E2E_EXPECTED_RECOVERY_POINTS -ErrorAction SilentlyContinue
+            Env:E2E_EXPECTED_RECOVERY_POINTS, Env:E2E_SOURCE_COMMIT, `
+            Env:E2E_VISUAL_OUTPUT_DIR -ErrorAction SilentlyContinue
     }
+}
+
+function Assert-GeneratedModelFiles {
+    param([string]$ReleaseRoot)
+    $modelPath = Join-Path $ReleaseRoot "data\model\algorithm-model.enc"
+    $reportPath = Join-Path $ReleaseRoot "data\model\algorithm-model-report.json"
+    $keyPath = Join-Path $ReleaseRoot "data\secrets\algorithm-model-key.txt"
+    foreach ($path in @($modelPath, $reportPath, $keyPath)) {
+        Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "首次启动未生成模型运行文件：$path"
+        Assert-True ((Get-Item -LiteralPath $path).Length -gt 0) "模型运行文件为空：$path"
+    }
+    $key = [IO.File]::ReadAllText($keyPath, [Text.Encoding]::UTF8).Trim()
+    Assert-True ($key -match '^[A-Za-z0-9_-]{43}=$') "模型密钥格式无效。"
+    $modelText = [IO.File]::ReadAllText($modelPath, [Text.Encoding]::UTF8)
+    Assert-True (-not $modelText.Contains('LinearSVC') -and -not $modelText.Contains('AdaBoost')) `
+        "模型密文意外暴露可识别参数结构。"
+    $acl = Get-Acl -LiteralPath $keyPath
+    Assert-True ([bool]$acl.AreAccessRulesProtected) "模型密钥 ACL 仍继承父目录权限。"
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $allowIdentities = @($acl.Access | Where-Object {
+            $_.AccessControlType -eq [Security.AccessControl.AccessControlType]::Allow
+        } | ForEach-Object { [string]$_.IdentityReference })
+    Assert-True ($allowIdentities.Count -eq 1 -and $allowIdentities[0] -eq $identity) `
+        "模型密钥 ACL 未精确限制为当前部署用户。"
 }
 
 function New-ReleasePasswordFile {
@@ -1033,6 +1069,7 @@ try {
         Invoke-ReleaseScript $releaseRoot "preflight.ps1" | Out-Null
         Invoke-ReleaseScript $releaseRoot "start.ps1" | Out-Null
         Assert-HealthUp
+        Assert-GeneratedModelFiles $releaseRoot
         $instanceIdentity = Get-Content -LiteralPath (Join-Path $releaseRoot "data\instance.json") `
             -Raw -Encoding UTF8 | ConvertFrom-Json
         $backupTaskName = "AlertManagementSystem-Backup-" + [string]$instanceIdentity.instance_id
@@ -1056,8 +1093,13 @@ try {
             $newPasswordFile = Join-Path $credentialRoot "round-$round-new-password.txt"
             $newPassword = New-ReleasePasswordFile $newPasswordFile
             $projectCode = "RELEASE-R$round-$($sourceCommit.Substring(0, 8).ToUpperInvariant())"
-            Invoke-E2e $e2eRoot $npm $releaseRoot "release-bootstrap" $smokeDataset 300 `
-                "test:release-bootstrap" $roundResultRoot $newPasswordFile $projectCode
+            if ($round -eq 1) {
+                Invoke-E2e $e2eRoot $npm $releaseRoot "visual-inventory" $smokeDataset 300 `
+                    "test:visual-inventory" $roundResultRoot $newPasswordFile $projectCode
+            } else {
+                Invoke-E2e $e2eRoot $npm $releaseRoot "release-bootstrap" $smokeDataset 300 `
+                    "test:release-bootstrap" $roundResultRoot $newPasswordFile $projectCode
+            }
             Set-AdminPasswordFile $adminPasswordFile $newPassword
             Remove-Item -LiteralPath $newPasswordFile -Force
         } else {

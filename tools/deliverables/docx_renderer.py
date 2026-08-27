@@ -78,6 +78,27 @@ def _configure(document: Document, document_date: str, title: str) -> None:
     run.font.size = Pt(8)
     run.font.color.rgb = RGBColor(100, 100, 100)
     _east_asia_font(run._element.get_or_add_rPr(), "Microsoft YaHei")
+    footer.add_run(" · 第 ")
+    _append_field(footer, "PAGE")
+    footer.add_run(" / ")
+    _append_field(footer, "NUMPAGES")
+    footer.add_run(" 页")
+
+
+def _append_field(paragraph: Any, instruction: str) -> None:
+    begin = OxmlElement("w:fldChar")
+    begin.set(qn("w:fldCharType"), "begin")
+    code = OxmlElement("w:instrText")
+    code.set(qn("xml:space"), "preserve")
+    code.text = f" {instruction} "
+    separate = OxmlElement("w:fldChar")
+    separate.set(qn("w:fldCharType"), "separate")
+    value = OxmlElement("w:t")
+    value.text = "1"
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+    run = paragraph.add_run()
+    run._r.extend((begin, code, separate, value, end))
 
 
 def _segments(nodes: list[dict[str, Any]], bold: bool = False, italic: bool = False) -> list[tuple[str, bool, bool, bool]]:

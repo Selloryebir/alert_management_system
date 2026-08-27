@@ -22,12 +22,15 @@ $releaseRoot = Join-Path $stagingRoot "alert-management-system-windows-x64"
 $lockPath = Join-Path $repositoryRoot "packaging\native\runtime-lock.json"
 $templateRoot = Join-Path $repositoryRoot "packaging\native\release"
 $algorithmSpec = Join-Path $repositoryRoot "packaging\native\algorithm-service.spec"
+$modelProvisionerSpec = Join-Path $repositoryRoot "packaging\native\model-provisioner.spec"
 $pyinstallerLock = Join-Path $repositoryRoot "packaging\native\pyinstaller.lock"
 $manualSources = @(
     "business-user-manual.docx",
     "business-user-manual.pdf",
     "windows-deployment-operations.docx",
-    "windows-deployment-operations.pdf"
+    "windows-deployment-operations.pdf",
+    "model-technical-brochure.docx",
+    "model-technical-brochure.pdf"
 )
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
@@ -237,7 +240,7 @@ function Get-BuildTool {
 if ($env:OS -ne "Windows_NT" -or -not [Environment]::Is64BitOperatingSystem) {
     throw "原生发布构建只支持 Windows x64。"
 }
-foreach ($required in @($lockPath, $algorithmSpec, $pyinstallerLock)) {
+foreach ($required in @($lockPath, $algorithmSpec, $modelProvisionerSpec, $pyinstallerLock)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
         throw "缺少构建输入：$required"
     }
@@ -352,25 +355,19 @@ try {
     Invoke-Checked -FilePath $buildPython -Arguments @("-m", "pip", "check") `
         -FailureMessage "Python 构建依赖不完整"
 
-    $modelDirectory = Join-Path $stagingRoot "model"
-    New-Item -ItemType Directory -Path $modelDirectory | Out-Null
-    $modelFile = Join-Path $modelDirectory "algorithm-model.enc"
-    $modelKeyFile = Join-Path $modelDirectory "algorithm-model-key.txt"
-    $modelReportFile = Join-Path $modelDirectory "algorithm-model-report.json"
-    Invoke-Checked -FilePath $buildPython -Arguments @(
-        (Join-Path $repositoryRoot "tools\model-training\train.py"),
-        "--data", (Join-Path $repositoryRoot "tools\model-training\data\engineering-scenarios.jsonl"),
-        "--model-out", $modelFile,
-        "--key-out", $modelKeyFile,
-        "--report-out", $modelReportFile
-    ) -FailureMessage "监督模型训练、评估或认证加密失败"
-
     $algorithmDist = Join-Path $stagingRoot "algorithm-dist"
     $algorithmWork = Join-Path $stagingRoot "algorithm-work"
     Invoke-Checked -FilePath $buildPython -Arguments @(
         "-m", "PyInstaller", "--noconfirm", "--clean",
         "--distpath", $algorithmDist, "--workpath", $algorithmWork, $algorithmSpec
     ) -FailureMessage "算法 Windows 可执行文件构建失败"
+    $modelProvisionerDist = Join-Path $stagingRoot "model-provisioner-dist"
+    $modelProvisionerWork = Join-Path $stagingRoot "model-provisioner-work"
+    Invoke-Checked -FilePath $buildPython -Arguments @(
+        "-m", "PyInstaller", "--noconfirm", "--clean",
+        "--distpath", $modelProvisionerDist, "--workpath", $modelProvisionerWork,
+        $modelProvisionerSpec
+    ) -FailureMessage "监督模型准备程序构建失败"
 
     Copy-Item -LiteralPath (Join-Path $templateRoot "README.txt") -Destination $releaseRoot
     Copy-Item -LiteralPath (Join-Path $templateRoot "THIRD-PARTY-NOTICES.txt") -Destination $releaseRoot
@@ -396,13 +393,15 @@ try {
         throw "PyInstaller 未生成预期算法 EXE。"
     }
     Copy-Item -Path (Join-Path $algorithmSource "*") -Destination $appDirectory.FullName -Recurse
-    $releaseModelDirectory = New-Item -ItemType Directory -Path `
-        (Join-Path $releaseRoot "app\model") -Force
-    Copy-Item -LiteralPath $modelFile -Destination $releaseModelDirectory.FullName
-    Copy-Item -LiteralPath $modelReportFile -Destination $releaseModelDirectory.FullName
-    $releaseSecretDirectory = New-Item -ItemType Directory -Path `
-        (Join-Path $releaseRoot "data\secrets") -Force
-    Copy-Item -LiteralPath $modelKeyFile -Destination $releaseSecretDirectory.FullName
+    $modelProvisionerSource = Join-Path $modelProvisionerDist "model-provisioner"
+    if (-not (Test-Path -LiteralPath `
+            (Join-Path $modelProvisionerSource "model-provisioner.exe") -PathType Leaf)) {
+        throw "PyInstaller 未生成预期模型准备程序 EXE。"
+    }
+    $modelProvisionerTarget = New-Item -ItemType Directory -Path `
+        (Join-Path $releaseRoot "app\model-provisioner") -Force
+    Copy-Item -Path (Join-Path $modelProvisionerSource "*") `
+        -Destination $modelProvisionerTarget.FullName -Recurse
 
     $jreDirectory = Join-Path $releaseRoot "runtime\jre"
     New-Item -ItemType Directory -Path (Split-Path -Parent $jreDirectory) -Force | Out-Null
@@ -447,6 +446,9 @@ try {
     }
     $demoTarget = Join-Path $sampleTarget "demo"
     New-Item -ItemType Directory -Path $demoTarget -Force | Out-Null
+    Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "samples\demo") -File | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $demoTarget
+    }
     Invoke-Checked -FilePath $buildPython -Arguments @(
         (Join-Path $repositoryRoot "samples\generate_samples.py"),
         "--dataset", "demo", "--output", (Join-Path $demoTarget "synthetic_demo_20000.csv")

@@ -51,7 +51,6 @@ ROOT_SOURCE_FILES = {"compose.yaml", "compose.network.yaml"}
 NPM_PROJECTS = (
     Path("src/frontend"),
     Path("tests/e2e"),
-    Path("tools/document-extraction"),
 )
 EXACT_REQUIREMENT = re.compile(
     r"^([A-Za-z0-9_.-]+)(?:\[[^]]+\])?==([^\s;]+)(?:\s*;\s*(.+))?$"
@@ -145,7 +144,9 @@ def tracked_source_files(root: Path = REPOSITORY_ROOT) -> list[Path]:
         relative_text = relative.as_posix()
         if relative.suffix.lower() not in SOURCE_SUFFIXES:
             continue
-        if relative_text in ROOT_SOURCE_FILES or relative_text.startswith(SOURCE_PREFIXES):
+        if relative_text in ROOT_SOURCE_FILES or relative_text.startswith(
+            SOURCE_PREFIXES
+        ):
             paths.append(root / relative)
     if not paths:
         raise AuditFailure("没有找到待检查的跟踪源码")
@@ -182,11 +183,15 @@ def check_text_files(paths: Iterable[Path]) -> None:
 
 def check_script_syntax(paths: Iterable[Path]) -> None:
     scripts = list(paths)
-    shell_scripts = sorted(str(path) for path in scripts if path.suffix.lower() == ".sh")
+    shell_scripts = sorted(
+        str(path) for path in scripts if path.suffix.lower() == ".sh"
+    )
     if shell_scripts:
         run_command("Bash 脚本语法", ["bash", "-n", *shell_scripts], timeout=120)
 
-    powershell_scripts = sorted(path for path in scripts if path.suffix.lower() == ".ps1")
+    powershell_scripts = sorted(
+        path for path in scripts if path.suffix.lower() == ".ps1"
+    )
     if not powershell_scripts:
         return
     powershell = shutil.which("powershell.exe") or shutil.which("pwsh")
@@ -230,7 +235,12 @@ def check_npm_lock(project_dir: Path) -> dict[str, str]:
     root_package = lock.get("packages", {}).get("")
     if not isinstance(root_package, dict):
         raise AuditFailure(f"{lock_path} 缺少根包记录")
-    for field in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
+    for field in (
+        "dependencies",
+        "devDependencies",
+        "optionalDependencies",
+        "peerDependencies",
+    ):
         expected = manifest.get(field, {})
         actual = root_package.get(field, {})
         if expected != actual:
@@ -258,7 +268,9 @@ def parse_locked_requirements(lock_path: Path) -> list[Package]:
             continue
         match = EXACT_REQUIREMENT.fullmatch(line)
         if not match:
-            raise AuditFailure(f"{lock_path}:{line_number} 不是精确的 name==version 锁定项")
+            raise AuditFailure(
+                f"{lock_path}:{line_number} 不是精确的 name==version 锁定项"
+            )
         name, version, _marker = match.groups()
         canonical_name = canonical_python_name(name)
         package = Package("PyPI", canonical_name, version)
@@ -306,7 +318,11 @@ def find_python312() -> str:
             continue
         try:
             result = subprocess.run(
-                [str(candidate), "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"],
+                [
+                    str(candidate),
+                    "-c",
+                    "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
+                ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 timeout=10,
@@ -317,7 +333,9 @@ def find_python312() -> str:
             continue
         if result.returncode == 0 and result.stdout.strip() == "3.12":
             return str(candidate)
-    raise AuditFailure("未找到项目要求的 Python 3.12；请先运行 scripts/dev/bootstrap.sh")
+    raise AuditFailure(
+        "未找到项目要求的 Python 3.12；请先运行 scripts/dev/bootstrap.sh"
+    )
 
 
 def maven_command(arguments: list[str]) -> list[str]:
@@ -344,7 +362,9 @@ def resolve_maven_dependencies() -> list[Package]:
         "-DoutputFile=target/m12-dependencies.txt",
     ]
     try:
-        run_command("Java test-compile 与运行时依赖解析", maven_command(arguments), timeout=600)
+        run_command(
+            "Java test-compile 与运行时依赖解析", maven_command(arguments), timeout=600
+        )
         if not output_path.is_file():
             raise AuditFailure("Maven dependency:list 未生成解析结果")
         packages: set[Package] = set()
@@ -415,40 +435,70 @@ def run_npm_audit(project_dir: Path, versions: dict[str, str]) -> None:
     if not npm:
         raise AuditFailure("未找到 npm，无法执行 npm audit")
     print(f"[质量审计] npm 漏洞审计：{project_dir}")
-    try:
-        result = subprocess.run(
-            [npm, "--prefix", str(project_dir), "audit", "--audit-level=high", "--json"],
-            cwd=REPOSITORY_ROOT,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=180,
-            check=False,
-        )
-        payload = json.loads(result.stdout.decode("utf-8"))
-    except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise AuditFailure(f"{project_dir} 的 npm audit 网络或响应解析失败") from error
-    if payload.get("error"):
-        raise AuditFailure(f"{project_dir} 的 npm audit 依赖源不可用或返回错误")
-    findings: list[tuple[str, str]] = []
-    for name, vulnerability in payload.get("vulnerabilities", {}).items():
-        if not isinstance(vulnerability, dict):
-            continue
-        if vulnerability.get("severity") not in ("high", "critical"):
-            continue
-        coordinate = f"npm:{name}@{versions.get(name, 'unknown')}"
-        for identifier in npm_vulnerability_ids(vulnerability):
-            findings.append((coordinate, identifier))
-    if findings:
-        for coordinate, identifier in sorted(set(findings)):
-            print(f"[依赖漏洞] {coordinate} {identifier}", file=sys.stderr)
-        raise AuditFailure(f"{project_dir} 存在高危或严重 npm 漏洞")
-    if result.returncode != 0:
-        raise AuditFailure(f"{project_dir} 的 npm audit 失败（退出码 {result.returncode}）")
+    last_error: BaseException | None = None
+    for attempt in range(1, 4):
+        try:
+            result = subprocess.run(
+                [
+                    npm,
+                    "--prefix",
+                    str(project_dir),
+                    "audit",
+                    "--audit-level=high",
+                    "--json",
+                ],
+                cwd=REPOSITORY_ROOT,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=180,
+                check=False,
+            )
+            payload = json.loads(result.stdout.decode("utf-8"))
+        except (
+            OSError,
+            subprocess.TimeoutExpired,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ) as error:
+            last_error = error
+            if attempt < 3:
+                time.sleep(attempt)
+                continue
+            raise AuditFailure(
+                f"{project_dir} 的 npm audit 网络或响应解析失败"
+            ) from error
+        findings: list[tuple[str, str]] = []
+        for name, vulnerability in payload.get("vulnerabilities", {}).items():
+            if not isinstance(vulnerability, dict):
+                continue
+            if vulnerability.get("severity") not in ("high", "critical"):
+                continue
+            coordinate = f"npm:{name}@{versions.get(name, 'unknown')}"
+            for identifier in npm_vulnerability_ids(vulnerability):
+                findings.append((coordinate, identifier))
+        if findings:
+            for coordinate, identifier in sorted(set(findings)):
+                print(f"[依赖漏洞] {coordinate} {identifier}", file=sys.stderr)
+            raise AuditFailure(f"{project_dir} 存在高危或严重 npm 漏洞")
+        if not payload.get("error") and result.returncode == 0:
+            break
+        last_error = RuntimeError(f"npm audit 退出码 {result.returncode}")
+        if attempt < 3:
+            print(
+                f"[质量审计] {project_dir} npm audit 外部服务异常，第 {attempt} 次有限重试"
+            )
+            time.sleep(attempt)
+    else:
+        raise AuditFailure(
+            f"{project_dir} 的 npm audit 依赖源连续不可用"
+        ) from last_error
     print(f"[质量审计] npm 漏洞审计通过：{project_dir}")
 
 
-def parse_osv_results(packages: list[Package], payload: object) -> list[tuple[Package, str]]:
+def parse_osv_results(
+    packages: list[Package], payload: object
+) -> list[tuple[Package, str]]:
     if not isinstance(payload, dict) or not isinstance(payload.get("results"), list):
         raise AuditFailure("OSV querybatch 响应结构无效")
     results = payload["results"]
@@ -462,7 +512,9 @@ def parse_osv_results(packages: list[Package], payload: object) -> list[tuple[Pa
         if not isinstance(vulnerabilities, list):
             raise AuditFailure("OSV querybatch 漏洞列表结构无效")
         for vulnerability in vulnerabilities:
-            if not isinstance(vulnerability, dict) or not isinstance(vulnerability.get("id"), str):
+            if not isinstance(vulnerability, dict) or not isinstance(
+                vulnerability.get("id"), str
+            ):
                 raise AuditFailure("OSV querybatch 漏洞标识无效")
             findings.append((package, vulnerability["id"]))
     return findings
@@ -484,7 +536,10 @@ def query_osv(packages: list[Package]) -> None:
     request = urllib.request.Request(
         OSV_BATCH_URL,
         data=request_body,
-        headers={"Content-Type": "application/json", "User-Agent": "alert-management-quality-audit/1"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "alert-management-quality-audit/1",
+        },
         method="POST",
     )
     payload: object | None = None
@@ -514,7 +569,9 @@ def query_osv(packages: list[Package]) -> None:
     counts: dict[str, int] = {}
     for package in unique_packages:
         counts[package.ecosystem] = counts.get(package.ecosystem, 0) + 1
-    summary = "，".join(f"{ecosystem} {count} 项" for ecosystem, count in sorted(counts.items()))
+    summary = "，".join(
+        f"{ecosystem} {count} 项" for ecosystem, count in sorted(counts.items())
+    )
     print(f"[质量审计] OSV 漏洞审计通过：{summary}")
 
 
@@ -538,27 +595,42 @@ def run_self_test() -> None:
 
         npm_dir = root / "npm"
         npm_dir.mkdir()
-        package = {"name": "fixture", "version": "1.0.0", "dependencies": {"vue": "3.5.41"}}
+        package = {
+            "name": "fixture",
+            "version": "1.0.0",
+            "dependencies": {"vue": "3.5.41"},
+        }
         lock = {
             "name": "fixture",
             "version": "1.0.0",
             "lockfileVersion": 3,
             "packages": {"": package, "node_modules/vue": {"version": "3.5.41"}},
         }
-        (npm_dir / "package.json").write_text(json.dumps(package) + "\n", encoding="utf-8")
-        (npm_dir / "package-lock.json").write_text(json.dumps(lock) + "\n", encoding="utf-8")
+        (npm_dir / "package.json").write_text(
+            json.dumps(package) + "\n", encoding="utf-8"
+        )
+        (npm_dir / "package-lock.json").write_text(
+            json.dumps(lock) + "\n", encoding="utf-8"
+        )
         check_npm_lock(npm_dir)
         package["dependencies"]["vue"] = "3.5.42"
-        (npm_dir / "package.json").write_text(json.dumps(package) + "\n", encoding="utf-8")
+        (npm_dir / "package.json").write_text(
+            json.dumps(package) + "\n", encoding="utf-8"
+        )
         expect_failure("npm 锁文件漂移", lambda: check_npm_lock(npm_dir))
 
         pyproject = root / "pyproject.toml"
         requirements = root / "requirements.lock"
-        pyproject.write_text('[project]\nname = "fixture"\nversion = "1"\ndependencies = ["demo==1.0"]\n', encoding="utf-8")
+        pyproject.write_text(
+            '[project]\nname = "fixture"\nversion = "1"\ndependencies = ["demo==1.0"]\n',
+            encoding="utf-8",
+        )
         requirements.write_text("demo==1.0\n", encoding="utf-8")
         check_python_lock(pyproject, requirements)
         requirements.write_text("demo==2.0\n", encoding="utf-8")
-        expect_failure("Python 锁文件漂移", lambda: check_python_lock(pyproject, requirements))
+        expect_failure(
+            "Python 锁文件漂移", lambda: check_python_lock(pyproject, requirements)
+        )
 
         fixture_package = Package("PyPI", "demo", "1.0")
         findings = parse_osv_results(

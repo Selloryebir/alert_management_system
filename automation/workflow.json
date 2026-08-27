@@ -32,23 +32,23 @@
   "stages": [
     {
       "id": "M0",
-      "name": "来源提取与产品事实冻结",
+      "name": "立项需求与产品事实冻结",
       "depends_on": [],
       "references": [
-        "docs/backgrounds/README.md",
-        "docs/sources/README.md",
-        "docs/sources/manifest.json",
+        "docs/product/requirements.md",
+        "docs/product/data-contract.md",
+        "docs/product/source-coverage.md",
         "docs/decisions/README.md"
       ],
       "acceptance": {
         "criteria": [
-          "四份来源均有可追溯去向，排除内容和理由已记录",
+          "立项需求、需求基线与能力处置形成唯一可追溯责任矩阵",
           "P0 需求、数据契约、架构和验收入口含义唯一",
-          "仓库结构、文档链接和提取可重复性检查通过"
+          "仓库结构、文档链接和需求覆盖检查通过"
         ],
         "commands": [
           "python3 scripts/validate_repository.py",
-          "npm --prefix tools/document-extraction run check"
+          "python3 scripts/validate_formal_baseline.py"
         ]
       }
     },
@@ -63,7 +63,7 @@
       "acceptance": {
         "criteria": [
           "Java、Python、Vue 和 PostgreSQL 可按开发说明启动",
-          "浏览器显示灾后重建标识及数据库、算法、主系统健康状态",
+          "浏览器显示正式产品身份及数据库、算法、主系统健康状态",
           "基础编译、单元测试、静态检查和迁移重启检查通过"
         ],
         "commands": [
@@ -193,7 +193,7 @@
     },
     {
       "id": "M8",
-      "name": "正式产品基线与来源闭环",
+      "name": "正式产品基线与能力闭环",
       "depends_on": ["M7"],
       "references": [
         "docs/planning/M8-implementation.md",
@@ -209,14 +209,13 @@
       "acceptance": {
         "criteria": [
           "正式运行路径、根说明和发布说明统一使用报警管理系统产品身份，历史证据仍可追溯",
-          "PDF/DOCX 中每项可识别能力均有实现证据、具体后续阶段、明确拒绝或外部重启条件",
+          "需求基线中每项可识别能力均有实现证据、具体后续阶段、明确拒绝或外部重启条件",
           "产品化阶段、版本标签、算法研究和安全边界形成唯一可执行入口"
         ],
         "commands": [
           "python3 scripts/validate_repository.py",
           "python3 scripts/validate_automation.py",
           "python3 scripts/validate_formal_baseline.py",
-          "npm --prefix tools/document-extraction run check",
           "scripts/dev/test.sh",
           "scripts/dev/restart-smoke.sh"
         ]
@@ -316,7 +315,7 @@
       "name": "正式说明书与项目过程文件",
       "depends_on": ["M12"],
       "references": [
-        "docs/sources/README.md",
+        "docs/product/source-coverage.md",
         "docs/product/requirements.md",
         "docs/verification/README.md"
       ],
@@ -348,12 +347,16 @@
           "Java、Python、TypeScript/Vue 固定 lint 与构建入口通过，POM 模型和编译无未处置告警",
           "多场景样例、非法输入原子拒绝和可复现监督模型通过测试，模型参数认证加密且密钥分离",
           "Dashboard 的统计、时序、占比和表格均由当前项目数据库事实生成，主要页面通过桌面和窄屏浏览器验收",
-          "背景原件及提取链不再由 Git 跟踪，正式 README、项目过程文档、部署运维手册和技术材料与实现及实测一致",
+          "项目档案及历史提取链不由正式源码树跟踪，需求能力矩阵、README、部署运维手册和技术材料与实现及实测一致",
           "不了解代码的业务用户可仅按说明完成预检、安装、启动、登录、样例闭环、备份恢复和停止",
           "Windows 原生包与 HTTPS 容器部署均从干净状态通过正式验收且失败不会假成功",
           "最终差距矩阵无悬空项，阻断和严重缺陷为零，发布候选标签绑定已验证提交"
         ],
         "commands": [
+          "scripts/dev/quality.sh",
+          "scripts/dev/test.sh",
+          ".runtime/deliverables-venv/bin/python tools/deliverables/build.py --check",
+          "python3 scripts/release/export_clean_source.py --check",
           "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release/verify-business-release.ps1",
           "python3 tests/smoke/run.py --target docker --fresh-volume",
           "python3 scripts/validate_release_candidate.py"

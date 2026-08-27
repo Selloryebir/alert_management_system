@@ -3,10 +3,18 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 
 const repositoryRoot = path.resolve(__dirname, "../..");
-const commit = execFileSync("git", ["rev-parse", "--short=12", "HEAD"], {
-  cwd: repositoryRoot,
-  encoding: "utf8",
-}).trim();
+const providedCommit = process.env.E2E_SOURCE_COMMIT?.trim();
+if (providedCommit && !/^[0-9a-f]{40}$/i.test(providedCommit)) {
+  throw new Error("E2E_SOURCE_COMMIT 必须是 40 位 Git SHA");
+}
+const commit = providedCommit?.slice(0, 12)
+  || execFileSync("git", ["rev-parse", "--short=12", "HEAD"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  }).trim();
+const outputRoot = process.env.E2E_VISUAL_OUTPUT_DIR
+  ? path.resolve(process.env.E2E_VISUAL_OUTPUT_DIR)
+  : path.join(repositoryRoot, ".runtime", "ui-audit");
 
 const viewports = [
   { directory: "desktop-1440x1000", width: 1440, height: 1000 },
@@ -53,7 +61,7 @@ export async function captureVisualState(
       page.locator('[data-testid="audit-table"] tbody td:nth-child(4)'),
     ];
     await page.screenshot({
-      path: path.join(repositoryRoot, ".runtime", "ui-audit", commit, viewport.directory, `${name}.png`),
+      path: path.join(outputRoot, commit, viewport.directory, `${name}.png`),
       fullPage: true,
       animations: "disabled",
       mask: masks,

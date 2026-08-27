@@ -259,9 +259,9 @@ def _mark_duplicates(
     strengths: dict[UUID, dict[NoiseType, float]],
     evidence: dict[UUID, dict[NoiseType, str]],
 ) -> None:
-    grouped: dict[
-        tuple[str, str, str | None, str, tuple[object, ...]], list[AlarmRecord]
-    ] = defaultdict(list)
+    grouped: dict[tuple[str, str, str | None, str, tuple[object, ...]], list[AlarmRecord]] = (
+        defaultdict(list)
+    )
     for record in request.records:
         grouped[(*_alarm_group(record), _core(record))].append(record)
 
@@ -273,15 +273,21 @@ def _mark_duplicates(
                 timestamp_groups.append([record])
             else:
                 timestamp_groups[-1].append(record)
-        for previous_group, current_group in zip(timestamp_groups, timestamp_groups[1:], strict=False):
+        for previous_group, current_group in zip(
+            timestamp_groups, timestamp_groups[1:], strict=False
+        ):
             delta = _seconds(previous_group[0].event_time, current_group[0].event_time)
             if delta > window:
                 continue
             strength = exp(-delta / window)
             for record in previous_group:
-                _set_duplicate(record, current_group[0], delta, window, strength, strengths, evidence)
+                _set_duplicate(
+                    record, current_group[0], delta, window, strength, strengths, evidence
+                )
             for record in current_group:
-                _set_duplicate(record, previous_group[-1], delta, window, strength, strengths, evidence)
+                _set_duplicate(
+                    record, previous_group[-1], delta, window, strength, strengths, evidence
+                )
 
 
 def _set_duplicate(
@@ -332,8 +338,7 @@ def _mark_chatter(
             )
 
         transformed = [
-            prefix_transitions[index] - minimum_ratio * index
-            for index in range(len(ordered))
+            prefix_transitions[index] - minimum_ratio * index for index in range(len(ordered))
         ]
         tree_size = 1
         while tree_size < len(transformed):
@@ -341,9 +346,7 @@ def _mark_chatter(
         minimum_tree = [float("inf")] * (tree_size * 2)
         minimum_tree[tree_size : tree_size + len(transformed)] = transformed
         for index in range(tree_size - 1, 0, -1):
-            minimum_tree[index] = min(
-                minimum_tree[index * 2], minimum_tree[index * 2 + 1]
-            )
+            minimum_tree[index] = min(minimum_tree[index * 2], minimum_tree[index * 2 + 1])
 
         def first_qualifying_start(
             node: int,
@@ -576,7 +579,9 @@ def _event_chains(
             for first, second in zip(episode, episode[1:], strict=False):
                 edge = first.tag, second.tag
                 actual_lag = _seconds(first.event_time, second.event_time)
-                can_extend = edge in valid_edges and actual_lag <= request.parameters.chain_window_seconds
+                can_extend = (
+                    edge in valid_edges and actual_lag <= request.parameters.chain_window_seconds
+                )
                 if can_extend and path:
                     can_extend = path[-1].record_id == first.record_id
                 if can_extend:
@@ -617,7 +622,8 @@ def _append_chain(
     member_ids = [member.record_id for member in members]
     chain_id = uuid5(
         NAMESPACE_URL,
-        f"{RULE_VERSION}:{ASSOCIATION_RULE}:" + ":".join(str(member_id) for member_id in member_ids),
+        f"{RULE_VERSION}:{ASSOCIATION_RULE}:"
+        + ":".join(str(member_id) for member_id in member_ids),
     )
     explanation = (
         f"{ASSOCIATION_RULE}；关系键为 {members[0].site}/{members[0].area}/"
@@ -668,8 +674,7 @@ def _cause_category(record: AlarmRecord, request: AnalysisRequest) -> tuple[Caus
     english_tokens = set(re.findall(r"[a-z0-9]+", text))
     feature_terms = sorted({term for weights in EXPERT_WEIGHTS.values() for term in weights})
     features = {
-        term: 1.0 if _term_present(term, text, english_tokens) else 0.0
-        for term in feature_terms
+        term: 1.0 if _term_present(term, text, english_tokens) else 0.0 for term in feature_terms
     }
     feature_norm = sqrt(sum(value * value for value in features.values()))
     maintenance_present = any(features[term] > 0 for term in MAINTENANCE_TERMS)

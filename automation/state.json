@@ -33,7 +33,6 @@
       "docs/algorithm/",
       "docs/architecture/",
       "docs/automation/",
-      "docs/backgrounds/",
       "docs/decisions/",
       "docs/deliverables/",
       "docs/guides/",
@@ -42,7 +41,6 @@
       "docs/product/source-coverage.md",
       "docs/releases/",
       "docs/security/",
-      "docs/sources/",
       "docs/verification/",
       "packaging/docker/",
       "packaging/native/",
@@ -62,8 +60,7 @@
       "tests/release/",
       "tests/e2e/",
       "tests/smoke/",
-      "tools/deliverables/",
-      "tools/document-extraction/"
+      "tools/deliverables/"
     ],
     "checks": [
       "阶段启动前：M13 检查点 4be7ea5 的本机 G13 与五条远端流水线均 PASS",

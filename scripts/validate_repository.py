@@ -13,7 +13,6 @@ from urllib.parse import unquote, urlsplit
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_PATHS = (
-    "AGENTS.md",
     "README.md",
     "CONTRIBUTING.md",
     ".gitignore",
@@ -21,8 +20,6 @@ REQUIRED_PATHS = (
     ".editorconfig",
     ".github/workflows/repository-check.yml",
     "docs/README.md",
-    "docs/backgrounds",
-    "docs/sources",
     "docs/product",
     "docs/architecture",
     "docs/decisions",

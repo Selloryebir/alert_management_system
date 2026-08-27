@@ -17,7 +17,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
-from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import HRFlowable, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from markdown_model import SourceDocument, inline_text
 
@@ -188,11 +188,13 @@ def _render_blocks(story: list[Any], nodes: Iterable[dict[str, Any]], styles: di
                 story.append(Spacer(1, 3 * mm))
             continue
         if kind in {"paragraph", "block_text"}:
-            story.append(Paragraph(_inline_markup(node.get("children", [])), styles["quote"] if quote else styles["normal"]))
+            story.append(KeepTogether([
+                Paragraph(_inline_markup(node.get("children", [])), styles["quote"] if quote else styles["normal"]),
+            ]))
             continue
         if kind == "block_code":
             value = html.escape(str(node.get("raw", "")).rstrip("\n")).replace("\n", "<br/>")
-            story.append(Paragraph(value, styles["code"]))
+            story.append(KeepTogether([Paragraph(value, styles["code"])]))
             continue
         if kind == "list":
             ordered = bool(node.get("attrs", {}).get("ordered", False))
@@ -234,11 +236,28 @@ def _render_blocks(story: list[Any], nodes: Iterable[dict[str, Any]], styles: di
         raise ValueError(f"不支持的 PDF 块节点：{kind}")
 
 
-class _InvariantCanvas(canvas.Canvas):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+class _NumberedCanvas(canvas.Canvas):
+    def __init__(self, *args: Any, document_date: str, **kwargs: Any) -> None:
         kwargs["invariant"] = 1
         kwargs["pageCompression"] = 0
         super().__init__(*args, **kwargs)
+        self._saved_page_states: list[dict[str, Any]] = []
+        pdf_date = document_date.replace("-", "")
+        self._doc.info._dateFormatter = lambda *_: f"D:{pdf_date}000000+00'00'"
+
+    def showPage(self) -> None:
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self) -> None:
+        total = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.setFont(FONT_NAME, 8)
+            self.setFillColor(colors.HexColor("#666666"))
+            self.drawRightString(A4[0] - 21 * mm, 9 * mm, f"第 {self._pageNumber} / {total} 页")
+            canvas.Canvas.showPage(self)
+        canvas.Canvas.save(self)
 
 
 def render_pdf(source: SourceDocument, document_date: str, font_path: Path) -> bytes:
@@ -266,7 +285,9 @@ def render_pdf(source: SourceDocument, document_date: str, font_path: Path) -> b
         page_canvas.setFont(FONT_NAME, 8)
         page_canvas.setFillColor(colors.HexColor("#666666"))
         page_canvas.drawString(21 * mm, 9 * mm, f"报警管理系统 · 文档日期 {document_date}")
-        page_canvas.drawRightString(A4[0] - 21 * mm, 9 * mm, f"第 {page_canvas.getPageNumber()} 页")
 
-    document.build(story, onFirstPage=decorate_page, onLaterPages=decorate_page, canvasmaker=_InvariantCanvas)
+    def canvas_factory(*args: Any, **kwargs: Any) -> _NumberedCanvas:
+        return _NumberedCanvas(*args, document_date=document_date, **kwargs)
+
+    document.build(story, onFirstPage=decorate_page, onLaterPages=decorate_page, canvasmaker=canvas_factory)
     return output.getvalue()

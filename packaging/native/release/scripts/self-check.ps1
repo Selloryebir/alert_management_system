@@ -40,7 +40,7 @@ try {
     foreach ($marker in @("initdb", "pg_ctl", "algorithm-service", "api/v1/health", "Save-RunningProcess",
             "SERVER_ADDRESS", "APP_BOOTSTRAP_ADMIN_PASSWORD_FILE", "ALGORITHM_MODEL_FILE",
             "ALGORITHM_MODEL_KEY_FILE", "Initialize-InstanceIdentity",
-            "Initialize-InstanceSecrets")) {
+            "Initialize-InstanceSecrets", "Initialize-AlgorithmModel")) {
         if ($start.IndexOf($marker, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
             throw "start.ps1 缺少必要运行标记：$marker"
         }

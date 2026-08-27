@@ -73,7 +73,9 @@ services:
         python /app/model-training/train.py \
           --data /app/model-training/data/engineering-scenarios.jsonl \
           --model-out "$$model" --key-out "$$key" --report-out "$$report"
-        chmod 0644 "$$model" "$$key" "$$report"
+        chown 10001:10001 "$$model" "$$key" "$$report"
+        chmod 0444 "$$model" "$$report"
+        chmod 0400 "$$key"
     volumes:
       - algorithm_model:/model
       - algorithm_model_key:/model-key

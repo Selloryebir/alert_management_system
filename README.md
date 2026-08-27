@@ -2,7 +2,7 @@
 
 本仓库提供报警文件导入、规范化、可解释分析、统计看板、人工处置、审计、报告和备份恢复验证的一体化应用。`v0.8.0` 已通过 Windows 11 x64 自包含运行包、Docker Compose、身份权限、HTTPS 边界和有限可靠性验收；M13 正式说明书和项目过程文件已通过，当前 M14 正在固定 `1.0.0-rc.1` 业务发布候选，最终业务用户终验仍以 `automation/state.json` 为准。
 
-产品北极星是让业务人员仅按中文说明即可部署并完成“导入校验 → 分析 → 查看 → 处置 → 报告 → 备份恢复”。实现与验收以稳定、可解释、可复现为优先，不把历史材料中未经验证的指标直接作为承诺。仓库内置数据均为合成示例数据。
+产品北极星是让业务人员仅按中文说明即可部署并完成“导入校验 → 分析 → 查看 → 处置 → 报告 → 备份恢复”。实现与验收以稳定、可解释、可复现为优先，不把立项阶段未经验证的指标直接作为承诺。仓库内置数据均为合成示例数据。
 
 ## Windows 11 快速开始
 
@@ -28,22 +28,19 @@
 ## 仓库入口
 
 - [`docs/`](docs/)：文档总入口及推荐阅读顺序。
-- `docs/backgrounds/`：只读原始 PDF、DOCX 资料及来源索引。
-- [`docs/sources/`](docs/sources/)：从原始资料生成的可追溯 Markdown、图片和提取清单。
 - [`docs/product/`](docs/product/)：经筛选的产品事实、范围和数据契约。
 - [`docs/architecture/`](docs/architecture/)：系统边界与已接受的技术决策。
-- [`docs/planning/`](docs/planning/)：阶段规划、范围和验收入口。
 - [`docs/guides/`](docs/guides/)：正式业务使用和 Windows 部署运维说明。
 - [`docs/deliverables/`](docs/deliverables/)：正式项目过程文档的 Markdown 单一事实源。
 - [`deliverables/`](deliverables/)：由 Markdown 确定生成的正式 DOCX/PDF 说明书与项目过程文件。
 - [`tools/deliverables/`](tools/deliverables/)：正式交付物生成和一致性验证工具。
-- [`automation/`](automation/)：可恢复的阶段状态、机器可读工作流和 Codex 提示链。
 - [`src/`](src/)：Java 后端、Python 算法服务和 Vue 前端源码。
-- [`tools/document-extraction/`](tools/document-extraction/)：可重复的历史材料提取工具。
 - [`scripts/validate_repository.py`](scripts/validate_repository.py)：无第三方依赖的仓库结构与文档链接检查。
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)：开发、验证和提交约定。
 
-后续文档应把原始事实、筛选后的产品要求、架构决策和验收记录分开保存。原始材料存在冲突时，以已落盘的产品决策和可执行验收标准为准。
+产品要求、架构决策和验收记录分区保存；冲突以已批准的需求基线、产品决策和可执行验收标准为准。
+
+正式源码包由仓库维护流程从已验证的干净提交生成，包内 `SOURCE-MANIFEST.json` 记录源提交、精确文件、权限、大小和 SHA-256。源码包不包含 Git 元数据、本地运行数据、内部阶段控制、内部验收证据或项目档案。
 
 团队职责按交付物划分：前端、Java 后端和 Python 算法代码进入各自源码组件；测试组负责跨组件契约、集成、端到端与演示验收；工程组负责 `scripts/`、持续集成和原生/Docker 交付。实际任务出现时再建立对应目录，不用空目录或占位代码模拟进度。
 

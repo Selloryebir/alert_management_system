@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 from pathlib import PurePosixPath
 from typing import Any
@@ -75,6 +76,9 @@ def verify_docx(data: bytes, source: SourceDocument) -> str:
         content_types = archive.read("[Content_Types].xml").lower()
         if b"macroenabled" in content_types or b"vba" in content_types:
             raise ArtifactError(f"{source.source_path} 的 DOCX 含宏内容类型")
+        footer_xml = b"\n".join(archive.read(name) for name in names if name.startswith("word/footer") and name.endswith(".xml"))
+        if b"PAGE" not in footer_xml or b"NUMPAGES" not in footer_xml:
+            raise ArtifactError(f"{source.source_path} 的 DOCX 页脚缺少当前页或总页数字段")
 
     try:
         document = Document(io.BytesIO(data))
@@ -144,6 +148,10 @@ def verify_pdf(data: bytes, source: SourceDocument) -> str:
     metadata = reader.metadata
     if not metadata or metadata.title != source.title:
         raise ArtifactError(f"{source.source_path} 的 PDF 元数据标题不正确")
+    if metadata.author != "报警管理系统项目组" or metadata.subject != "报警管理系统正式项目交付物":
+        raise ArtifactError(f"{source.source_path} 的 PDF 元数据项目身份不正确")
+    if not metadata.creation_date or not metadata.modification_date:
+        raise ArtifactError(f"{source.source_path} 的 PDF 元数据缺少创建或修改时间")
     _validate_pdf_actions(reader, source)
 
     embedded_font = False
@@ -166,4 +174,8 @@ def verify_pdf(data: bytes, source: SourceDocument) -> str:
     if source.title not in extracted:
         raise ArtifactError(f"{source.source_path} 的 PDF 缺少正式标题")
     _assert_core_text(source, extracted, "PDF")
+    total = len(reader.pages)
+    for index, page_text in enumerate(extracted_pages, start=1):
+        if not re.search(rf"第\s*{index}\s*/\s*{total}\s*页", page_text):
+            raise ArtifactError(f"{source.source_path} 的 PDF 第 {index} 页页码或总页数不正确")
     return extracted

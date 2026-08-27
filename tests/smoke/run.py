@@ -812,8 +812,14 @@ def execute_business_closure(compose: Compose, *, network_mode: bool) -> dict[st
     for service, state in states.items():
         if state["status"] != "running" or state["health"] != "healthy":
             raise VerificationError(f"容器未健康运行：{service}={state}")
-    if len(compose.resource_ids("volume")) != 1:
-        raise VerificationError("项目启动后必须且只能有一个项目卷。")
+    volume_names = compose.resource_ids("volume")
+    expected_suffixes = {"_pgdata", "_algorithm_model", "_algorithm_model_key"}
+    actual_suffixes = {
+        next((suffix for suffix in expected_suffixes if name.endswith(suffix)), "")
+        for name in volume_names
+    }
+    if len(volume_names) != 3 or actual_suffixes != expected_suffixes:
+        raise VerificationError(f"项目卷不符合预期：{volume_names}")
     assert_system_up()
     assert_frontend()
     login_as_bootstrap_admin()

@@ -4,23 +4,25 @@
 from __future__ import annotations
 
 import argparse
-from base64 import urlsafe_b64encode
-from collections import Counter
 import json
 import os
-from pathlib import Path
+import re
 import sys
+import unicodedata
+from base64 import urlsafe_b64encode
+from collections import Counter
+from difflib import SequenceMatcher
+from pathlib import Path
 from typing import Any
 
 import numpy as np
+import skops.io as sio
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.pipeline import Pipeline
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
-import skops.io as sio
-
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ALGORITHM_ROOT = REPOSITORY_ROOT / "src" / "algorithm"
@@ -38,15 +40,20 @@ from algorithm_service.supervised import (  # noqa: E402
     text_feature,
 )
 
-
 SEED = 20260827
 SPLITS = ("train", "validation", "test")
+DEFAULT_DATA = (
+    Path(sys._MEIPASS) / "model-data" / "engineering-scenarios.jsonl"
+    if getattr(sys, "frozen", False)
+    else Path(__file__).resolve().parent / "data" / "engineering-scenarios.jsonl"
+)
 FROZEN_THRESHOLDS = {
     "svm_score": -0.4,
     "svm_margin": 0.05,
     "adaboost_score": 0.0,
     "adaboost_margin": 0.01,
 }
+MAX_CROSS_SPLIT_TEXT_SIMILARITY = 0.88
 
 
 class TrainingDataError(ValueError):
@@ -87,7 +94,8 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
 
 def validate_group_isolation(rows: list[dict[str, Any]]) -> None:
     groups_by_split = {
-        split: {row["group_id"] for row in rows if row["split"] == split} for split in SPLITS
+        split: {row["group_id"] for row in rows if row["split"] == split}
+        for split in SPLITS
     }
     for split in SPLITS:
         if not groups_by_split[split]:
@@ -103,6 +111,24 @@ def validate_group_isolation(rows: list[dict[str, Any]]) -> None:
                 raise TrainingDataError(
                     f"{first}/{second} group_id 泄漏：{','.join(sorted(overlap))}"
                 )
+    normalized = [
+        (
+            row["split"],
+            re.sub(
+                r"\s+", "", unicodedata.normalize("NFKC", text_feature(row["record"]))
+            ).lower(),
+        )
+        for row in rows
+    ]
+    for index, (first_split, first_text) in enumerate(normalized):
+        for second_split, second_text in normalized[index + 1 :]:
+            if first_split == second_split:
+                continue
+            if first_text == second_text:
+                raise TrainingDataError("跨 split 报警描述完全重复")
+            similarity = SequenceMatcher(None, first_text, second_text).ratio()
+            if similarity >= MAX_CROSS_SPLIT_TEXT_SIMILARITY:
+                raise TrainingDataError(f"跨 split 报警描述过度相似：{similarity:.3f}")
 
 
 def _split(rows: list[dict[str, Any]], name: str) -> list[dict[str, Any]]:
@@ -148,7 +174,9 @@ def train_bundle(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def evaluate(bundle: dict[str, Any], rows: list[dict[str, Any]], split: str) -> dict[str, Any]:
+def evaluate(
+    bundle: dict[str, Any], rows: list[dict[str, Any]], split: str
+) -> dict[str, Any]:
     model = SupervisedModel(bundle)
     selected = _split(rows, split)
     expected = [row["label"] for row in selected]
@@ -168,7 +196,9 @@ def evaluate(bundle: dict[str, Any], rows: list[dict[str, Any]], split: str) -> 
             zero_division=0,
         ),
         "confusion_labels": labels,
-        "confusion_matrix": confusion_matrix(expected, predicted, labels=labels).tolist(),
+        "confusion_matrix": confusion_matrix(
+            expected, predicted, labels=labels
+        ).tolist(),
     }
 
 
@@ -200,17 +230,22 @@ def write_artifacts(
         "seed": SEED,
         "thresholds": FROZEN_THRESHOLDS,
         "group_isolation": True,
+        "text_isolation": {
+            "exact_duplicate_rejected": True,
+            "maximum_similarity_exclusive": MAX_CROSS_SPLIT_TEXT_SIMILARITY,
+        },
         "validation": evaluate(bundle, rows, "validation"),
         "test": evaluate(bundle, rows, "test"),
     }
     report_path.write_text(
-        json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+        json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
     )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data", type=Path, required=True)
+    parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--model-out", type=Path, required=True)
     parser.add_argument("--key-out", type=Path, required=True)
     parser.add_argument("--report-out", type=Path, required=True)

@@ -27,6 +27,7 @@ EXPECTED_DOCUMENT_SOURCES = {
     "docs/deliverables/closure-report.md",
     "docs/deliverables/development-process.md",
     "docs/deliverables/source-gap-analysis.md",
+    "docs/deliverables/model-technical-brochure.md",
 }
 HUMAN_ACCEPTANCE_STEPS = {
     "hash_and_extract",
@@ -54,6 +55,7 @@ POST_ACCEPTANCE_ALLOWED_PATHS = {
     "docs/deliverables/closure-report.md",
     "docs/deliverables/development-process.md",
     "docs/deliverables/source-gap-analysis.md",
+    "docs/deliverables/model-technical-brochure.md",
     "deliverables/manifest.json",
     "deliverables/project-proposal.docx",
     "deliverables/project-proposal.pdf",
@@ -67,6 +69,8 @@ POST_ACCEPTANCE_ALLOWED_PATHS = {
     "deliverables/development-process.pdf",
     "deliverables/source-gap-analysis.docx",
     "deliverables/source-gap-analysis.pdf",
+    "deliverables/model-technical-brochure.docx",
+    "deliverables/model-technical-brochure.pdf",
 }
 
 
@@ -325,8 +329,8 @@ def validate_matrices(mode: str) -> None:
 def validate_deliverables() -> None:
     manifest = json.loads((ROOT / "deliverables/manifest.json").read_text(encoding="utf-8"))
     documents = manifest.get("documents")
-    if not isinstance(documents, list) or len(documents) != 8:
-        raise ValueError("正式交付清单必须登记恰好 8 个文档源。")
+    if not isinstance(documents, list) or len(documents) != 9:
+        raise ValueError("正式交付清单必须登记恰好 9 个文档源。")
     sources: set[str] = set()
     outputs: set[str] = set()
     for document in documents:
@@ -347,8 +351,8 @@ def validate_deliverables() -> None:
             path = safe_repository_file(relative)
             if path.stat().st_size != output.get("size") or sha256(path) != output.get("sha256"):
                 raise ValueError(f"正式交付输出大小或哈希不匹配：{relative}")
-    if sources != EXPECTED_DOCUMENT_SOURCES or len(outputs) != 16:
-        raise ValueError("正式交付清单来源或 16 个输出不符合冻结集合。")
+    if sources != EXPECTED_DOCUMENT_SOURCES or len(outputs) != 18:
+        raise ValueError("正式交付清单来源或 18 个输出不符合冻结集合。")
     font = manifest.get("font", {})
     for path_key, hash_key in (("path", "sha256"), ("license_path", "license_sha256")):
         path = safe_repository_file(font.get(path_key, ""))

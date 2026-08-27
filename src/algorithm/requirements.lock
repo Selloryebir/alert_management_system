@@ -5,7 +5,7 @@ anyio==4.14.2
 cffi==2.1.1
 click==8.4.2
 colorama==0.4.6; sys_platform == "win32"
-cryptography==46.0.5
+cryptography==50.0.1
 fastapi==0.141.1
 h11==0.16.0
 httpcore2==2.12.0
