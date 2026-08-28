@@ -25,6 +25,19 @@ describe("看板展示数据", () => {
     expect(trendChartPoints([])).toEqual([]);
   });
 
+  it("为大量聚合时段生成连续且有界的折线坐标", () => {
+    const trend = Array.from({ length: 20_000 }, (_, index) => ({
+      bucket: `时段-${index}`,
+      count: (index % 97) + 1,
+    }));
+    const points = trendChartPoints(trend);
+
+    expect(points).toHaveLength(20_000);
+    expect(points[0].x).toBe(32);
+    expect(points.at(-1)?.x).toBe(568);
+    expect(points.every((point) => Number.isFinite(point.x) && point.y >= 32 && point.y <= 188)).toBe(true);
+  });
+
   it("环图比例来自互斥报警类型实际计数", () => {
     const segments = donutSegments(dashboard.noise_type_counts);
     expect(segments.map(({ label, count, percentage }) => ({ label, count, percentage }))).toEqual([

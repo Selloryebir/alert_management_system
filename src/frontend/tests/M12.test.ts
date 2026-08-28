@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/vue";
+import { cleanup, render, screen, waitFor } from "@testing-library/vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import DataBackupPanel from "../src/DataBackupPanel.vue";
@@ -51,8 +51,6 @@ describe("M12 数据与备份管理界面", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(DataBackupPanel, { props: { user: admin } });
 
-    await fireEvent.click(screen.getByText("数据与备份"));
-
     expect(await screen.findAllByText("25 MiB")).toHaveLength(2);
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText(/完整校验通过/)).toBeInTheDocument();
@@ -83,8 +81,6 @@ describe("M12 数据与备份管理界面", () => {
     })));
     render(DataBackupPanel, { props: { user: admin } });
 
-    await fireEvent.click(screen.getByText("数据与备份"));
-
     expect(await screen.findByText(/待由部署管理员执行完整校验/)).toBeInTheDocument();
     expect(screen.queryByText(/完整校验通过/)).not.toBeInTheDocument();
     expect(screen.getByText("暂无成功备份")).toBeInTheDocument();
@@ -106,8 +102,6 @@ describe("M12 数据与备份管理界面", () => {
       operator_instructions: ["请使用当前部署方式对应的备份流程。"],
     })));
     render(DataBackupPanel, { props: { user: admin } });
-
-    await fireEvent.click(screen.getByText("数据与备份"));
 
     expect(await screen.findByText("Windows 本机原生部署")).toBeInTheDocument();
     expect(screen.getByText("由部署环境管理")).toBeInTheDocument();

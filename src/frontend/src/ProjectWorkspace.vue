@@ -7,6 +7,9 @@ import {
   exportProject,
   fetchProjectOverview,
   listProjects,
+  projectDisplayCode,
+  projectDisplayContext,
+  projectDisplayName,
   setProjectArchived,
   updateProject,
   type Project,
@@ -85,10 +88,11 @@ async function refreshProjects() {
 }
 
 function loadSettings(project: Project) {
-  settings.name = project.name;
-  settings.client_name = project.client_name ?? "";
-  settings.site = project.site ?? "";
-  settings.unit_name = project.unit_name ?? "";
+  const context = projectDisplayContext(project);
+  settings.name = projectDisplayName(project);
+  settings.client_name = context.client;
+  settings.site = context.site;
+  settings.unit_name = context.unit;
   settings.report_title = project.report_title ?? project.name;
   settings.report_fields = [...(project.report_fields ?? REPORT_FIELDS.map(([key]) => key))];
   settings.required_fields = [...(project.validation_rules?.required_fields ?? [])];
@@ -147,7 +151,7 @@ async function submitProject() {
     includeArchived.value = false;
     await refreshProjects();
     await chooseProject(project);
-    message.value = `项目“${project.name}”已创建并选中。`;
+    message.value = `项目“${projectDisplayName(project)}”已创建并选中。`;
   } catch (error) {
     errorMessage.value = `项目创建失败：${error instanceof Error ? error.message : "未知错误"}。`;
   } finally {
@@ -301,14 +305,14 @@ onMounted(refreshProjects);
     <p v-if="projects.length === 0 && !busy" class="empty-copy">暂无匹配项目。请创建第一个项目，或调整搜索条件。</p>
     <div v-else class="project-list" data-testid="project-select">
       <article v-for="project in projects" :key="project.project_id" class="project-card" :class="{ selected: selectedProject?.project_id === project.project_id }">
-        <div><strong>{{ project.name }}</strong><span>{{ project.code }} · {{ project.client_name || "未填写客户" }}</span><small>{{ project.site || "未填写厂区" }} / {{ project.unit_name || "未填写装置" }}</small></div>
+        <div><strong>{{ projectDisplayName(project) }}</strong><span>{{ projectDisplayCode(project) }} · {{ projectDisplayContext(project).client || "未填写客户" }}</span><small>{{ projectDisplayContext(project).site || "未填写厂区" }} / {{ projectDisplayContext(project).unit || "未填写装置" }}</small></div>
         <div><span class="status-badge">{{ projectStatusLabel(project.status) }}</span><button type="button" class="secondary-button" :data-testid="`select-project-${project.code}`" @click="chooseProject(project)">{{ selectedProject?.project_id === project.project_id ? "当前项目" : "选择" }}</button></div>
       </article>
     </div>
 
     <section v-if="selectedProject" class="project-current" aria-label="当前项目">
       <div class="panel-heading compact-heading">
-        <div><p class="eyebrow">当前项目</p><h3>当前：{{ selectedProject.name }}</h3><p>{{ selectedProject.code }} · {{ projectStatusLabel(selectedProject.status) }}</p></div>
+        <div><p class="eyebrow">当前项目</p><h3>当前：{{ projectDisplayName(selectedProject) }}</h3><p>{{ projectDisplayCode(selectedProject) }} · {{ projectStatusLabel(selectedProject.status) }}</p></div>
         <div class="project-actions">
           <button v-if="canManage" type="button" class="secondary-button" @click="showSettings = !showSettings">{{ showSettings ? "收起设置" : "项目设置" }}</button>
           <button type="button" class="secondary-button" @click="downloadManifest">导出项目清单</button>

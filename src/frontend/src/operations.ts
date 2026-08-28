@@ -71,7 +71,7 @@ function reportFilename(response: Response, runId: string, format: "pdf" | "xlsx
   const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
   if (encoded) return decodeURIComponent(encoded.replace(/^"|"$/g, ""));
   const plain = disposition.match(/filename="?([^";]+)"?/i)?.[1];
-  return plain || `synthetic-alarm-analysis-${runId}.${format}`;
+  return plain || `alarm-analysis-${runId}.${format}`;
 }
 
 export async function exportReport(
