@@ -45,6 +45,13 @@ try {
             throw "start.ps1 缺少必要运行标记：$marker"
         }
     }
+
+    $preflight = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "preflight.ps1"), [Text.Encoding]::UTF8)
+    foreach ($marker in @("WindowsBuiltInRole]::Administrator", "关闭管理员 PowerShell")) {
+        if ($preflight.IndexOf($marker, [StringComparison]::Ordinal) -lt 0) {
+            throw "preflight.ps1 缺少管理员权限拒绝标记：$marker"
+        }
+    }
     $restore = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "restore-verify.ps1"), [Text.Encoding]::UTF8)
     foreach ($marker in @("initdb", "pg_ctl", "pg_restore", "127.0.0.1", "criticalTables",
             "Get-DatabaseFacts", "Assert-FactsEqual", "RequireCurrentMatch", "database_facts",

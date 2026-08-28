@@ -57,6 +57,11 @@ try {
     if ($env:OS -ne "Windows_NT" -or -not [Environment]::Is64BitOperatingSystem) {
         throw "仅支持 Windows 11 x64。修复建议：在 64 位 Windows 11 电脑上运行本发布包。"
     }
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        throw "当前 PowerShell 正以管理员身份运行，包内 PostgreSQL 不允许在该权限下启动。修复建议：关闭管理员 PowerShell（若从 VS Code 运行，也需关闭以管理员身份启动的 VS Code），再用普通用户 PowerShell 重新执行预检和启动。"
+    }
 
     $context = Get-RuntimeContext
     Assert-FixedRuntimeConfig $context

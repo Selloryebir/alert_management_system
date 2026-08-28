@@ -8,7 +8,7 @@
 
 首次启动
 --------
-1. 右键打开 PowerShell，切换到本目录。
+1. 用普通用户权限打开 PowerShell（不要选择“以管理员身份运行”），切换到本目录。
 2. 执行：powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\preflight.ps1
 3. 预检通过后执行：powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\start.ps1
 4. 浏览器访问：http://127.0.0.1:8080
