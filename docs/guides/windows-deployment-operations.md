@@ -24,6 +24,8 @@
 - 完整的 Windows x64 ZIP 及同名 `.sha256` 文件；
 - 能访问本机地址的浏览器。
 
+必须使用普通用户权限运行原生包。若 PowerShell 或承载终端的 VS Code 以管理员身份运行，包内 PostgreSQL 会拒绝启动；请完整关闭管理员窗口，再重新打开普通用户 PowerShell。
+
 不要把发布包解压到系统根目录、临时下载目录或会自动同步/清理的目录。推荐由组织确定一个长期固定目录。首次启动生成实例身份后，不要移动整个解压目录；路径和实例身份不一致时，启停、备份和清理会拒绝执行。
 
 原生包不会修改系统信任库、防火墙、机器级环境变量，也不会复用电脑上已有的 PostgreSQL。
@@ -39,6 +41,38 @@
 5. 粘贴可使用鼠标右键或 `Ctrl+V`。命令中的单引号、反斜杠和空格都要保留。
 
 若窗口标题显示“命令提示符”且提示符不是 `PS`，请关闭后按上述步骤重新打开 PowerShell。不要把示例路径原样执行：先在文件资源管理器中找到实际 ZIP，按住 Shift 右键该文件选择“复制文件地址”，再替换代码框中的路径。文件资源管理器顶部的地址栏可用于确认安装目录。
+
+### 2.2 判断实际运行权限与 UAC
+
+没有选择“以管理员身份运行”并不能单独证明 PowerShell 使用普通权限。PowerShell 会继承父进程权限：若 VS Code、Windows Terminal 或其他承载程序已经提升，内部终端仍是管理员权限。若当前账号属于本机 Administrators 组且 Windows UAC 被完全关闭，直接从开始菜单打开的 PowerShell 也会取得完整管理员令牌。包内 PostgreSQL 拒绝在这种令牌下启动。
+
+在准备运行发布包的同一个 PowerShell 窗口执行：
+
+```powershell
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = [Security.Principal.WindowsPrincipal]::new($identity)
+$isAdministrator = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$enableLua = (Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System').EnableLUA
+[pscustomobject]@{ IsAdministrator = $isAdministrator; EnableLUA = $enableLua }
+```
+
+按结果处理：
+
+- `IsAdministrator=False`：当前是普通权限，可以继续预检。
+- `IsAdministrator=True` 且 `EnableLUA=1`：关闭当前 PowerShell；若由 VS Code 或 Windows Terminal 承载，还要完整关闭其全部窗口，再从开始菜单以普通方式重新打开并复查。
+- `IsAdministrator=True` 且 `EnableLUA=0`：UAC 已被完全关闭。对于 Administrators 组账号，即使没有选择“以管理员身份运行”，进程仍可能取得完整管理员令牌。应由电脑管理员按组织策略重新启用 UAC 并重启 Windows，或改用不属于 Administrators 组的标准 Windows 用户运行本包。
+
+经批准需要重新启用 UAC 时，电脑管理员可在管理员 PowerShell 中执行以下机器级修改，然后手工重启 Windows：
+
+```powershell
+Set-ItemProperty `
+  -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' `
+  -Name EnableLUA `
+  -Type DWord `
+  -Value 1
+```
+
+重启后必须在新的普通 PowerShell 中再次执行上述检查，确认 `IsAdministrator=False`，再运行本包。不要修改 `preflight.ps1` 或 PostgreSQL 程序来绕过权限检查。
 
 ## 3. 校验和解压 ZIP
 
