@@ -106,6 +106,46 @@ class ReleaseCandidateValidatorTests(unittest.TestCase):
             ):
                 validator.validate_human_acceptance("approved", state, candidate)
 
+    def test_released_acceptance_allows_later_product_changes(self) -> None:
+        candidate = "a" * 40
+        archive_hash = "b" * 64
+        recorded_at = "2026-08-27T12:00:00+08:00"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            evidence = root / "docs/verification/evidence/M14.md"
+            evidence.parent.mkdir(parents=True)
+            evidence.write_text(
+                (
+                    f"# M14\n\n项目负责人验收声明\nPASS\n{candidate}\n"
+                    f"C:\\验收\\candidate.zip\n{archive_hash}\nproject_owner_current_session\n"
+                    f"人工已验证不存在大问题，符合交付预期。\n{recorded_at}\nv1.0.0\n"
+                ),
+                encoding="utf-8",
+            )
+            state = {
+                "stages": {
+                    "M14": {
+                        "human_acceptance": {
+                            "candidate_commit": candidate,
+                            "validated_archive_path": "C:\\验收\\candidate.zip",
+                            "validated_archive_sha256": archive_hash,
+                            "decision_source": "project_owner_current_session",
+                            "attestation_text": "人工已验证不存在大问题，符合交付预期。",
+                            "final_release_authorized": True,
+                            "result": "PASS",
+                            "recorded_at": recorded_at,
+                            "record_file": "docs/verification/evidence/M14.md",
+                        },
+                        "evidence_files": ["docs/verification/evidence/M14.md"],
+                    }
+                }
+            }
+            with patch.object(validator, "ROOT", root), patch.object(
+                validator, "run", return_value=SimpleNamespace(returncode=0, stdout="")
+            ), patch.object(validator, "validate_post_acceptance_changes") as change_check:
+                validator.validate_human_acceptance("released", state, "c" * 40)
+                change_check.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

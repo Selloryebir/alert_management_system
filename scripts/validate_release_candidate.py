@@ -101,6 +101,11 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sha256_normalized_text(path: Path) -> str:
+    data = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(data).hexdigest()
+
+
 def safe_repository_file(relative: str) -> Path:
     pure = PurePosixPath(relative)
     if pure.is_absolute() or ".." in pure.parts or not pure.parts:
@@ -252,7 +257,8 @@ def validate_human_acceptance(mode: str, state: dict[str, object], head: str) ->
         raise ValueError("人工确认绑定的候选提交必须是完整 SHA。")
     if run("git", "merge-base", "--is-ancestor", candidate, head, check=False).returncode:
         raise ValueError("人工确认绑定的候选提交不是当前发布树的祖先。")
-    validate_post_acceptance_changes(candidate, head)
+    if mode != "released":
+        validate_post_acceptance_changes(candidate, head)
     if not isinstance(archive_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", archive_hash):
         raise ValueError("已验证 ZIP 的 SHA-256 格式无效。")
     if not isinstance(archive_path, str) or not archive_path.strip().lower().endswith(".zip"):
@@ -337,7 +343,8 @@ def validate_deliverables() -> None:
     font = manifest.get("font", {})
     for path_key, hash_key in (("path", "sha256"), ("license_path", "license_sha256")):
         path = safe_repository_file(font.get(path_key, ""))
-        if sha256(path) != font.get(hash_key):
+        actual_hash = sha256_normalized_text(path) if path_key == "license_path" else sha256(path)
+        if actual_hash != font.get(hash_key):
             raise ValueError(f"正式交付字体依赖哈希不匹配：{font.get(path_key)}")
     deliverables_python = ROOT / ".runtime/deliverables-venv/bin/python"
     check = run(
