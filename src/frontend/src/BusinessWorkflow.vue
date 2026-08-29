@@ -26,6 +26,8 @@ import {
 import type { ImportBatch } from "./imports";
 import { dashboardCsvRows, donutSegments, encodeCsv, trendChartPoints } from "./dashboardPresentation";
 
+type BusinessSection = "all" | "dashboard" | "analysis" | "alarms" | "reports";
+
 const props = defineProps<{
   currentBatch?: ImportBatch;
   batches: ImportBatch[];
@@ -34,6 +36,7 @@ const props = defineProps<{
   canOperate?: boolean;
   canManage?: boolean;
   systemAdmin?: boolean;
+  activeSection?: BusinessSection;
 }>();
 const emit = defineEmits<{
   demoReset: [];
@@ -113,6 +116,14 @@ const trendPoints = computed(() => trendChartPoints(dashboard.value?.trend ?? []
 const trendPolyline = computed(() => trendPoints.value.map((point) => `${point.x},${point.y}`).join(" "));
 const trendMaximum = computed(() => Math.max(...(dashboard.value?.trend ?? []).map((point) => point.count), 0));
 const noiseSegments = computed(() => donutSegments(dashboard.value?.noise_type_counts ?? {}));
+const currentSection = computed(() => props.activeSection ?? "all");
+const sectionHeading = computed(() => ({
+  all: ["分析工作台", "报警业务闭环"],
+  dashboard: ["态势总览", "Dashboard"],
+  analysis: ["规则与关联", "分析任务"],
+  alarms: ["协同闭环", "报警处置"],
+  reports: ["成果沉淀", "报告与审计"],
+}[currentSection.value]));
 
 const lastPage = computed(() => {
   if (!alarmPage.value || alarmPage.value.total === 0) return 0;
@@ -404,16 +415,17 @@ function exportDashboardData() {
   <section id="business-workflow" class="business-panel" aria-labelledby="business-title">
     <div class="panel-heading">
       <div>
-        <p class="eyebrow">分析与审核</p>
-        <h2 id="business-title">报警业务闭环</h2>
+        <p class="eyebrow">{{ sectionHeading[0] }}</p>
+        <h2 id="business-title">{{ sectionHeading[1] }}</h2>
       </div>
     </div>
 
-    <p v-if="actionableBatches.length === 0" class="empty-copy" data-testid="empty-state">
-      尚无可分析批次。请先在导入向导中确认一个合成数据文件。
-    </p>
+    <div v-show="currentSection === 'all' || currentSection === 'analysis'">
+      <p v-if="actionableBatches.length === 0" class="empty-copy" data-testid="empty-state">
+        尚无可分析批次。请先在“数据导入”中确认报警文件。
+      </p>
 
-    <section v-else class="analysis-parameters" aria-labelledby="analysis-parameters-title">
+      <section v-else class="analysis-parameters" aria-labelledby="analysis-parameters-title">
       <div class="panel-heading compact-heading">
         <div>
           <p class="eyebrow">hybrid-v2 推荐预设</p>
@@ -440,9 +452,9 @@ function exportDashboardData() {
           <span>持续 P1 报警必须已有确认时间才命中</span>
         </label>
       </div>
-    </section>
+      </section>
 
-    <div v-if="actionableBatches.length > 0" class="batch-actions" aria-label="可分析批次">
+      <div v-if="actionableBatches.length > 0" class="batch-actions" aria-label="可分析批次">
       <article v-for="batch in actionableBatches" :key="batch.batch_id" class="batch-action-card">
         <div>
           <strong>{{ batch.file_name }}</strong>
@@ -457,6 +469,7 @@ function exportDashboardData() {
           {{ actionLabel(batch) }}
         </button>
       </article>
+      </div>
     </div>
 
     <p v-if="businessError" class="request-error" role="alert" data-testid="service-error">
@@ -464,8 +477,12 @@ function exportDashboardData() {
     </p>
     <p v-if="businessMessage" class="import-message" role="status">{{ businessMessage }}</p>
 
+    <p v-if="(currentSection === 'dashboard' || currentSection === 'alarms') && !dashboard" class="workspace-empty">
+      暂无已加载的分析结果。请前往“分析任务”选择批次并完成或加载分析。
+    </p>
+
     <template v-if="analysis?.status === 'COMPLETED' && dashboard">
-      <section class="dashboard" aria-labelledby="dashboard-title">
+      <section v-show="currentSection === 'all' || currentSection === 'dashboard'" class="dashboard" aria-labelledby="dashboard-title">
         <div class="panel-heading compact-heading">
           <div>
             <p class="eyebrow">固定事实源统计</p>
@@ -498,15 +515,15 @@ function exportDashboardData() {
             <div v-if="dashboard.trend.length">
               <svg class="trend-chart" viewBox="0 0 600 220" role="img" aria-labelledby="trend-chart-title trend-chart-description">
                 <title id="trend-chart-title">每小时报警数量趋势</title>
-                <desc id="trend-chart-description">横轴按时间先后排列，纵轴从零到 {{ trendMaximum }} 条报警。</desc>
+                <desc id="trend-chart-description">横轴按时间先后排列，纵轴从零到 {{ trendMaximum }} 条报警，以连续折线展示 {{ dashboard.trend.length }} 个时间点。</desc>
+                <line x1="32" y1="32" x2="568" y2="32" class="chart-grid" />
+                <line x1="32" y1="84" x2="568" y2="84" class="chart-grid" />
+                <line x1="32" y1="136" x2="568" y2="136" class="chart-grid" />
                 <line x1="32" y1="188" x2="568" y2="188" class="chart-axis" />
                 <line x1="32" y1="32" x2="32" y2="188" class="chart-axis" />
                 <text x="8" y="38" class="chart-label">{{ trendMaximum }}</text>
                 <text x="18" y="192" class="chart-label">0</text>
-                <polyline :points="trendPolyline" class="trend-line" />
-                <g v-for="point in trendPoints" :key="point.bucket">
-                  <circle :cx="point.x" :cy="point.y" r="4" class="trend-point"><title>{{ point.bucket }}：{{ point.count }} 条</title></circle>
-                </g>
+                <polyline :points="trendPolyline" class="trend-line" vector-effect="non-scaling-stroke" />
               </svg>
               <p class="chart-range"><span>{{ dashboard.trend[0]?.bucket }}</span><span>时间</span><span>{{ dashboard.trend.at(-1)?.bucket }}</span></p>
               <details class="chart-data"><summary>查看小时趋势数据表</summary><div class="table-wrap"><table><caption>每小时报警数量</caption><thead><tr><th scope="col">时间</th><th scope="col">报警数（条）</th></tr></thead><tbody><tr v-for="point in dashboard.trend" :key="point.bucket"><td>{{ point.bucket }}</td><td>{{ point.count }}</td></tr></tbody></table></div></details>
@@ -568,7 +585,7 @@ function exportDashboardData() {
         </div>
       </section>
 
-      <section class="alarm-browser" aria-labelledby="alarm-list-title">
+      <section v-show="currentSection === 'all' || currentSection === 'alarms'" class="alarm-browser" aria-labelledby="alarm-list-title">
         <h3 id="alarm-list-title">报警列表</h3>
         <form class="filter-grid" @submit.prevent="refreshAlarms(0)">
           <label>优先级<select v-model="filters.priority"><option value="">全部</option><option v-for="value in ['P1','P2','P3','P4']" :key="value" :value="value">{{ priorityLabel(value) }}</option></select></label>
@@ -600,7 +617,7 @@ function exportDashboardData() {
         </div>
       </section>
 
-      <article v-if="selectedAlarm" class="alarm-detail" data-testid="alarm-detail">
+      <article v-if="selectedAlarm" v-show="currentSection === 'all' || currentSection === 'alarms'" class="alarm-detail" data-testid="alarm-detail">
         <div class="panel-heading compact-heading"><div><p class="eyebrow">报警详情</p><h3>{{ selectedAlarm.tag }}</h3></div><span class="status-badge" :class="`disposition-${selectedAlarm.disposition.status.toLowerCase()}`">{{ zh(selectedAlarm.disposition.status) }}</span></div>
         <dl class="detail-grid">
           <div><dt>源行</dt><dd data-testid="detail-source-row">{{ selectedAlarm.source_row }}</dd></div><div><dt>发生时间</dt><dd>{{ selectedAlarm.event_time }}</dd></div>
@@ -619,7 +636,7 @@ function exportDashboardData() {
 
         <section class="chain-section" data-testid="detail-event-chains">
           <h4>相关事件链</h4>
-          <p class="association-warning">以下内容是关联建议，不代表已确认根因。</p>
+          <p class="association-warning">系统按时间窗口、状态转移和规则证据呈现可追溯关联线索，支持快速定位重点链路。</p>
           <p v-if="selectedAlarm.event_chains.length === 0" class="empty-copy">该报警未关联事件链。</p>
           <article v-for="chain in selectedAlarm.event_chains" :key="chain.chain_id" class="chain-card" data-testid="event-chain">
             <strong>{{ chain.association_rule }}</strong><p>{{ chain.start_time }} 至 {{ chain.end_time }}</p><p>{{ localizedEvidence(chain.explanation) }}</p>
@@ -670,9 +687,9 @@ function exportDashboardData() {
           </div>
         </section>
       </article>
-      <p v-if="detailBusy" class="import-message" role="status">正在加载或更新报警详情…</p>
+      <p v-if="detailBusy" v-show="currentSection === 'all' || currentSection === 'alarms'" class="import-message" role="status">正在加载或更新报警详情…</p>
     </template>
 
-    <ReviewOperations :run-id="analysis?.status === 'COMPLETED' ? analysis.run_id : undefined" :project-id="projectId" :can-manage="canManage" :system-admin="systemAdmin" @report-downloaded="emit('reportDownloaded')" @demo-reset="handleDemoReset" />
+    <ReviewOperations v-show="currentSection === 'all' || currentSection === 'reports'" :run-id="analysis?.status === 'COMPLETED' ? analysis.run_id : undefined" :project-id="projectId" :can-manage="canManage" :system-admin="systemAdmin" @report-downloaded="emit('reportDownloaded')" @demo-reset="handleDemoReset" />
   </section>
 </template>

@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { test } from "./test-fixtures";
+import { openWorkspace, test } from "./test-fixtures";
 
 function requiredEnvironment(name: string): string {
   const value = process.env[name]?.trim();
@@ -31,7 +31,7 @@ async function loginThroughPage(page: Page, password: string): Promise<void> {
 }
 
 async function openBackupPanel(page: Page): Promise<void> {
-  await page.getByText("数据与备份", { exact: true }).click();
+  await openWorkspace(page, "backup");
   await expect(page.getByRole("heading", { name: "数据容量与恢复点" })).toBeVisible();
   await expect(page.getByLabel("数据与备份摘要")).toBeVisible();
   await expect(page.getByText("Windows 本机原生部署", { exact: true })).toBeVisible();
@@ -54,6 +54,7 @@ test("发布候选首次登录通过页面改密、新建项目并查看初始�
   await passwordForm.getByLabel("再次输入新密码").fill(newPassword);
   await passwordForm.getByRole("button", { name: "保存新密码" }).click();
   await expect(page.getByText("密码已更新，其他旧会话已失效。", { exact: true })).toBeVisible();
+  await openWorkspace(page, "projects");
   await expect(page.getByRole("heading", { name: "选择当前工作项目" })).toBeVisible();
 
   await page.getByRole("button", { name: "新建项目" }).click();

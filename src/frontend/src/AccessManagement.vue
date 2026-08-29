@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 
 import {
   createUser,
@@ -14,7 +14,7 @@ import {
   type ProjectMember,
   type UserAccount,
 } from "./auth";
-import type { Project } from "./projects";
+import { projectDisplayName, type Project } from "./projects";
 
 const props = defineProps<{ user: CurrentUser; project?: Project }>();
 
@@ -140,16 +140,22 @@ async function removeMember(member: ProjectMember) {
 }
 
 watch(() => props.project?.project_id, loadMembers);
+onMounted(() => {
+  void loadUsers();
+  void loadMembers();
+});
 </script>
 
 <template>
-  <details v-if="systemAdmin || (project && canManageMembers)" class="access-panel" @toggle="($event.currentTarget as HTMLDetailsElement).open && (loadUsers(), loadMembers())">
-    <summary><strong>账号与项目权限</strong></summary>
+  <section v-if="systemAdmin || (project && canManageMembers)" class="access-panel" aria-label="账号与项目权限">
     <p v-if="message" class="import-message" role="status">{{ message }}</p>
     <p v-if="errorMessage" class="request-error" role="alert">{{ errorMessage }}</p>
 
     <section v-if="systemAdmin" aria-labelledby="users-title">
       <div class="panel-heading compact-heading"><div><p class="eyebrow">系统管理</p><h3 id="users-title">账号管理</h3></div><button type="button" @click="showCreate = !showCreate">{{ showCreate ? "取消新建" : "新建账号" }}</button></div>
+      <aside v-if="showCreate && newUser.global_role === 'SYSTEM_ADMIN'" class="admin-boundary-note">
+        新建管理员账号前，请确认：分析结论来自规则证据与关联模型，应由授权人员结合现场工况形成正式处置结论；管理员可查看全部项目、审计记录和系统运维信息。
+      </aside>
       <form v-if="showCreate" class="access-form" @submit.prevent="submitUser">
         <label>账号<input v-model="newUser.username" autocomplete="off" pattern="[a-z0-9._-]{3,50}" required /></label>
         <label>展示名<input v-model="newUser.display_name" maxlength="100" required /></label>
@@ -162,7 +168,7 @@ watch(() => props.project?.project_id, loadMembers);
     </section>
 
     <section v-if="project && canManageMembers" aria-labelledby="members-title">
-      <div class="panel-heading compact-heading"><div><p class="eyebrow">当前项目</p><h3 id="members-title">{{ project.name }} · 成员职责</h3></div><button type="button" class="secondary-button" :disabled="busy" @click="loadMembers">刷新成员</button></div>
+      <div class="panel-heading compact-heading"><div><p class="eyebrow">当前项目</p><h3 id="members-title">{{ projectDisplayName(project) }} · 成员职责</h3></div><button type="button" class="secondary-button" :disabled="busy" @click="loadMembers">刷新成员</button></div>
       <form v-if="systemAdmin" class="access-form" @submit.prevent="saveMember()">
         <label>账号
           <select v-model="memberUserId" required><option value="">请选择账号</option><option v-for="item in users.filter((value) => value.status === 'ACTIVE')" :key="item.user_id" :value="item.user_id">{{ item.display_name }}（{{ item.username }}）</option></select>
@@ -173,5 +179,5 @@ watch(() => props.project?.project_id, loadMembers);
       <p v-else class="empty-copy">项目负责人可调整或移除现有成员；新增账号并加入项目由系统管理员完成。</p>
       <div v-if="members.length" class="table-wrap"><table data-testid="member-table"><thead><tr><th>账号</th><th>展示名</th><th>项目职责</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="member in members" :key="member.user_id"><td>{{ member.username }}</td><td>{{ member.display_name }}</td><td>{{ member.project_role === 'MANAGER' ? '项目负责人' : '分析人员' }}</td><td>{{ member.status === 'ACTIVE' ? '已启用' : '已停用' }}</td><td><button type="button" class="secondary-button" :disabled="busy" @click="saveMember(member.user_id, member.project_role === 'MANAGER' ? 'ANALYST' : 'MANAGER')">改为{{ member.project_role === 'MANAGER' ? '分析人员' : '项目负责人' }}</button> <button type="button" class="danger-button" :disabled="busy" @click="removeMember(member)">移除</button></td></tr></tbody></table></div>
     </section>
-  </details>
+  </section>
 </template>

@@ -84,3 +84,12 @@ export async function injectNextFetchFailure(
     };
   }, { suffix: pathSuffix, responseBody: body });
 }
+
+export async function openWorkspace(
+  page: Page,
+  workspace: "dashboard" | "import" | "analysis" | "alarms" | "reports" | "projects" | "permissions" | "backup" | "status",
+): Promise<void> {
+  const tab = page.getByTestId(`workspace-tab-${workspace}`);
+  await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+}

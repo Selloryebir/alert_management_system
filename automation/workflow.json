@@ -362,6 +362,29 @@
           "python3 scripts/validate_release_candidate.py"
         ]
       }
+    },
+    {
+      "id": "M15",
+      "name": "产品工作台与工业化视觉",
+      "depends_on": ["M14"],
+      "references": [
+        "docs/planning/M15-product-workspace.md",
+        "docs/product/requirements.md",
+        "docs/product/source-coverage.md"
+      ],
+      "acceptance": {
+        "criteria": [
+          "Dashboard、导入、分析、处置、报告、项目、权限、备份与状态通过独立页签访问且权限边界不退化",
+          "日常业务页采用面向分析价值的产品叙事，必要能力边界集中在管理员入口",
+          "大规模趋势图不以逐点大散点遮挡折线，桌面与窄屏保持工业工作台层级和可读性"
+        ],
+        "commands": [
+          "npm --prefix src/frontend run lint",
+          "npm --prefix src/frontend test -- --run",
+          "npm --prefix src/frontend run build",
+          "python scripts/validate_automation.py"
+        ]
+      }
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { expect, type Page, type APIResponse, type Response } from "@playwright/test";
 import path from "node:path";
-import { injectNextFetchFailure, test } from "./test-fixtures";
+import { injectNextFetchFailure, openWorkspace, test } from "./test-fixtures";
 
 const repositoryRoot = path.resolve(__dirname, "../..");
 const mode = process.env.E2E_MODE ?? "smoke";
@@ -26,7 +26,9 @@ async function responseJson<T>(response: APIResponse | Response): Promise<T> {
 }
 
 async function importAndAnalyze(page: Page): Promise<{ batchId: string; runId: string }> {
+  await openWorkspace(page, "projects");
   await page.getByTestId(`select-project-${projectCode}`).click();
+  await openWorkspace(page, "import");
   await expect(page.getByTestId("file-input")).toBeEnabled();
   await page.getByTestId("file-input").setInputFiles(dataset);
   const previewResponse = page.waitForResponse(
@@ -45,6 +47,7 @@ async function importAndAnalyze(page: Page): Promise<{ batchId: string; runId: s
   const confirmed = await responseJson<{ status: string }>(await confirmResponse);
   expect(confirmed.status).toBe("IMPORTED");
 
+  await openWorkspace(page, "analysis");
   const analysisResponse = page.waitForResponse(
     (response) => response.url().includes(`/api/v1/imports/${preview.batch_id}/analyses`)
       && response.request().method() === "POST",
@@ -98,6 +101,7 @@ test("浏览器完成导入、分析、详情、事件链和人工处置闭环",
     await expect(page.getByTestId(`dashboard-cause-${name}`)).toContainText(String(value));
   }
 
+  await openWorkspace(page, "alarms");
   await page.getByTestId("filter-noise").selectOption("PERSISTENT");
   await page.getByTestId("filter-cause").selectOption("MAINTENANCE_TEST");
   await page.getByRole("button", { name: "应用筛选" }).click();
@@ -146,12 +150,15 @@ test("页面显示算法不可用的可重试提示", async ({ page }) => {
     message: "算法服务不可用，可重试",
   });
 
+  await openWorkspace(page, "projects");
   await page.getByTestId(`select-project-${projectCode}`).click();
+  await openWorkspace(page, "import");
   await expect(page.getByTestId("file-input")).toBeEnabled();
   await page.getByTestId("file-input").setInputFiles(dataset);
   await page.getByTestId("preview-button").click();
   await expect(page.getByTestId("preview-summary")).toContainText("300");
   await page.getByTestId("confirm-import").click();
+  await openWorkspace(page, "analysis");
   await page.getByTestId("start-analysis").click();
   await expect(page.getByTestId("service-error")).toContainText("算法服务不可用");
   await expect(page.getByTestId("service-error")).toContainText("重试");

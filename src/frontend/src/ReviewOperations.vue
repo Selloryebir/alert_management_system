@@ -78,15 +78,15 @@ async function loadAudit(page = 0) {
 async function handleReset() {
   resetError.value = "";
   resetMessage.value = "";
-  if (resetConfirmation.value !== "RESET_DEMO") {
-    resetError.value = "请输入精确确认值 RESET_DEMO 后再复位。";
+  if (resetConfirmation.value !== "RESET_DATA") {
+    resetError.value = "请输入精确确认值 RESET_DATA 后再重置。";
     return;
   }
   resetBusy.value = true;
   try {
-    const result = await resetDemo(resetConfirmation.value);
+    const result = await resetDemo("RESET_DEMO");
     const deleted = Object.values(result.deleted_counts).reduce((total, count) => total + count, 0);
-    resetMessage.value = `演示数据已复位（${result.completed_at}；共清理 ${deleted} 条业务与审计记录）。`;
+    resetMessage.value = `业务数据已重置（${result.completed_at}；共清理 ${deleted} 条业务与审计记录）。`;
     resetConfirmation.value = "";
     auditPage.value = undefined;
     auditError.value = "";
@@ -94,7 +94,7 @@ async function handleReset() {
     reportError.value = "";
     emit("demoReset");
   } catch (error) {
-    resetError.value = `演示复位失败：${error instanceof Error ? error.message : "未知错误"}。现有页面状态已保留，请排除进行中的分析或服务故障后重试。`;
+    resetError.value = `业务数据重置失败：${error instanceof Error ? error.message : "未知错误"}。现有页面状态已保留，请排除进行中的分析或服务故障后重试。`;
   } finally {
     resetBusy.value = false;
   }
@@ -106,15 +106,15 @@ async function handleReset() {
     <div class="panel-heading compact-heading">
       <div>
         <p class="eyebrow">报告与追溯</p>
-        <h3 id="review-operations-title">报告、审计与演示数据维护</h3>
+        <h3 id="review-operations-title">分析成果与全程追溯</h3>
       </div>
-      <p class="demo-operator">操作身份取自当前登录账号</p>
+      <p class="operator-badge">操作身份取自当前登录账号</p>
     </div>
 
     <div class="operations-grid">
       <section class="operation-card" aria-labelledby="report-title">
         <h4 id="report-title">整次分析报告</h4>
-        <p class="empty-copy">导出完整已完成分析；使用示例数据时，报告会明确标注合成数据声明。</p>
+        <p class="empty-copy">导出完整分析成果，沉淀趋势、分类、处置、关联链路与审计记录。</p>
         <div class="operation-actions">
           <button type="button" data-testid="report-pdf" :disabled="reportBusy || !runId" @click="downloadReport('pdf')">
             {{ reportBusy ? "生成中…" : "下载 PDF" }}
@@ -167,15 +167,15 @@ async function handleReset() {
     </div>
 
     <section v-if="systemAdmin" class="danger-zone" aria-labelledby="reset-title">
-      <h4 id="reset-title">危险操作：复位演示数据</h4>
-      <p>这会清空系统内全部演示项目的导入、分析、处置和审计数据，而不只是当前项目。失败时页面不会伪装成功或清除当前状态。</p>
+      <h4 id="reset-title">危险操作：重置全部业务数据</h4>
+      <p>这会清空系统内全部项目的导入、分析、处置和审计数据，并恢复初始项目，而不只是当前项目。失败时页面不会清除当前状态。</p>
       <div class="reset-grid">
         <label>
-          输入 RESET_DEMO 精确确认
+          输入 RESET_DATA 精确确认
           <input v-model="resetConfirmation" data-testid="reset-confirmation" :disabled="resetBusy" autocomplete="off" />
         </label>
         <button type="button" class="danger-button" data-testid="reset-button" :disabled="resetBusy" @click="handleReset">
-          {{ resetBusy ? "复位中…" : "复位全部演示数据" }}
+          {{ resetBusy ? "重置中…" : "重置全部业务数据" }}
         </button>
       </div>
       <p v-if="resetError" class="request-error compact-message" role="alert" data-testid="reset-message">{{ resetError }}</p>

@@ -2,7 +2,7 @@ import { expect, type Page, type APIResponse, type Response } from "@playwright/
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { test } from "./test-fixtures";
+import { openWorkspace, test } from "./test-fixtures";
 import { captureVisualState } from "./visual-audit";
 
 const repositoryRoot = path.resolve(__dirname, "../..");
@@ -58,6 +58,7 @@ test("真实业务闭环生成桌面与窄屏视觉清单", async ({ page }) => 
   await passwordForm.getByLabel("新密码", { exact: true }).fill(newPassword);
   await passwordForm.getByLabel("再次输入新密码").fill(newPassword);
   await passwordForm.getByRole("button", { name: "保存新密码" }).click();
+  await openWorkspace(page, "projects");
   await expect(page.getByRole("heading", { name: "选择当前工作项目" })).toBeVisible();
 
   await page.getByRole("button", { name: "新建项目" }).click();
@@ -71,14 +72,15 @@ test("真实业务闭环生成桌面与窄屏视觉清单", async ({ page }) => 
   await expect(page.getByTestId(`select-project-${projectCode}`)).toHaveText("当前项目");
   await captureVisualState(page, "02-project", page.getByLabel("当前项目"));
 
-  await page.getByText("账号与项目权限", { exact: true }).click();
+  await openWorkspace(page, "permissions");
   await expect(page.getByRole("heading", { name: "账号管理" })).toBeVisible();
   await captureVisualState(page, "03-accounts-members", page.getByRole("heading", { name: "账号管理" }));
 
-  await page.getByText("数据与备份", { exact: true }).click();
+  await openWorkspace(page, "backup");
   await expect(page.getByLabel("数据与备份摘要")).toBeVisible();
   await captureVisualState(page, "04-backup-status", page.getByRole("heading", { name: "数据容量与恢复点" }));
 
+  await openWorkspace(page, "import");
   const invalid = await previewFile(page, invalidDataset);
   expect(invalid.status).toBe("REJECTED");
   await expect(page.getByTestId("import-error-dialog")).toBeVisible();
@@ -93,6 +95,7 @@ test("真实业务闭环生成桌面与窄屏视觉清单", async ({ page }) => 
   const confirmResponse = page.waitForResponse((item) => item.url().includes(`/api/v1/imports/${ready.batch_id}/confirm`));
   await page.getByTestId("confirm-import").click();
   expect((await responseJson<{ status: string }>(await confirmResponse)).status).toBe("IMPORTED");
+  await openWorkspace(page, "analysis");
   await captureVisualState(page, "07-imported-analysis-entry", page.getByRole("heading", { name: "本次分析参数" }));
 
   const analysisResponse = page.waitForResponse((item) =>
@@ -103,6 +106,7 @@ test("真实业务闭环生成桌面与窄屏视觉清单", async ({ page }) => 
   await captureVisualState(page, "08-dashboard-overview", page.getByRole("heading", { name: "分析总览" }));
   await captureVisualState(page, "09-dashboard-trend-ratio", page.getByRole("img", { name: "每小时报警数量趋势" }));
 
+  await openWorkspace(page, "alarms");
   await page.getByTestId("filter-cause").selectOption("EQUIPMENT_FAULT");
   await page.getByRole("button", { name: "应用筛选" }).click();
   await expect(page.getByTestId("alarm-row-222")).toBeVisible();
@@ -126,8 +130,9 @@ test("真实业务闭环生成桌面与窄屏视觉清单", async ({ page }) => 
   await expect(page.getByTestId("disposition-history")).toContainText("待处理 → 处理中");
   await captureVisualState(page, "12-classification-disposition", page.getByTestId("alarm-detail"));
 
-  await expect(page.getByRole("heading", { name: "报告、审计与演示数据维护" })).toBeVisible();
+  await openWorkspace(page, "reports");
+  await expect(page.getByRole("heading", { name: "报告与审计", exact: true })).toBeVisible();
   await page.getByTestId("audit-refresh").click();
   await expect(page.getByTestId("audit-table")).toBeVisible();
-  await captureVisualState(page, "13-report-audit-reset", page.getByRole("heading", { name: "报告、审计与演示数据维护" }));
+  await captureVisualState(page, "13-report-audit-reset", page.getByRole("heading", { name: "报告与审计", exact: true }));
 });

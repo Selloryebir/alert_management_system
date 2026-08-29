@@ -56,7 +56,7 @@ const health = {
 };
 
 describe("M10 全中文项目化入口", () => {
-  it("显示固定合成数据声明、六步引导和中文健康状态", async () => {
+  it("显示产品能力叙事、六步引导、独立页签和中文健康状态", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === "/api/v1/health") return { ok: true, json: async () => health } as Response;
@@ -66,10 +66,16 @@ describe("M10 全中文项目化入口", () => {
     render(App);
 
     expect(screen.getByRole("heading", { name: "报警管理系统" })).toBeInTheDocument();
-    expect(screen.getByText("仅使用合成数据")).toBeInTheDocument();
+    expect(screen.getByText(/推动分析、处置与报告协同闭环/)).toBeInTheDocument();
+    expect(screen.queryByText("仅使用合成数据")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("workspace-tab-dashboard")).toHaveAttribute("aria-selected", "true");
+    expect(document.querySelector(".status-panel")).not.toBeVisible();
     for (let index = 1; index <= 6; index += 1) {
       expect(await screen.findByTestId(`onboarding-step-${index}`)).toBeInTheDocument();
     }
+    await fireEvent.click(await screen.findByTestId("workspace-tab-status"));
+    expect(screen.getByTestId("workspace-tab-status")).toHaveAttribute("aria-selected", "true");
+    expect(document.querySelector(".status-panel")).toBeVisible();
     await waitFor(() => expect(screen.getAllByText("正常")).toHaveLength(3));
     expect(screen.queryByText("UP")).not.toBeInTheDocument();
   });
@@ -139,6 +145,7 @@ describe("M10 全中文项目化入口", () => {
       expect((request?.[1]?.headers as Headers).get("Accept")).toBe("application/json");
       expect(request?.[1]?.credentials).toBe("same-origin");
     });
+    await fireEvent.click(screen.getByTestId("workspace-tab-import"));
     await fireEvent.change(screen.getByTestId("file-input"), { target: { files: [new File(["x"], "alarm.csv", { type: "text/csv" })] } });
     await fireEvent.click(screen.getByTestId("preview-button"));
 
@@ -186,6 +193,7 @@ describe("M10 全中文项目化入口", () => {
       throw new Error(`未处理请求 ${url}`);
     }));
     render(App);
+    await fireEvent.click(await screen.findByTestId("workspace-tab-import"));
     await waitFor(() => expect(screen.getByTestId("file-input")).toBeEnabled());
     await fireEvent.change(screen.getByTestId("file-input"), { target: { files: [new File(["x"], "invalid.csv", { type: "text/csv" })] } });
     await fireEvent.click(screen.getByTestId("preview-button"));
@@ -267,7 +275,7 @@ describe("M10 全中文项目化入口", () => {
     render(ResetHost);
     expect(await screen.findByText(`当前：${project.name}`)).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "模拟演示复位" }));
-    expect(await screen.findByText(`当前：${defaultProject.name}`)).toBeInTheDocument();
+    expect(await screen.findByText("当前：默认分析项目")).toBeInTheDocument();
     expect(screen.queryByText(`当前：${project.name}`)).not.toBeInTheDocument();
   });
 });
