@@ -1,7 +1,7 @@
 import { expect, type APIResponse, type Page, type Response } from "@playwright/test";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { injectNextFetchFailure, test } from "./test-fixtures";
+import { injectNextFetchFailure, openWorkspace, test } from "./test-fixtures";
 
 test.setTimeout(600_000);
 
@@ -66,6 +66,7 @@ async function assertSuccessfulWithoutBody(
 }
 
 async function ensureProject(page: Page): Promise<void> {
+  await openWorkspace(page, "projects");
   if (projectCode === "DEFAULT-DEMO") return;
   await expect(page.getByRole("heading", { name: "选择当前工作项目" })).toBeVisible();
   await expect(page.getByTestId("project-select")).toBeVisible();
@@ -85,6 +86,7 @@ async function ensureProject(page: Page): Promise<void> {
 async function importAndAnalyze(page: Page): Promise<string> {
   await ensureProject(page);
   await page.getByTestId(`select-project-${projectCode}`).click();
+  await openWorkspace(page, "import");
   await expect(page.getByTestId("file-input")).toBeEnabled();
   await page.getByTestId("file-input").setInputFiles(dataset);
   const previewPromise = page.waitForResponse(
@@ -102,6 +104,7 @@ async function importAndAnalyze(page: Page): Promise<string> {
   await page.getByTestId("confirm-import").click();
   expect((await responseJson<{ status: string }>(await confirmPromise)).status).toBe("IMPORTED");
 
+  await openWorkspace(page, "analysis");
   const analysisPromise = page.waitForResponse(
     (response) => response.url().includes(`/api/v1/imports/${preview.batch_id}/analyses`)
       && response.request().method() === "POST",
@@ -119,6 +122,7 @@ async function importAndAnalyze(page: Page): Promise<string> {
 }
 
 async function openSyntheticChainAlarm(page: Page): Promise<void> {
+  await openWorkspace(page, "alarms");
   await page.getByTestId("filter-cause").selectOption("EQUIPMENT_FAULT");
   await page.getByRole("button", { name: "应用筛选" }).click();
   await page.getByTestId("alarm-row-222").click();
@@ -175,6 +179,7 @@ async function downloadReport(
   format: "pdf" | "xlsx",
   outputDirectory: string,
 ): Promise<ReportMetric> {
+  await openWorkspace(page, "reports");
   mkdirSync(outputDirectory, { recursive: true });
   const responsePromise = page.waitForResponse(
     (response) => response.url().endsWith(`/api/v1/analyses/${runId}/reports/${format}`)
@@ -251,6 +256,7 @@ async function assertReportFailureKeepsState(page: Page, runId: string): Promise
 }
 
 async function resetDemo(page: Page, injectFailure: boolean): Promise<ResetResponse> {
+  await openWorkspace(page, "reports");
   await expect(page.getByText("操作身份取自当前登录账号", { exact: true })).toBeVisible();
   await page.getByTestId("reset-confirmation").fill("RESET_DEMO");
   if (injectFailure) {
