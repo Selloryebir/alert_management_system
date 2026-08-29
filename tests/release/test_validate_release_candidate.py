@@ -146,6 +146,56 @@ class ReleaseCandidateValidatorTests(unittest.TestCase):
                 validator.validate_human_acceptance("released", state, "c" * 40)
                 change_check.assert_not_called()
 
+    def test_released_tag_allows_remote_main_to_advance(self) -> None:
+        release = "a" * 40
+        remote_main = "b" * 40
+        remote_dev = "c" * 40
+        remote = "\n".join(
+            (
+                f"{remote_main}\trefs/heads/main",
+                f"{remote_dev}\trefs/heads/dev",
+                f"{release}\trefs/tags/v1.0.0",
+                f"{release}\trefs/tags/v1.0.0^{{}}",
+            )
+        )
+
+        def fake_run(*args: str, **kwargs: object) -> SimpleNamespace:
+            if args[:3] == ("git", "cat-file", "-t"):
+                return SimpleNamespace(returncode=0, stdout="tag\n")
+            if args[:3] == ("git", "rev-parse", "v1.0.0^{}"):
+                return SimpleNamespace(returncode=0, stdout=release + "\n")
+            if args[:2] == ("git", "ls-remote"):
+                return SimpleNamespace(returncode=0, stdout=remote)
+            if args[:3] == ("git", "merge-base", "--is-ancestor"):
+                self.assertEqual(release, args[3])
+                self.assertIn(args[4], {remote_main, remote_dev})
+                return SimpleNamespace(returncode=0, stdout="")
+            self.fail(f"未预期的命令：{args}")
+
+        with patch.object(validator, "run", side_effect=fake_run):
+            validator.validate_published_tag(release, require_head=False)
+
+    def test_post_main_still_requires_exact_remote_main(self) -> None:
+        release = "a" * 40
+        remote_main = "b" * 40
+        remote = "\n".join(
+            (
+                f"{remote_main}\trefs/heads/main",
+                f"{'c' * 40}\trefs/heads/dev",
+                f"{release}\trefs/tags/v1.0.0",
+                f"{release}\trefs/tags/v1.0.0^{{}}",
+            )
+        )
+        results = (
+            SimpleNamespace(returncode=0, stdout="tag\n"),
+            SimpleNamespace(returncode=0, stdout=release + "\n"),
+            SimpleNamespace(returncode=0, stdout=release + "\n"),
+            SimpleNamespace(returncode=0, stdout=remote),
+        )
+        with patch.object(validator, "run", side_effect=results):
+            with self.assertRaisesRegex(ValueError, "远端 main 未绑定"):
+                validator.validate_published_tag(release, require_head=True)
+
 
 if __name__ == "__main__":
     unittest.main()

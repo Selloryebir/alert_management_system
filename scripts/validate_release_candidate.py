@@ -399,8 +399,18 @@ def validate_published_tag(release_commit: str, require_head: bool) -> None:
         raise ValueError("post-main 校验必须在精确 main 发布提交上执行。")
     remote = run("git", "ls-remote", "origin", "refs/heads/main", "refs/heads/dev", f"refs/tags/{RELEASE_TAG}", f"refs/tags/{RELEASE_TAG}^{{}}").stdout
     refs = {line.split("\t", 1)[1]: line.split("\t", 1)[0] for line in remote.splitlines() if "\t" in line}
-    if refs.get("refs/heads/main") != release_commit or refs.get(f"refs/tags/{RELEASE_TAG}^{{}}") != release_commit:
-        raise ValueError("远端 main 或正式 peeled tag 未绑定记录的发布提交。")
+    remote_main = refs.get("refs/heads/main")
+    if refs.get(f"refs/tags/{RELEASE_TAG}^{{}}") != release_commit:
+        raise ValueError("远端正式 peeled tag 未绑定记录的发布提交。")
+    if not remote_main:
+        raise ValueError("远端 main 不存在。")
+    if require_head:
+        if remote_main != release_commit:
+            raise ValueError("远端 main 未绑定记录的发布提交。")
+    elif run(
+        "git", "merge-base", "--is-ancestor", release_commit, remote_main, check=False
+    ).returncode:
+        raise ValueError("远端 main 不是记录发布提交的后代。")
     remote_dev = refs.get("refs/heads/dev")
     if not remote_dev or run("git", "merge-base", "--is-ancestor", release_commit, remote_dev, check=False).returncode:
         raise ValueError("远端 dev 尚未可达 main 发布提交。")
