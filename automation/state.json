@@ -2,36 +2,7 @@
   "schema_version": 1,
   "workflow_id": "alert-management-rebuild",
   "current_stage": "M15",
-  "active_run": {
-    "stage": "M15",
-    "base_commit": "1e0e755d086860d03c8a65bd3c418e873442b628",
-    "requirements": [
-      "PRD-012",
-      "PRD-040"
-    ],
-    "allowed_paths": [
-      "automation/README.md",
-      "automation/workflow.json",
-      "automation/state.json",
-      "docs/planning/M15-product-workspace.md",
-      "docs/verification/evidence/M15.md",
-      "src/frontend/"
-    ],
-    "checks": [
-      "实现提交 3b8706fa：npm --prefix src/frontend run lint 通过",
-      "实现提交 3b8706fa：npm --prefix src/frontend test -- --run 通过（5 个文件、40 项测试）",
-      "实现提交 3b8706fa：npm --prefix src/frontend run build 通过",
-      "实现提交 3b8706fa：python scripts/validate_automation.py 通过",
-      "实现提交 3b8706fa：python scripts/validate_repository.py 通过"
-    ],
-    "failures": [
-      "首次全量前端回归有 17 项旧断言仍假定单页同时可见或查找已删除的演示叙事；更新为页签切换、正式叙事和自动展开管理页断言后通过。",
-      "新增页签可见性断言首次早于异步身份初始化执行；改为等待工作区挂载后再核验。"
-    ],
-    "decision": "以不改变后端契约的最小前端增量完成页签化、叙事集中、趋势图和工业化视觉改造；本地门槛已通过，按要求不推送触发 CI。",
-    "next_action": "由项目负责人查看实际浏览器视觉；确认后再推送分支并进入合入流程。",
-    "resume_status": null
-  },
+  "active_run": null,
   "completed_run": {
     "stage": "M14",
     "base_commit": "8b9b4e55691c2458b0f8dabd10588a0306d3b3c2",
@@ -316,15 +287,15 @@
       "note": "固定候选 53b8ff3 经项目负责人确认后，仅发生允许的文档与发布治理变化；PR #17 合入 main，发布提交 7f1df6e 的主线及 annotated v1.0.0 标签五条远端流水线均成功，GitHub Release 已发布。"
     },
     "M15": {
-      "status": "review",
+      "status": "passed",
       "attempt": 1,
       "evidence_files": [
         "docs/verification/evidence/M15.md"
       ],
-      "checkpoint_commit": null,
-      "remote_verified": false,
-      "next_action": "本地实现与门槛已完成；待项目负责人浏览器视觉确认后再推送并进入远端验收。",
-      "note": "实现提交 3b8706fa 完成本阶段范围，5 个前端测试文件共 40 项测试、lint、生产构建及仓库契约均通过；按项目负责人要求未推送、未触发 CI。"
+      "checkpoint_commit": "b5d22118079a7693c8fababef8a6629f59995abd",
+      "remote_verified": true,
+      "next_action": "无；M15 已通过，后续产品增量按新阶段重新进入开发与验收流程。",
+      "note": "产品工作台、正式叙事、工业化视觉和大数据趋势呈现已通过本机门槛、Windows 双目录业务终验及 dev 精确检查点的仓库、M1、Windows 三条适用远端流水线。"
     }
   }
 }
