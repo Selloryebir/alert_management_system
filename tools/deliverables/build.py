@@ -104,10 +104,13 @@ def _load_config() -> Config:
     )
 
 
-def _check_fact_file(path: Path, expected_hash: str, label: str) -> None:
+def _check_fact_file(path: Path, expected_hash: str, label: str, *, normalize_newlines: bool = False) -> None:
     if path.is_symlink() or not path.is_file():
         raise BuildError(f"缺少或拒绝符号链接形式的{label}：{path.relative_to(REPO_ROOT)}")
-    actual = _sha256(path.read_bytes())
+    data = path.read_bytes()
+    if normalize_newlines:
+        data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    actual = _sha256(data)
     if actual != expected_hash:
         raise BuildError(f"{label}哈希不一致：期望 {expected_hash}，实际 {actual}")
 
@@ -264,7 +267,7 @@ def main() -> int:
     try:
         config = _load_config()
         _check_fact_file(config.font_path, config.font_sha256, "中文字体")
-        _check_fact_file(config.license_path, config.license_sha256, "字体许可证")
+        _check_fact_file(config.license_path, config.license_sha256, "字体许可证", normalize_newlines=True)
         if args.check:
             _check_mode(config)
             print("PASS: 十份 Markdown 与 DOCX/PDF 交付物一致、结构安全且生成确定")

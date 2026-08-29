@@ -28,18 +28,18 @@
     },
     {
       "source": "docs/guides/windows-deployment-operations.md",
-      "source_sha256": "b896a2758d278fbeae9ac4924d0b106a8f4e604a556b6fb105dfdc3f7d2da988",
+      "source_sha256": "69be92c4150880243c15cab30d24998fed1f31ab5176ce1aeb853b33e47067a4",
       "title": "报警管理系统 Windows 部署与运维手册",
       "outputs": {
         "docx": {
           "path": "deliverables/windows-deployment-operations.docx",
-          "sha256": "b53a8f963699458e08ad599e0717ce4bab15e8a969e5094fb6cb3e639f83234c",
-          "size": 924684
+          "sha256": "4677e00f57bd759a9550aabef8f73e9bb1c466f3b6891a66a6fa5014fa91225c",
+          "size": 931429
         },
         "pdf": {
           "path": "deliverables/windows-deployment-operations.pdf",
-          "sha256": "b17f5ab08cf7571b942d7526cf5bbf372a5e91fe5462d27d9127b51bf3077ded",
-          "size": 284934
+          "sha256": "b6ef1c74c6595b3c7e3dd391715f3e20c83bc744011c3bc2bfcced6bc9ffc550",
+          "size": 297880
         }
       }
     },
