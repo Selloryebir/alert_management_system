@@ -28,7 +28,7 @@ fi
 bundle=$(curl --noproxy '*' --fail --silent --show-error \
   "http://127.0.0.1:8080$asset_path")
 grep -Fq "报警管理系统" <<<"$bundle"
-grep -Fq "仅使用合成数据" <<<"$bundle"
+grep -Fq "趋势洞察" <<<"$bundle"
 
 migration_table=$(docker_run exec "$POSTGRES_CONTAINER" psql \
   --username alert_management --dbname alert_management --tuples-only --no-align \
