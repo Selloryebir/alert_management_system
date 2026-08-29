@@ -280,8 +280,8 @@ async function resetDemo(page: Page, injectFailure: boolean): Promise<ResetRespo
   expect(reset.business_state).toBe("EMPTY");
   expect(reset.completed_at).toBeTruthy();
   expect(Object.keys(reset.deleted_counts).length).toBeGreaterThan(0);
-  await expect(page.getByTestId("reset-message")).toContainText("已复位");
-  await expect(page.getByTestId("empty-state").first()).toBeVisible();
+  await expect(page.getByTestId("reset-message")).toContainText("已重置");
+  await expect(page.getByText("暂无已加载的分析结果。请前往“分析任务”选择批次并完成或加载分析。", { exact: true })).toBeVisible();
   const audit = await responseJson<AuditPage>(await page.request.get("/api/v1/audit-events?page=0&size=1"));
   expect(audit.total).toBe(1);
   expect(audit.items).toHaveLength(1);
