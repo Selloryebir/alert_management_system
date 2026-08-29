@@ -62,7 +62,7 @@ afterEach(() => {
 });
 
 describe("M1 状态页", () => {
-  it("显示 Demo 身份、合成数据标识和三个健康组件", async () => {
+  it("显示产品价值叙事、独立状态页和三个健康组件", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -84,7 +84,9 @@ describe("M1 状态页", () => {
     expect(
       screen.getByRole("heading", { name: "报警管理系统" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("仅使用合成数据")).toBeInTheDocument();
+    expect(screen.getByText(/识别高频、重复、抖动、短时与持续报警模式/)).toBeInTheDocument();
+    expect(screen.queryByText("仅使用合成数据")).not.toBeInTheDocument();
+    await fireEvent.click(await screen.findByTestId("workspace-tab-status"));
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "所有基础服务正常" })).toBeInTheDocument();
@@ -103,6 +105,7 @@ describe("M1 状态页", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
 
     render(App);
+    await fireEvent.click(await screen.findByTestId("workspace-tab-status"));
 
     expect(
       await screen.findByText(
@@ -129,6 +132,7 @@ describe("M1 状态页", () => {
     );
 
     render(App);
+    await fireEvent.click(await screen.findByTestId("workspace-tab-status"));
 
     await waitFor(() => {
       expect(
@@ -196,6 +200,7 @@ describe("M2 导入向导", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(App);
+    await fireEvent.click(await screen.findByTestId("workspace-tab-import"));
     await waitFor(() => expect(screen.getByLabelText("报警文件")).toBeEnabled());
     const fileInput = screen.getByLabelText("报警文件");
     await fireEvent.change(fileInput, {
@@ -248,6 +253,7 @@ describe("M2 导入向导", () => {
     );
 
     render(App);
+    await fireEvent.click(await screen.findByTestId("workspace-tab-import"));
     await waitFor(() => expect(screen.getByLabelText("报警文件")).toBeEnabled());
     const fileInput = screen.getByLabelText("报警文件");
     await fireEvent.change(
@@ -447,19 +453,24 @@ describe("M4 浏览器业务闭环", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(App);
+    await fireEvent.click(await screen.findByTestId("workspace-tab-import"));
     await waitFor(() => expect(screen.getByTestId("file-input")).toBeEnabled());
     await fireEvent.change(screen.getByTestId("file-input"), {
       target: { files: [new File(["synthetic"], "synthetic_smoke.csv", { type: "text/csv" })] },
     });
     await fireEvent.click(screen.getByTestId("preview-button"));
     await fireEvent.click(await screen.findByTestId("confirm-import"));
+    await fireEvent.click(screen.getByTestId("workspace-tab-analysis"));
     await fireEvent.click(await screen.findByTestId("start-analysis"));
 
     expect(await screen.findByTestId("dashboard-total")).toHaveTextContent("300");
+    expect(document.querySelector(".trend-line")).toBeInTheDocument();
+    expect(document.querySelector(".trend-point")).not.toBeInTheDocument();
     expect(screen.getByTestId("dashboard-chains")).toHaveTextContent("12");
     expect(screen.getByTestId("dashboard-noise-DUPLICATE")).toHaveTextContent("30");
     expect(screen.getByTestId("dashboard-cause-EQUIPMENT_FAULT")).toHaveTextContent("30");
 
+    await fireEvent.click(screen.getByTestId("workspace-tab-alarms"));
     await fireEvent.update(screen.getByTestId("filter-cause"), "EQUIPMENT_FAULT");
     await fireEvent.click(screen.getByRole("button", { name: "应用筛选" }));
     await waitFor(() => {
@@ -473,7 +484,7 @@ describe("M4 浏览器业务闭环", () => {
     expect(await screen.findByTestId("alarm-detail")).toHaveTextContent(alarmItem.tag);
     expect(screen.getByTestId("detail-source-row")).toHaveTextContent("222");
     expect(screen.getByTestId("detail-evidence")).toHaveTextContent("关联事件链规则");
-    expect(screen.getByTestId("detail-event-chains")).toHaveTextContent("关联建议，不代表已确认根因");
+    expect(screen.getByTestId("detail-event-chains")).toHaveTextContent("支持快速定位重点链路");
 
     expect(screen.getByTestId("classification-original")).toHaveTextContent("一般报警 / 标准报警 / 设备故障");
     await fireEvent.update(screen.getByTestId("classification-noise"), "CHATTER");
@@ -511,9 +522,10 @@ describe("M4 浏览器业务闭环", () => {
     expect(screen.getByTestId("disposition-history")).toHaveTextContent("待处理 → 处理中");
     expect(screen.getByTestId("disposition-history")).toHaveTextContent("处理中 → 已关闭");
 
-    await fireEvent.update(screen.getByTestId("reset-confirmation"), "RESET_DEMO");
+    await fireEvent.click(screen.getByTestId("workspace-tab-reports"));
+    await fireEvent.update(screen.getByTestId("reset-confirmation"), "RESET_DATA");
     await fireEvent.click(screen.getByTestId("reset-button"));
-    expect(await screen.findByTestId("reset-message")).toHaveTextContent("演示数据已复位");
+    expect(await screen.findByTestId("reset-message")).toHaveTextContent("业务数据已重置");
     expect(screen.queryByTestId("dashboard-total")).not.toBeInTheDocument();
     expect(screen.queryByTestId("preview-summary")).not.toBeInTheDocument();
     expect(await screen.findByTestId("empty-state")).toHaveTextContent("尚无可分析批次");
@@ -593,7 +605,9 @@ describe("M4 浏览器业务闭环", () => {
 
     render(App);
     expect(await screen.findByTestId("empty-state")).toHaveTextContent("尚无可分析批次");
+    await fireEvent.click(screen.getByTestId("workspace-tab-import"));
     await fireEvent.click(screen.getByRole("button", { name: "刷新批次" }));
+    await fireEvent.click(screen.getByTestId("workspace-tab-analysis"));
     await fireEvent.click(await screen.findByRole("button", { name: "分析此历史批次" }));
 
     expect(await screen.findByTestId("service-error")).toHaveTextContent("算法服务不可用");
@@ -636,7 +650,9 @@ describe("M4 浏览器业务闭环", () => {
     );
 
     render(App);
+    await fireEvent.click(await screen.findByTestId("workspace-tab-import"));
     await fireEvent.click(await screen.findByRole("button", { name: "刷新批次" }));
+    await fireEvent.click(screen.getByTestId("workspace-tab-analysis"));
     await fireEvent.click(await screen.findByRole("button", { name: "查看分析" }));
 
     expect(await screen.findByTestId("dashboard-total")).toHaveTextContent("0");
@@ -652,10 +668,10 @@ describe("M5 报告、审计与演示复位", () => {
     render(ReviewOperations, { props: { projectId: "project-1", canManage: true, systemAdmin: true } });
 
     expect(screen.getByText(/操作身份取自当前登录账号/)).toBeInTheDocument();
-    await fireEvent.update(screen.getByTestId("reset-confirmation"), "reset_demo");
+    await fireEvent.update(screen.getByTestId("reset-confirmation"), "reset_data");
     await fireEvent.click(screen.getByTestId("reset-button"));
 
-    expect(screen.getByTestId("reset-message")).toHaveTextContent("精确确认值 RESET_DEMO");
+    expect(screen.getByTestId("reset-message")).toHaveTextContent("精确确认值 RESET_DATA");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -759,7 +775,7 @@ describe("M5 报告、审计与演示复位", () => {
     vi.stubGlobal("fetch", fetchMock);
     const view = render(ReviewOperations, { props: { runId: "run-1", projectId: "project-1", canManage: true, systemAdmin: true } });
 
-    await fireEvent.update(screen.getByTestId("reset-confirmation"), "RESET_DEMO");
+    await fireEvent.update(screen.getByTestId("reset-confirmation"), "RESET_DATA");
     await fireEvent.click(screen.getByTestId("reset-button"));
     expect(await screen.findByTestId("reset-message")).toHaveTextContent("存在进行中的分析");
     expect(screen.getByTestId("report-pdf")).toBeEnabled();
@@ -767,7 +783,7 @@ describe("M5 报告、审计与演示复位", () => {
 
     await fireEvent.click(screen.getByTestId("reset-button"));
     await waitFor(() => expect(view.emitted().demoReset).toHaveLength(1));
-    expect(screen.getByTestId("reset-message")).toHaveTextContent("演示数据已复位");
+    expect(screen.getByTestId("reset-message")).toHaveTextContent("业务数据已重置");
     expect(fetchMock).toHaveBeenLastCalledWith("/api/v1/demo/reset", expect.objectContaining({
       body: JSON.stringify({ confirmation: "RESET_DEMO" }),
     }));

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 
 import type { CurrentUser } from "./auth";
 import { fetchDataBackupStatus, type DataBackupStatus } from "./dataBackup";
@@ -76,15 +76,11 @@ async function loadStatus() {
   }
 }
 
-function handleToggle(event: Event) {
-  const details = event.currentTarget as HTMLDetailsElement;
-  if (details.open && !status.value) void loadStatus();
-}
+onMounted(() => void loadStatus());
 </script>
 
 <template>
-  <details v-if="systemAdmin" class="data-backup-panel" @toggle="handleToggle">
-    <summary><strong>数据与备份</strong></summary>
+  <section v-if="systemAdmin" class="data-backup-panel" aria-label="数据与备份">
     <div class="panel-heading compact-heading">
       <div><p class="eyebrow">系统管理</p><h2>数据容量与恢复点</h2></div>
       <button type="button" class="secondary-button" :disabled="loading" @click="loadStatus">
@@ -153,5 +149,5 @@ function handleToggle(event: Event) {
       </dl>
     </section>
     <p v-else-if="status" class="empty-copy">当前环境的备份与恢复由部署管理员按对应部署说明管理。</p>
-  </details>
+  </section>
 </template>

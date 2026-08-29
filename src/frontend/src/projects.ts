@@ -27,6 +27,23 @@ export interface Project {
   updated_at: string;
 }
 
+export function projectDisplayName(project: Pick<Project, "code" | "name">): string {
+  return project.code === "DEFAULT-DEMO" ? "默认分析项目" : project.name;
+}
+
+export function projectDisplayCode(project: Pick<Project, "code">): string {
+  return project.code === "DEFAULT-DEMO" ? "DEFAULT" : project.code;
+}
+
+export function projectDisplayContext(
+  project: Pick<Project, "code" | "client_name" | "site" | "unit_name">,
+): { client: string; site: string; unit: string } {
+  if (project.code !== "DEFAULT-DEMO") {
+    return { client: project.client_name, site: project.site, unit: project.unit_name };
+  }
+  return { client: "初始客户", site: "初始厂区", unit: "初始装置" };
+}
+
 export interface ProjectInput {
   code: string;
   name: string;

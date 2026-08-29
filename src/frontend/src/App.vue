@@ -13,7 +13,9 @@ import { ApiError, setUnauthorizedHandler } from "./api";
 import { createUnknownHealth, fetchHealth, type HealthView } from "./health";
 import { fieldLabel, priorityLabel, zh } from "./labels";
 import { confirmImport, listImports, previewImport, type ImportBatch, type ImportCorrections } from "./imports";
-import type { Project } from "./projects";
+import { projectDisplayName, type Project } from "./projects";
+
+type WorkspaceTab = "dashboard" | "import" | "analysis" | "alarms" | "reports" | "projects" | "permissions" | "backup" | "status";
 
 const TARGET_FIELDS = [
   ["event_time", true], ["return_time", false], ["ack_time", false], ["site", true],
@@ -52,6 +54,7 @@ const importErrorDialog = ref<HTMLDialogElement>();
 const previewButton = ref<HTMLButtonElement>();
 const correctionTitle = ref<HTMLElement>();
 const showImportErrors = ref(false);
+const activeWorkspace = ref<WorkspaceTab>("dashboard");
 
 const healthSummary = computed(() => {
   const statuses = Object.values(health.value).map((item) => item.status);
@@ -65,6 +68,22 @@ const systemAdmin = computed(() => authenticatedUser.value?.global_role === "SYS
 const canManageProject = computed(() => Boolean(systemAdmin.value || currentProject.value?.project_role === "MANAGER"));
 const canOperateProject = computed(() => Boolean(canManageProject.value || currentProject.value?.project_role === "ANALYST"));
 const projectWritable = computed(() => currentProject.value?.status === "ACTIVE" && canOperateProject.value);
+const currentProjectName = computed(() => currentProject.value ? projectDisplayName(currentProject.value) : "尚未选择项目");
+const workspaceTabs = computed(() => [
+  { id: "dashboard" as const, label: "Dashboard" },
+  { id: "import" as const, label: "数据导入" },
+  { id: "analysis" as const, label: "分析任务" },
+  { id: "alarms" as const, label: "报警处置" },
+  { id: "reports" as const, label: "报告审计" },
+  { id: "projects" as const, label: "项目管理" },
+  ...(systemAdmin.value || canManageProject.value ? [{ id: "permissions" as const, label: "权限管理" }] : []),
+  ...(systemAdmin.value ? [{ id: "backup" as const, label: "备份恢复" }] : []),
+  { id: "status" as const, label: "运行状态" },
+]);
+const businessSection = computed(() => {
+  if (["analysis", "alarms", "reports"].includes(activeWorkspace.value)) return activeWorkspace.value as "analysis" | "alarms" | "reports";
+  return "dashboard";
+});
 const mappingHeaders = computed(() => currentBatch.value?.headers ?? []);
 const correctableErrors = computed(() => {
   const fields = new Set<string>(TARGET_FIELDS.map(([field]) => field));
@@ -80,7 +99,7 @@ const correctableErrors = computed(() => {
 });
 const onboarding = computed(() => [
   { title: "创建或选择项目", done: Boolean(currentProject.value), hint: "先确定本次工作归属。" },
-  { title: "选择报警样例文件", done: Boolean(selectedFile.value), hint: "支持 CSV、TXT 和 XLSX。" },
+  { title: "选择报警数据文件", done: Boolean(selectedFile.value), hint: "支持 CSV、TXT 和 XLSX。" },
   { title: "完成字段映射与预览", done: Boolean(currentBatch.value), hint: "用中文下拉框核对源表头。" },
   { title: "确认导入", done: Boolean(currentBatch.value && ["IMPORTED", "ANALYZING", "COMPLETED", "FAILED"].includes(currentBatch.value.status)), hint: "整批校验通过后再落库。" },
   { title: "完成分析并查看看板", done: analysisCompleted.value, hint: "分析结果来自当前项目。" },
@@ -246,6 +265,7 @@ async function handleManualChanged() {
 
 function handleAnalysisCompleted() {
   analysisCompleted.value = true;
+  activeWorkspace.value = "dashboard";
   void projectWorkspace.value?.refreshOverview();
 }
 
@@ -257,7 +277,8 @@ function handleDispositionCompleted() {
 async function handleDemoReset() {
   resetProjectBusinessState();
   await projectWorkspace.value?.resetAfterDemoReset();
-  demoResetMessage.value = "演示数据已复位，已重新加载默认项目。";
+  demoResetMessage.value = "业务数据已重置，已重新加载初始项目。";
+  activeWorkspace.value = "dashboard";
 }
 
 function handleUnauthorized() {
@@ -309,9 +330,9 @@ onBeforeUnmount(() => setUnauthorizedHandler(undefined));
 <template>
   <main class="page-shell">
     <header class="identity" aria-labelledby="page-title">
-      <p class="eyebrow">工业报警分析与处置</p><h1 id="page-title">报警管理系统</h1>
-      <p class="synthetic-notice">仅使用合成数据</p>
-      <p class="identity-copy">以项目为工作边界，完成文件导入、规则分析、统计查看、人工处置和报告输出。算法结果是可解释的分析建议，不代表已确认工业根因。</p>
+      <div><p class="eyebrow">Industrial Alarm Intelligence</p><h1 id="page-title">报警管理系统</h1></div>
+      <p class="identity-copy">汇聚报警数据，识别高频、重复、抖动、短时与持续报警模式，呈现趋势和关联链路，推动分析、处置与报告协同闭环。</p>
+      <p class="capability-strip" aria-label="核心能力">趋势洞察 <span>·</span> 关联分析 <span>·</span> 处置协同 <span>·</span> 审计追溯</p>
     </header>
 
     <p v-if="authLoading" class="import-message" role="status">正在初始化安全会话…</p>
@@ -319,14 +340,18 @@ onBeforeUnmount(() => setUnauthorizedHandler(undefined));
     <template v-else>
     <AccountPanel :user="authenticatedUser" @changed="handleAuthenticated" @logged-out="handleLoggedOut" />
     <template v-if="!authenticatedUser.must_change_password">
-    <nav class="workspace-nav" aria-label="业务区快捷导航"><a href="#project-workspace">项目</a><a href="#import-workspace">导入</a><a href="#business-workflow">分析与处置</a></nav>
-    <ProjectWorkspace ref="projectWorkspace" :system-admin="systemAdmin" @selected="handleProjectSelected" />
-    <AccessManagement :user="authenticatedUser" :project="currentProject" />
-    <DataBackupPanel v-if="systemAdmin" :user="authenticatedUser" />
+    <nav class="workspace-nav" role="tablist" aria-label="产品工作区">
+      <button v-for="tab in workspaceTabs" :key="tab.id" type="button" role="tab" aria-controls="workspace-content" :aria-selected="activeWorkspace === tab.id" :class="{ active: activeWorkspace === tab.id }" :data-testid="`workspace-tab-${tab.id}`" @click="activeWorkspace = tab.id">{{ tab.label }}</button>
+    </nav>
+    <div class="workspace-context" aria-live="polite"><span>当前项目</span><strong>{{ currentProjectName }}</strong><i aria-hidden="true"></i><span>系统</span><strong>{{ healthSummary }}</strong></div>
+    <div id="workspace-content" role="tabpanel" aria-label="当前工作区内容" tabindex="0">
+    <ProjectWorkspace v-show="activeWorkspace === 'projects'" ref="projectWorkspace" :system-admin="systemAdmin" @selected="handleProjectSelected" />
+    <AccessManagement v-if="activeWorkspace === 'permissions'" :user="authenticatedUser" :project="currentProject" />
+    <DataBackupPanel v-if="activeWorkspace === 'backup' && systemAdmin" :user="authenticatedUser" />
     <p v-if="demoResetMessage" class="import-message" role="status" data-testid="reset-message">{{ demoResetMessage }}</p>
 
-    <nav class="onboarding-panel" aria-labelledby="onboarding-title">
-      <div><p class="eyebrow">首次使用</p><h2 id="onboarding-title">六步完成一次业务闭环</h2></div>
+    <nav v-show="activeWorkspace === 'dashboard'" class="onboarding-panel" aria-labelledby="onboarding-title">
+      <div><p class="eyebrow">工作进度</p><h2 id="onboarding-title">业务闭环导航</h2></div>
       <ol class="onboarding-steps">
         <li v-for="(step, index) in onboarding" :key="step.title" :data-testid="`onboarding-step-${index + 1}`" :class="{ done: step.done }">
           <span>{{ step.done ? "✓" : index + 1 }}</span><div><strong>{{ step.title }}</strong><small>{{ step.done ? "已完成" : step.hint }}</small></div>
@@ -334,19 +359,18 @@ onBeforeUnmount(() => setUnauthorizedHandler(undefined));
       </ol>
     </nav>
 
-    <details class="status-panel">
-      <summary><strong>系统运行状态：</strong>{{ healthSummary }}</summary>
-      <div class="panel-heading"><div><p class="eyebrow">运行状态</p><h2>{{ healthSummary }}</h2></div><button type="button" :disabled="loading" @click="loadHealth">{{ loading ? "检查中…" : "重新检查" }}</button></div>
+    <section v-show="activeWorkspace === 'status'" class="status-panel" aria-labelledby="status-title">
+      <div class="panel-heading"><div><p class="eyebrow">运行状态</p><h2 id="status-title">{{ healthSummary }}</h2></div><button type="button" :disabled="loading" @click="loadHealth">{{ loading ? "检查中…" : "重新检查" }}</button></div>
       <p v-if="requestFailed" class="request-error" role="alert">无法访问主系统健康接口。请确认主系统已启动，然后点击“重新检查”。</p>
       <div class="status-grid" aria-live="polite">
         <article v-for="[key, label, hint] in healthItems" :key="key" class="status-card"><div class="status-line"><h3>{{ label }}</h3><span class="status-badge" :class="`status-${health[key].status.toLowerCase()}`" :aria-label="`${label}状态 ${zh(health[key].status)}`">{{ zh(health[key].status) }}</span></div><p>{{ healthGuidance(key, hint) }}</p></article>
       </div>
-    </details>
+    </section>
 
-    <section id="import-workspace" class="import-panel" aria-labelledby="import-title">
+    <section v-show="activeWorkspace === 'import'" id="import-workspace" class="import-panel" aria-labelledby="import-title">
       <div class="panel-heading"><div><p class="eyebrow">当前项目数据</p><h2 id="import-title">文件导入与字段映射</h2></div><button type="button" class="secondary-button" :disabled="importBusy || !currentProject" @click="refreshBatches()">刷新批次</button></div>
       <p v-if="!currentProject" class="empty-copy">请先在上方创建或选择项目。</p>
-      <p v-else-if="!projectWritable" class="archive-notice">“{{ currentProject.name }}”处于归档状态，当前仅可查看历史批次。</p>
+      <p v-else-if="!projectWritable" class="archive-notice">“{{ currentProjectName }}”处于归档状态，当前仅可查看历史批次。</p>
       <div class="import-form"><label><span>报警文件</span><input :key="fileInputKey" data-testid="file-input" type="file" accept=".csv,.txt,.xlsx" :disabled="importBusy || !projectWritable" @change="selectFile" /></label><button ref="previewButton" data-testid="preview-button" type="button" :disabled="importBusy || !selectedFile || !projectWritable" @click="previewSelectedFile">{{ importBusy ? "处理中…" : mappingHeaders.length ? "按当前映射重新校验" : "读取表头并预览" }}</button></div>
 
       <section v-if="mappingHeaders.length" class="mapping-editor" data-testid="mapping-editor" aria-labelledby="mapping-title"><h3 id="mapping-title">字段映射</h3><p>左侧是系统目标字段，右侧选择文件中的源表头；可选字段允许留空。</p><div class="mapping-grid"><label v-for="[field, required] in TARGET_FIELDS" :key="field"><span>{{ fieldLabel(field) }}{{ required ? "（必填）" : "（可选）" }}</span><select v-model="fieldMapping[field]" :disabled="importBusy"><option value="">不映射</option><option v-for="header in mappingHeaders" :key="header" :value="header">{{ header }}</option></select></label></div></section>
@@ -382,8 +406,9 @@ onBeforeUnmount(() => setUnauthorizedHandler(undefined));
       <div v-if="recentBatches.length" class="table-wrap recent-batches"><table><caption>当前项目最近导入批次</caption><thead><tr><th>文件</th><th>格式</th><th>状态</th><th>总行数</th><th>创建时间</th></tr></thead><tbody><tr v-for="batch in recentBatches" :key="batch.batch_id"><td>{{ batch.file_name }}</td><td>{{ zh(batch.format) }}</td><td>{{ zh(batch.status) }}</td><td>{{ batch.total_rows }}</td><td>{{ batch.created_at }}</td></tr></tbody></table></div>
     </section>
 
-    <ManualAlarmPanel v-if="currentProject" :project-id="currentProject.project_id" :site="currentProject.site" :area="currentProject.unit_name" :read-only="!projectWritable" @changed="handleManualChanged" />
-    <BusinessWorkflow v-if="currentProject" :key="currentProject.project_id" :current-batch="currentBatch" :batches="recentBatches" :project-id="currentProject.project_id" :read-only="currentProject.status !== 'ACTIVE'" :can-operate="canOperateProject" :can-manage="canManageProject" :system-admin="systemAdmin" @analysis-completed="handleAnalysisCompleted" @disposition-completed="handleDispositionCompleted" @report-downloaded="reportDownloaded = true" @demo-reset="handleDemoReset" />
+    <ManualAlarmPanel v-if="currentProject" v-show="activeWorkspace === 'import'" :project-id="currentProject.project_id" :site="currentProject.site" :area="currentProject.unit_name" :read-only="!projectWritable" @changed="handleManualChanged" />
+    <BusinessWorkflow v-if="currentProject" v-show="['dashboard', 'analysis', 'alarms', 'reports'].includes(activeWorkspace)" :key="currentProject.project_id" :active-section="businessSection" :current-batch="currentBatch" :batches="recentBatches" :project-id="currentProject.project_id" :read-only="currentProject.status !== 'ACTIVE'" :can-operate="canOperateProject" :can-manage="canManageProject" :system-admin="systemAdmin" @analysis-completed="handleAnalysisCompleted" @disposition-completed="handleDispositionCompleted" @report-downloaded="reportDownloaded = true" @demo-reset="handleDemoReset" />
+    </div>
     </template>
     </template>
   </main>
