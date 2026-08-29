@@ -77,7 +77,7 @@ ALLOWED_DISPOSITIONS = {
     "已实现",
     "明确拒绝",
     "外部输入后才可重启",
-    *(f"M{number}" for number in range(8, 15)),
+    *(f"M{number}" for number in range(8, 16)),
 }
 
 
@@ -117,7 +117,7 @@ def validate_source_coverage(errors: list[str]) -> None:
     content = read(relative, errors)
     rows: list[tuple[int, str, str]] = []
     for line in content.splitlines():
-        match = re.match(r"^\| SC-(\d{3}) \|.*?\| (已实现|明确拒绝|外部输入后才可重启|M(?:8|9|10|11|12|13|14)) \|", line)
+        match = re.match(r"^\| SC-(\d{3}) \|.*?\| (已实现|明确拒绝|外部输入后才可重启|M(?:8|9|1[0-5])) \|", line)
         if match:
             rows.append((int(match.group(1)), match.group(2), line))
     expected_ids = list(range(1, 58))
@@ -167,13 +167,13 @@ def validate_workflow(errors: list[str]) -> None:
         errors.append(f"无法读取自动化契约：{exc}")
         return
     stage_ids = [stage.get("id") for stage in workflow.get("stages", [])]
-    if stage_ids != [f"M{number}" for number in range(15)]:
-        errors.append("产品化工作流必须完整定义 M0..M14。")
+    if stage_ids != [f"M{number}" for number in range(16)]:
+        errors.append("产品化工作流必须完整定义 M0..M15。")
     current_stage = state.get("current_stage")
-    productization_stages = {f"M{number}" for number in range(8, 15)}
+    productization_stages = {f"M{number}" for number in range(8, 16)}
     if current_stage not in productization_stages:
-        errors.append("正式产品基线校验仅适用于 M8..M14 产品化阶段。")
-    for number in range(8, 15):
+        errors.append("正式产品基线校验仅适用于 M8..M15 产品化阶段。")
+    for number in range(8, 16):
         stage_id = f"M{number}"
         if stage_id not in state.get("stages", {}):
             errors.append(f"状态文件缺少产品化阶段：{stage_id}")
@@ -194,7 +194,7 @@ def main() -> int:
         for error in errors:
             print(f"- {error}", file=sys.stderr)
         return 1
-    print("正式产品基线校验通过：产品身份、57 项需求能力和 M8–M14 阶段均已闭环。")
+    print("正式产品基线校验通过：产品身份、57 项需求能力和 M8–M15 阶段均已闭环。")
     return 0
 
 
