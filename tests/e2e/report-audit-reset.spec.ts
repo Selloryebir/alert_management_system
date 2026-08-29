@@ -258,7 +258,7 @@ async function assertReportFailureKeepsState(page: Page, runId: string): Promise
 async function resetDemo(page: Page, injectFailure: boolean): Promise<ResetResponse> {
   await openWorkspace(page, "reports");
   await expect(page.getByText("操作身份取自当前登录账号", { exact: true })).toBeVisible();
-  await page.getByTestId("reset-confirmation").fill("RESET_DEMO");
+  await page.getByTestId("reset-confirmation").fill("RESET_DATA");
   if (injectFailure) {
     await injectNextFetchFailure(page, "/api/v1/demo/reset", {
       code: "RESET_FAILED",
@@ -268,7 +268,7 @@ async function resetDemo(page: Page, injectFailure: boolean): Promise<ResetRespo
     await expect(page.getByTestId("reset-message")).toContainText("失败");
     await expect(page.getByTestId("reset-message")).toContainText("重试");
     await expect(page.getByTestId("dashboard-total")).toContainText("300");
-    await page.getByTestId("reset-confirmation").fill("RESET_DEMO");
+    await page.getByTestId("reset-confirmation").fill("RESET_DATA");
   }
 
   const resetPromise = page.waitForResponse(
