@@ -131,8 +131,8 @@ test("真实业务闭环生成桌面与窄屏视觉清单", async ({ page }) => 
   await captureVisualState(page, "12-classification-disposition", page.getByTestId("alarm-detail"));
 
   await openWorkspace(page, "reports");
-  await expect(page.getByRole("heading", { name: "报告、审计与演示数据维护" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "报告与审计", exact: true })).toBeVisible();
   await page.getByTestId("audit-refresh").click();
   await expect(page.getByTestId("audit-table")).toBeVisible();
-  await captureVisualState(page, "13-report-audit-reset", page.getByRole("heading", { name: "报告、审计与演示数据维护" }));
+  await captureVisualState(page, "13-report-audit-reset", page.getByRole("heading", { name: "报告与审计", exact: true }));
 });
